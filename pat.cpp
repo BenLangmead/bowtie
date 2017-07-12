@@ -11,6 +11,32 @@
 using namespace std;
 using namespace seqan;
 
+static void wrongQualityFormat(const String<char>& read_name) {
+	cerr << "Encountered a space parsing the quality string for read " << read_name << endl
+	<< "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
+	<< "re-run Bowtie with the --integer-quals option." << endl;
+	throw 1;
+}
+
+static void tooFewQualities(const String<char>& read_name) {
+	cerr << "Too few quality values for read: " << read_name << endl
+	<< "\tare you sure this is a FASTQ-int file?" << endl;
+	throw 1;
+}
+
+static void tooManyQualities(const String<char>& read_name) {
+	cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+	<< "Please truncate reads and quality values and and re-run Bowtie" << endl;
+	throw 1;
+}
+
+static void tooManySeqChars(const String<char>& read_name) {
+	cerr << "Reads file contained a pattern with more than 1024 sequence characters." << endl
+	<< "Please truncate reads and quality values and and re-run Bowtie." << endl
+	<< "Offending read: " << read_name << endl;
+	throw 1;
+}
+
 /**
  * Calculate a per-read random seed based on a combination of
  * the read data (incl. sequence, name, quals) and the global
@@ -100,6 +126,8 @@ pair<bool, bool> PatternSourcePerThread::nextReadPair() {
 		}
 		last_batch_ = res.first;
 		last_batch_size_ = res.second;
+		assert(res.second == 0 || !buf_.bufa_[0].readOrigBuf.empty());
+		assert(res.second < 1 || blockReads_ || !buf_.bufa_[res.second-1].readOrigBuf.empty());
 		assert_eq(0, buf_.cur_buf_);
 	} else {
 		buf_.next(); // advance cursor
@@ -124,7 +152,7 @@ pair<bool, bool> PatternSourcePerThread::nextReadPair() {
 		return make_pair(false, this_is_last ? last_batch_ : false);
 	}
 	// Parse read/pair
-	//assert(strlen(buf_.read_a().readOrigBuf) != 0);
+	assert(blockReads_ || !buf_.read_a().readOrigBuf.empty());
 	assert(buf_.read_a().empty());
 	if(!parse(buf_.read_a(), buf_.read_b())) {
 		return make_pair(false, false);
@@ -991,9 +1019,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 					if (newlines == 4) {
 						newlines = 0;
 					}
-					else {
-						aborted = true; // Unexpected EOF
-					}
+					aborted = true; // EOF before any evidence of record
 					break;
 				}
 				buf.append(c);
@@ -1002,6 +1028,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 		if(aborted) {
 			readi--;
 		}
+		assert(readi == 0 || !readBuf[readi-1].readOrigBuf.empty());
 		return make_pair(done, readi);
 	}
 }
@@ -1483,30 +1510,4 @@ bool RawPatternSource::parse(
 		return parse(rb, r, curb, cura, rdid);
 	}
 	return true;
-}
-
-void wrongQualityFormat(const String<char>& read_name) {
-	cerr << "Encountered a space parsing the quality string for read " << read_name << endl
-	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
-	     << "re-run Bowtie with the --integer-quals option." << endl;
-	throw 1;
-}
-
-void tooFewQualities(const String<char>& read_name) {
-	cerr << "Too few quality values for read: " << read_name << endl
-		 << "\tare you sure this is a FASTQ-int file?" << endl;
-	throw 1;
-}
-
-void tooManyQualities(const String<char>& read_name) {
-	cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-		 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
-	throw 1;
-}
-
-void tooManySeqChars(const String<char>& read_name) {
-	cerr << "Reads file contained a pattern with more than 1024 sequence characters." << endl
-		 << "Please truncate reads and quality values and and re-run Bowtie." << endl
-		 << "Offending read: " << read_name << endl;
-	throw 1;
 }

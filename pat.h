@@ -136,7 +136,9 @@ struct PerThreadReadBuf {
 		cur_buf_ = max_buf_;
 		for(size_t i = 0; i < max_buf_; i++) {
 			bufa_[i].reset();
+			assert(bufa_[i].empty());
 			bufb_[i].reset();
+			assert(bufb_[i].empty());
 		}
 		rdid_ = std::numeric_limits<TReadId>::max();
 	}
@@ -303,11 +305,6 @@ protected:
 	int trim3_;
 	int trim5_;
 };
-
-extern void wrongQualityFormat(const String<char>& read_name);
-extern void tooFewQualities(const String<char>& read_name);
-extern void tooManyQualities(const String<char>& read_name);
-extern void tooManySeqChars(const String<char>& read_name);
 
 /**
  * Encapsulates a source of patterns which is an in-memory vector.
@@ -1110,6 +1107,7 @@ private:
 			curb_.buf = &rb.readOrigBuf;
 			cura_.off = curb_.off = 0;
 		}
+		assert(!cura_.buf->empty());
 		return composer_.parse(ra, rb, cura_, curb_, buf_.rdid());
 	}
 

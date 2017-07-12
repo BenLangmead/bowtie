@@ -62,6 +62,8 @@ struct Read {
 		RESET_BUF(patRcRev, patBufRcRev, Dna5);
 		RESET_BUF(qualRev, qualBufRev, char);
 		RESET_BUF(name, nameBuf, char);
+		readOrigBuf.clear();
+		qualOrigBuf.clear();
 	}
 
 	void clearAll() {
@@ -78,6 +80,8 @@ struct Read {
 		primer = '?';
 		trimc = '?';
 		seed = 0;
+		readOrigBuf.clear();
+		qualOrigBuf.clear();
 	}
 
 	/// Return true iff the read (pair) is empty
