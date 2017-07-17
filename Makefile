@@ -11,6 +11,7 @@ INC = $(SEQAN_INC) -I third_party
 CPP = g++ -w
 CXX = $(CPP)
 CC = gcc
+LIBS = $(LDFLAGS) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -73,6 +74,11 @@ PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
 
+#if we're not using TBB, then we can't use queuing locks
+ifeq (1,$(NO_TBB))
+	NO_QUEUELOCK=1
+endif
+
 ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
 	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
@@ -84,11 +90,16 @@ ifeq (1,$(NO_SPINLOCK))
 	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
-ifeq (1,$(WITH_TBB))
-	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+ifneq (1,$(NO_TBB))
+	LIBS += $(PTHREAD_LIB) -ltbb
+	ifeq (1, $(RELEASE_BIN))
+		LIBS += -ltbbmalloc
+	else
+		LIBS += -ltbbmalloc_proxy
+	endif
 	override EXTRA_FLAGS += -DWITH_TBB
 else
-	LIBS = $(PTHREAD_LIB)
+	LIBS += $(PTHREAD_LIB)
 endif
 
 POPCNT_CAPABILITY ?= 1
@@ -134,7 +145,7 @@ ifeq (1,$(WITH_COHORTLOCK))
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
 
-ifneq (1,$(WITH_TBB))
+ifeq (1,$(NO_TBB))
 	OTHER_CPPS += tinythread.cpp
 endif
 
@@ -425,7 +436,7 @@ install: all
 	done
 
 .PHONY: simple-test
-simple-test: all perl-deps
+simple-test: allall perl-deps
 	eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
 	./scripts/test/simple_tests.pl --bowtie=./bowtie --bowtie-build=./bowtie-build
 
@@ -441,7 +452,7 @@ perl-deps:
 		mkdir .perllib.tmp ; \
 		$$DL http://cpanmin.us | perl - -l $(CURDIR)/.perllib.tmp App::cpanminus local::lib ; \
 		eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
-		cpanm -f Math::Random Clone Test::Deep ; \
+		cpanm --force Math::Random Clone Test::Deep Sys::Info -n --quiet; \
 	fi
 
 

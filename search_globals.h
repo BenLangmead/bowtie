@@ -20,6 +20,7 @@ extern bool showSeed;
 extern bool quiet;
 extern bool gAllowMateContainment;
 extern bool gReportColorPrimer;
+extern bool noUnal;
 
 extern MUTEX_T gLock;
 

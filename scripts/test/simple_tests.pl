@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 ##
 # Give simple tests with known results to bowtie.
@@ -14,6 +14,8 @@ use Data::Dumper;
 use DNA;
 use Clone qw(clone);
 use Test::Deep;
+use Sys::Info;
+use Sys::Info::Constants qw( :device_cpu );
 
 my $bowtie = "";
 my $bowtie_build = "";
@@ -726,6 +728,13 @@ my @cases = (
 		paired   => 1,
 	  pairhits => [ { "*,*" => 1 } ] },
 
+	{ name     => "Interleaved 1",
+	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  interleaved   => "\@r0/1\nAACGAAAG\n+\nIIIIIIII\n\@r0/2\nCCATCTA\n+\nIIIIIII",
+	  args     => "-v 0",
+	  paired   => 1,
+	  pairhits => [{ "2,16" => 1 }] },
+
 	# Check paired-end exclusions
 
 	{ name     => "Paired-end 1",
@@ -1105,9 +1114,12 @@ sub runbowtie($$$$$$$$$$$$$$$$$$$$$$$) {
 	while(<FA>) { print $_; }
 	close(FA);
 	if($do_build) {
+		my $info = Sys::Info->new;
+		my $cpu = $info->device('CPU');
+		my $nthreads = int(rand($cpu->count || 1)) + 1;
 		my $build_args = "";
 		$build_args .= " -C " if $color;
-		my $cmd = "$bowtie_build $idx_type --quiet --sanity $build_args $fa .simple_tests.tmp";
+		my $cmd = "$bowtie_build $idx_type --threads $nthreads --quiet --sanity $build_args $fa .simple_tests.tmp";
 		print "$cmd\n";
 		system($cmd);
 		($? == 0) || die "Bad exitlevel from bowtie-build: $?";
@@ -1131,6 +1143,9 @@ sub runbowtie($$$$$$$$$$$$$$$$$$$$$$$) {
 		} elsif($read_file_format eq "tabbed") {
 			$formatarg = "--12";
 			$ext = ".tab";
+		} elsif($read_file_format eq "interleaved") {
+			$formatarg = "--interleaved";
+			$ext = ".fq";
 		} elsif($read_file_format eq "cline_reads") {
 			$formatarg = "-c";
 			$readarg = $read_file;
@@ -1254,7 +1269,7 @@ sub matchSamOptionalFlags($$) {
 my $tmpfafn = ".simple_tests.pl.fa";
 my $last_ref = undef;
 foreach my $large_idx (undef,1) {
-	foreach my $debug_mode (undef,1) {
+	foreach my $debug_mode (1,undef) {
 		for (my $ci = 0; $ci < scalar(@cases); $ci++) {
 			my $c = $cases[$ci];
 			last unless defined($c);
@@ -1300,6 +1315,7 @@ foreach my $large_idx (undef,1) {
 					$read_file  = $c->{qseq}    if defined($c->{qseq});
 					$read_file  = $c->{raw}     if defined($c->{raw});
 					$read_file  = $c->{cline_reads} if defined($c->{cline_reads});
+					$read_file  = $c->{interleaved} if defined($c->{interleaved});
 					$read_file  = $c->{cont_fasta_reads} if defined($c->{cont_fasta_reads});
 
 					$mate1_file = $c->{fastq1}  if defined($c->{fastq1});
@@ -1327,6 +1343,7 @@ foreach my $large_idx (undef,1) {
 						$read_file_format = "qseq"   if defined($c->{qseq})   || defined($c->{qseq1});
 						$read_file_format = "raw"    if defined($c->{raw})    || defined($c->{raw1});
 						$read_file_format = "cline_reads" if defined($c->{cline_reads}) || defined($c->{cline_reads1});
+						$read_file_format = "interleaved" if defined($c->{interleaved}) || defined($c->{interleaved1});
 						$read_file_format = "cont_fasta_reads" if defined($c->{cont_fasta_reads}) || defined($c->{cont_fasta_reads1});
 						next unless $fw;
 					}

@@ -149,6 +149,7 @@ static vector<string> qualities2;
 static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
 bool gReportColorPrimer;
+bool noUnal; // don't print unaligned reads
 MUTEX_T gLock;
 
 static void resetOptions() {
@@ -259,6 +260,7 @@ static void resetOptions() {
 	wrapper.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
 	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
+	noUnal					= false; // true -> do not report unaligned reads
 }
 
 // mating constraints
@@ -345,6 +347,8 @@ enum {
 	ARG_WRAPPER,
 	ARG_BLOCK_BYTES,            // --input-block-bytes
 	ARG_READS_PER_BLOCK         // --input-reads-per-block
+	ARG_INTERLEAVED_FASTQ,
+	ARG_SAM_NO_UNAL,
 };
 
 static struct option long_options[] = {
@@ -397,7 +401,6 @@ static struct option long_options[] = {
 	{(char*)"range",        no_argument,       0,            ARG_RANGE},
 	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{(char*)"phased",       no_argument,       0,            'z'},
-	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
 	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
@@ -452,6 +455,8 @@ static struct option long_options[] = {
 	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
 	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
+	{(char*)"interleaved",  required_argument, 0,            ARG_INTERLEAVED_FASTQ},
+	{(char*)"no-unal",      no_argument,       0,            ARG_SAM_NO_UNAL},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -469,7 +474,7 @@ static void printUsage(ostream& out) {
 	}
 
 	out << "Usage: " << endl
-        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]" << endl
+        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]" << endl
         << endl
 	    << "  <m1>    Comma-separated list of files containing upstream mates (or the" << endl
 	    << "          sequences themselves, if -c is set) paired with mates in <m2>" << endl
@@ -477,6 +482,7 @@ static void printUsage(ostream& out) {
 	    << "          sequences themselves if -c is set) paired with mates in <m1>" << endl
 	    << "  <r>     Comma-separated list of files containing Crossbow-style reads.  Can be" << endl
 	    << "          a mixture of paired and unpaired.  Specify \"-\" for stdin." << endl
+	    << "  <i>     Files with interleaved paired-end FASTQ reads." << endl
 	    << "  <s>     Comma-separated list of files containing unpaired reads, or the" << endl
 	    << "          sequences themselves, if -c is set.  Specify \"-\" for stdin." << endl
 	    << "  <hit>   File to write hits to (default: stdout)" << endl
@@ -527,10 +533,10 @@ static void printUsage(ostream& out) {
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
 	    << "  --quiet            print nothing but the alignments" << endl
-	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
+	    << "  --no-unal          suppress SAM records for unaligned reads" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
 	    << "  --suppress <cols>  suppresses given columns (comma-delim'ed) in default output" << endl
 	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
@@ -655,6 +661,7 @@ static void parseOptions(int argc, const char **argv) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
 			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
+			case ARG_INTERLEAVED_FASTQ: tokenize(optarg, ",", mates12); format = INTERLEAVED; break;
 			case 'f': format = FASTA; break;
 			case 'F': {
 				format = FASTA_CONT;
@@ -832,6 +839,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_SAM_NO_QNAME_TRUNC: samNoQnameTrunc = true; break;
 			case ARG_SAM_NOHEAD: samNoHead = true; break;
 			case ARG_SAM_NOSQ: samNoSQ = true; break;
+			case ARG_SAM_NO_UNAL: noUnal = true; break;
 			case ARG_SAM_RG: {
 				if(!rgs.empty()) rgs += '\t';
 				rgs += optarg;
@@ -2619,6 +2627,9 @@ patsrcFromStrings(
 			return new RawPatternSource(reads, pp, patDumpfile);
 		case FASTQ:
 			return new FastqPatternSource(reads,pp, patDumpfile);
+		case INTERLEAVED:
+			// not yet implemented with blocked input
+			throw 1;
 		case TAB_MATE:
 			return new TabbedPatternSource(reads, pp, patDumpfile);
 		case CMDLINE:

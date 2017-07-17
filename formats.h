@@ -12,6 +12,7 @@ enum file_format {
 	FASTA = 1,
 	FASTA_CONT,
 	FASTQ,
+	INTERLEAVED,
 	TAB_MATE,
 	RAW,
 	CMDLINE,

@@ -46,6 +46,7 @@ static bool packed;
 static bool writeRef;
 static bool justRef;
 static int reverseType;
+static int nthreads;
 static string wrapper;
 bool color;
 
@@ -75,6 +76,7 @@ static void resetOptions() {
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
 	reverseType  = REF_READ_REVERSE_EACH;
+	nthreads     = 1;
 	wrapper.clear();
 	color        = false;
 }
@@ -90,6 +92,7 @@ enum {
 	ARG_NTOA,
 	ARG_USAGE,
 	ARG_NEW_REVERSE,
+	ARG_THREADS,
 	ARG_WRAPPER
 };
 
@@ -129,6 +132,7 @@ static void printUsage(ostream& out) {
 	    << "    -3/--justref            just build .3/.4.ebwt (packed reference) portion" << endl
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
 	    << "    -t/--ftabchars <int>    # of chars consumed in initial lookup (default: 10)" << endl
+	    << "    --threads <int>         # of threads" << endl
 	    << "    --ntoa                  convert Ns in reference to As" << endl
 	    //<< "    --big --little          endianness (default: little, this host: "
 	    //<< (currentlyBigEndian()? "big":"little") << ")" << endl
@@ -146,7 +150,7 @@ static void printUsage(ostream& out) {
 				 << "that you run the wrapper script 'bowtie-build' instead."
 				 << endl << endl;
 		}
-
+		
 }
 
 static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
@@ -176,6 +180,7 @@ static struct option long_options[] = {
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)"color",        no_argument,       0,            'C'},
+	{(char*)"threads",      required_argument, 0,            ARG_THREADS},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"new-reverse",  no_argument,       0,            ARG_NEW_REVERSE},
@@ -211,6 +216,7 @@ static int parseNumber(T lower, const char *errmsg) {
 static void parseOptions(int argc, const char **argv) {
 	int option_index = 0;
 	int next_option;
+	bool bmaxDivNSet = false;
 	do {
 		next_option = getopt_long(
 			argc, const_cast<char**>(argv),
@@ -256,6 +262,7 @@ static void parseOptions(int argc, const char **argv) {
 				bmaxDivN = 0xffffffff; // don't use multSqrt
 				break;
 			case ARG_BMAX_DIV:
+				bmaxDivNSet = true;
 				bmaxDivN = parseNumber<uint32_t>(1, "--bmaxdivn arg must be at least 1");
 				bmax = OFF_MASK;         // don't use bmax
 				bmaxMultSqrt = OFF_MASK; // don't use multSqrt
@@ -267,6 +274,9 @@ static void parseOptions(int argc, const char **argv) {
 				seed = parseNumber<int>(0, "--seed arg must be at least 0");
 				break;
 			case ARG_NTOA: nsToAs = true; break;
+	        	case ARG_THREADS:
+			        nthreads = parseNumber<int>(0, "--threads arg must be at least 1");
+		                break;
 			case ARG_NEW_REVERSE: reverseType = REF_READ_REVERSE; break;
 			case 'a': autoMem = false; break;
 			case 'q': verbose = false; break;
@@ -287,6 +297,9 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "Warning: specified bmax is very small (" << bmax << ").  This can lead to" << endl
 		     << "extremely slow performance and memory exhaustion.  Perhaps you meant to specify" << endl
 		     << "a small --bmaxdivn?" << endl;
+	}
+	if (!bmaxDivNSet) {
+		bmaxDivN *= nthreads;
 	}
 }
 
@@ -441,6 +454,7 @@ static void driver(const string& infile,
 	                offRate,      // suffix-array sampling rate
 	                -1,           // ISA sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
+			nthreads,
 	                outfile,      // basename for .?.ebwt files
 	                !reverse,     // fw
 	                !entireSA,    // useBlockwise
@@ -505,7 +519,7 @@ extern "C" {
 /**
  * main function.  Parses command-line arguments.
  */
-int bowtie_build(int argc, const char **argv) {
+  int bowtie_build(int argc, const char **argv) {
 	try {
 		// Reset all global state, including getopt state
 		opterr = optind = 1;
@@ -655,5 +669,6 @@ int bowtie_build(int argc, const char **argv) {
 		}
 		return e;
 	}
+  }
 }
-}
+

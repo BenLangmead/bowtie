@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <cmath>
+#include <zlib.h>
+#include <sys/stat.h>
 #include <stdexcept>
 #include <vector>
 #include <string>
@@ -408,13 +410,21 @@ public:
 	 */
 	virtual ~CFilePatternSource() {
 		if(is_open_) {
-			assert(fp_ != NULL);
-			fclose(fp_);
-			fp_ = NULL;
-			if(qfp_ != NULL) {
+			if (compressed_) {
+				gzclose(zfp_);
+				zfp_ = NULL;
+			}
+			else if (fp_ != stdin) {
+				fclose(fp_);
+				fp_ = NULL;
+			}
+			if(qfp_ != NULL && qfp_ != stdin) {
 				fclose(qfp_);
 				qfp_ = NULL;
 			}
+			assert(zfp_ == NULL);
+			assert(fp_ == NULL || fp_ == stdin);
+			assert(qfp_ == NULL || qfp_ == stdin);
 		}
 	}
 
@@ -461,6 +471,31 @@ protected:
 	 * Open the next file in the list of input files.
 	 */
 	void open();
+
+	int getc_wrapper() {
+		return compressed_ ? gzgetc(zfp_) : getc_unlocked(fp_);
+	}
+
+	int ungetc_wrapper(int c) {
+		return compressed_ ? gzungetc(c, zfp_) : ungetc(c, fp_);
+	}
+
+	bool is_gzipped_file(const std::string& filename) {
+		struct stat s;
+		if (stat(filename.c_str(), &s) != 0) {
+			perror("stat");
+		}
+		else {
+			if (S_ISFIFO(s.st_mode))
+				return true;
+		}
+		size_t pos = filename.find_last_of(".");
+		std::string ext = (pos == std::string::npos) ? "" : filename.substr(pos + 1);
+		if (ext == "" || ext == "gz" || ext == "Z") {
+			return true;
+		}
+		return false;
+	}
 	
 	vector<string> infiles_; /// filenames for read files
 	vector<string> qinfiles_; /// filenames for quality files
@@ -468,10 +503,12 @@ protected:
 	size_t filecur_;   /// index into infiles_ of next file to read
 	FILE *fp_; /// read file currently being read from
 	FILE *qfp_; /// quality file currently being read from
+    gzFile zfp_;
 	bool is_open_; /// whether fp_ is currently open
 	bool first_;
 	char buf_[64*1024]; /// file buffer for sequences
 	char qbuf_[64*1024]; /// file buffer for qualities
+    bool compressed_;
 
 private:
 
