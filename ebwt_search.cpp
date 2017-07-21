@@ -346,7 +346,7 @@ enum {
 	ARG_COLOR_PRIMER,
 	ARG_WRAPPER,
 	ARG_BLOCK_BYTES,            // --input-block-bytes
-	ARG_READS_PER_BLOCK         // --input-reads-per-block
+	ARG_READS_PER_BLOCK,        // --input-reads-per-block
 	ARG_INTERLEAVED_FASTQ,
 	ARG_SAM_NO_UNAL,
 };
