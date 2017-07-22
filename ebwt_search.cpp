@@ -1349,12 +1349,6 @@ static void exactSearch(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
-
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -1649,11 +1643,6 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -2063,12 +2052,6 @@ static void twoOrThreeMismatchSearchFull(
 	CHUD_START();
 	{
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
-		
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -2535,11 +2518,6 @@ static void seededQualCutoffSearchFull(
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
