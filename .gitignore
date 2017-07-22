@@ -16,3 +16,4 @@ bowtie-inspect-s-debug
 .simple_tests*
 reads_*.fq
 reads_*.sam
+
