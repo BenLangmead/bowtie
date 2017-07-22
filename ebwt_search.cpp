@@ -1366,9 +1366,11 @@ static void exactSearch(PatternComposer& _patsrc,
 				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -1663,9 +1665,11 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*)&tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2076,9 +2080,11 @@ static void twoOrThreeMismatchSearchFull(
 				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2545,9 +2551,11 @@ static void seededQualCutoffSearchFull(
 				threads[i] = new std::thread(seededQualSearchWorkerFull, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
