@@ -46,19 +46,19 @@ ifneq (,$(findstring Darwin,$(shell uname)))
 	ifneq (,$(findstring 13,$(shell uname -r)))
 		CPP = clang++
 		CC = clang
-		EXTRA_FLAGS += -stdlib=libstdc++
+		override EXTRA_FLAGS += -stdlib=libstdc++
 	endif
 	ifneq (,$(findstring 14,$(shell uname -r)))
 		CPP = clang++
 		CC = clang
-		EXTRA_FLAGS += -stdlib=libstdc++
+		override EXTRA_FLAGS += -stdlib=libstdc++
 	endif
 endif
 
 LINUX = 0
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
-    EXTRA_FLAGS += -Wl,--hash-style=both
+    override EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
 MM_DEF = 
@@ -75,21 +75,25 @@ PTHREAD_DEF =
 
 ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
-	EXTRA_FLAGS += -static-libgcc -static-libstdc++
+	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
     PTHREAD_LIB = -lpthread
 endif
 
+ifeq (1,$(NO_SPINLOCK))
+	override EXTRA_FLAGS += -DNO_SPINLOCK
+endif
+
 ifeq (1,$(WITH_TBB))
 	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
-	EXTRA_FLAGS += -DWITH_TBB
+	override EXTRA_FLAGS += -DWITH_TBB
 else
 	LIBS = $(PTHREAD_LIB)
 endif
 
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
-    EXTRA_FLAGS += -DPOPCNT_CAPABILITY
+    override EXTRA_FLAGS += -DPOPCNT_CAPABILITY
     INC += -I third_party
 endif
 
