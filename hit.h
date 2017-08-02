@@ -17,8 +17,6 @@
 #include "formats.h"
 #include "filebuf.h"
 #include "edit.h"
-#include "refmap.h"
-#include "annot.h"
 #include "sstring.h"
 
 /**
@@ -31,7 +29,6 @@ using namespace seqan;
 /// Constants for the various output modes
 enum output_types {
 	OUTPUT_FULL = 1,
-	OUTPUT_CONCISE,
 	OUTPUT_BINARY,
 	OUTPUT_CHAIN,
 	OUTPUT_SAM,
@@ -42,7 +39,6 @@ enum output_types {
 static const std::string output_type_names[] = {
 	"Invalid!",
 	"Full",
-	"Concise",
 	"Binary",
 	"None"
 };
@@ -150,7 +146,7 @@ bool operator< (const Hit& a, const Hit& b);
 class HitSink {
 public:
 	explicit HitSink(
-		OutFileBuf* out,
+		OutFileBuf& out,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
 		const std::string& dumpMax,
@@ -159,12 +155,9 @@ public:
 		vector<string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize) :
-		_outs(),
-		_deleteOuts(false),
+		out_(out),
 		_refnames(refnames),
-		_numWrappers(0),
-		_locks(),
-		ts_wrap(NULL),
+		mutex_(),
 		dumpAlBase_(dumpAl),
 		dumpUnalBase_(dumpUnal),
 		dumpMaxBase_(dumpMax),
@@ -184,50 +177,8 @@ public:
 		ptNumReportedPaired_ = ptNumReported_ + nthreads_;
 		ptNumUnaligned_ = ptNumReportedPaired_ + nthreads_;
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
-		_outs.push_back(out);
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
-		//had to move this below the array inits, otherwise it get's mangled leading to segfaults on access
-		_locks.push_back(new MUTEX_T);
-		initDumps();
-	}
-
-	/**
-	 * Open a number of output streams; usually one per reference
-	 * sequence.  For now, we give then names refXXXXX.map where XXXXX
-	 * is the 0-padded reference index.  Someday we may want to include
-	 * the name of the reference sequence in the filename somehow.
-	 */
-	explicit HitSink(
-		size_t numOuts,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		vector<string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize) :
-		_outs(),
-		_deleteOuts(true),
-		_refnames(refnames),
-		_locks(),
-		dumpAlBase_(dumpAl),
-		dumpUnalBase_(dumpUnal),
-		dumpMaxBase_(dumpMax),
-		onePairFile_(onePairFile),
-		sampleMax_(sampleMax),
-		quiet_(false),
-		nthreads_(0),
-		perThreadBufSize_(0),
-		ptNumAligned_(NULL)
-	{
-		// Open all files for writing and initialize all locks
-		for(size_t i = 0; i < numOuts; i++) {
-			_outs.push_back(NULL); // we open output streams lazily
-			_locks.push_back(new MUTEX_T);
-		}
-		initDumps();
 	}
 
 	/**
@@ -239,39 +190,7 @@ public:
 			ptNumAligned_ = NULL;
 		}
 		closeOuts();
-		if(_deleteOuts) {
-			// Delete all non-NULL output streams
-			for(size_t i = 0; i < _outs.size(); i++) {
-				if(_outs[i] != NULL) {
-					delete _outs[i];
-					_outs[i] = NULL;
-				}
-				if(_locks[i] != NULL) {
-					delete _locks[i];
-					_locks[i] = NULL;
-				}
-			}
-		}
 		destroyDumps();
-	}
-
-	/**
-	 * Call this whenever this HitSink is wrapped by a new
-	 * HitSinkPerThread.  This helps us keep track of whether the main
-	 * lock or any of the per-stream locks will be contended.
-	 */
-	void addWrapper() {
-		ThreadSafe ts(&numWrapper_mutex_m);
-		_numWrappers++;
-	}
-
-	/**
-	 * Called by concrete subclasses to figure out which elements of
-	 * the _outs/_locks array to use when outputting the alignment.
-	 */
-	size_t refIdxToStreamIdx(size_t refIdx) {
-		if(refIdx >= _outs.size()) return 0;
-		return refIdx;
 	}
 
 	/**
@@ -313,49 +232,19 @@ public:
 		}
 		const Hit& firstHit = (hptr == NULL) ? (*hsptr)[start] : *hptr;
 		bool paired = firstHit.mate > 0;
-		// Sort reads so that those against the same reference sequence
-		// are consecutive.
-		if(hsptr != NULL && _outs.size() > 1 && end - start > 2) {
-			sort(hsptr->begin() + start, hsptr->begin() + end);
-		}
 		BTString& o = ptBufs_[threadId];
-		if(_outs.size() == 1) {
-			// Per-thread buffering is active
-			for(size_t i = start; i < end; i++) {
-				const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
-				assert(h.repOk());
-				if(nthreads_ > 1) {
-					maybeFlush(threadId, 0);
-					append(o, h, mapq, xms);
-					ptCounts_[threadId]++;
-				} else {
-					append(o, h, mapq, xms);
-					out(0).writeString(o);
-					o.clear();
-				}
-			}
-		} else {
-			// multiple output streams or alignments
-			// Note: in this case we basically don't get the benefit
-			// from per-thread buffering, becuase it is too
-			// complicated to provide per-thread, per-output-lock
-			// buffers.
-			size_t i = start;
-			while(i < end) {
-				const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
-				size_t strIdx = refIdxToStreamIdx(h.h.first);
-				{
-					assert(h.repOk());
-					do {
-						append(o, h, mapq, xms);
-						{
-							ThreadSafe _ts(_locks[strIdx]);
-							out(h.h.first).writeString(o);
-						}
-						o.clear();
-						i++;
-					} while(refIdxToStreamIdx(h.h.first) == strIdx && i < end);
-				}
+		// Per-thread buffering is active
+		for(size_t i = start; i < end; i++) {
+			const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
+			assert(h.repOk());
+			if(nthreads_ > 1) {
+				maybeFlush(threadId, 0);
+				append(o, h, mapq, xms);
+				ptCounts_[threadId]++;
+			} else {
+				append(o, h, mapq, xms);
+				out_.writeString(o);
+				o.clear();
 			}
 		}
 		if(tally) {
@@ -418,20 +307,17 @@ public:
 			}
 			else if(numReportedPaired > 0 && numReported == 0) {
 				cerr << "Reported " << (numReportedPaired >> 1)
-					 << " paired-end alignments to " << _outs.size()
-					 << " output stream(s)" << endl;
+					 << " paired-end alignments" << endl;
 			}
 			else if(numReported > 0 && numReportedPaired == 0) {
 				cerr << "Reported " << numReported
-					 << " alignments to " << _outs.size()
-					 << " output stream(s)" << endl;
+					 << " alignments" << endl;
 			}
 			else {
 				assert_gt(numReported + numReportedPaired, 0);
 				cerr << "Reported " << (numReportedPaired >> 1)
 					 << " paired-end alignments and " << numReported
-					 << " singleton alignments to " << _outs.size()
-					 << " output stream(s)" << endl;
+					 << " singleton alignments" << endl;
 			}
 			if(hadoopOut) {
 				cerr << "reporter:counter:Bowtie,Reads with reported alignments," << numAligned << endl;
@@ -444,28 +330,9 @@ public:
 	}
 
 	/**
-	 * Returns alignment output stream, lazily created if needed.
+	 * Returns alignment output stream.
 	 */
-	OutFileBuf& out(size_t refIdx) {
-		const size_t strIdx = refIdxToStreamIdx(refIdx);
-		if(_outs[strIdx] == NULL) {
-			assert(_deleteOuts);
-			{
-				ThreadSafe _ts(&main_mutex_m);
-				if(_outs[strIdx] == NULL) { // avoid race
-					BTString o;
-					o << "ref";
-					if     (strIdx < 10)    o << "0000";
-					else if(strIdx < 100)   o << "000";
-					else if(strIdx < 1000)  o << "00";
-					else if(strIdx < 10000) o << "0";
-					o << strIdx << ".map";
-					_outs[strIdx] = new OutFileBuf(o.toZBuf(), false);
-				}
-			}
-		}
-		return *(_outs[strIdx]);
-	}
+	OutFileBuf& out() { return out_; }
 
 	/**
 	 * Return true iff this HitSink dumps aligned reads to an output
@@ -686,8 +553,8 @@ protected:
 	 */
 	void flush(size_t threadId, size_t outId) {
 		{
-			ThreadSafe _ts(_locks[0]); // flush
-			out(outId).writeString(ptBufs_[threadId]);
+			ThreadSafe _ts(&mutex_); // flush
+			out_.writeString(ptBufs_[threadId]);
 		}
 		ptCounts_[threadId] = 0;
 		ptBufs_[threadId].clear();
@@ -716,23 +583,12 @@ protected:
 	 * Close (and flush) all OutFileBufs.
 	 */
 	void closeOuts() {
-		// Flush and close all non-NULL output streams
-		for(size_t i = 0; i < _outs.size(); i++) {
-			if(_outs[i] != NULL && !_outs[i]->closed()) {
-				_outs[i]->close();
-			}
-		}
+		out_.close();
 	}
 
-	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
-	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
+	OutFileBuf&         out_;        /// the alignment output stream(s)
 	vector<string>*     _refnames;    /// map from reference indexes to names
-	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
-	vector<MUTEX_T*>    _locks;       /// pthreads mutexes for per-file critical sections
-	MUTEX_T             main_mutex_m;    /// pthreads mutexes for fields of this object
-	MUTEX_T             numWrapper_mutex_m;
-	MUTEX_T             firstLock;
-	ThreadSafe*         ts_wrap;      /// for mutual exclusion
+	MUTEX_T             mutex_;       /// pthreads mutexes for per-file critical sections
 	
 	// used for output read buffer	
 	size_t nthreads_;
@@ -886,10 +742,9 @@ public:
 		hitsForThisRead_(),
 		_max(max),
 		_n(n),
-        defaultMapq_(defaultMapq),
+		defaultMapq_(defaultMapq),
 		threadId_(threadId)
 	{
-		sink.addWrapper();
 		assert_gt(_n, 0);
 	}
 
@@ -1420,110 +1275,6 @@ private:
 };
 
 /**
- * Sink that prints lines like this:
- * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
- *
- * Activated with --concise
- */
-class ConciseHitSink : public HitSink {
-public:
-	/**
-	 * Construct a single-stream ConciseHitSink (default)
-	 */
-	ConciseHitSink(
-		OutFileBuf* out,
-		int offBase,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		std::vector<std::string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize,
-		bool reportOpps = false) :
-		HitSink(
-			out,
-			dumpAl,
-			dumpUnal,
-			dumpMax,
-			onePairFile,
-			sampleMax,
-			refnames,
-			nthreads,
-			perThreadBufSize),
-		_reportOpps(reportOpps),
-		offBase_(offBase) { }
-
-	/**
-	 * Construct a multi-stream ConciseHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	ConciseHitSink(
-		size_t numOuts,
-		int offBase,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		std::vector<std::string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize,
-		bool reportOpps = false) :
-		HitSink(
-			numOuts,
-			dumpAl,
-			dumpUnal,
-			dumpMax,
-			onePairFile,
-			sampleMax,
-			refnames,
-			nthreads,
-			perThreadBufSize),
-		_reportOpps(reportOpps),
-		offBase_(offBase) { }
-
-	/**
-	 * Append a verbose, readable hit to the given output stream.
-	 */
-	static void append(
-		BTString& o,
-		const Hit& h,
-		int offBase,
-		bool reportOpps)
-	{
-		o << h.patId;
-		if(h.mate > 0) {
-			assert(h.mate == 1 || h.mate == 2);
-			o << '/' << (int)h.mate;
-		}
-		o << (h.fw? '+' : '-') << ':';
-		// .first is text id, .second is offset
-		o << '<' << h.h.first << ',' << (h.h.second + offBase) << ',' << h.mms.count();
-		if(reportOpps) {
-			o << ',' << h.oms;
-		}
-		o << '>' << '\n';
-	}
-
-	/**
-	 * Append a verbose, readable hit to the given output stream.
-	 */
-	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
-		ConciseHitSink::append(o, h, this->offBase_, this->_reportOpps);
-	}
-
-protected:
-
-private:
-	bool _reportOpps;
-	int  offBase_;     /// Add this to reference offsets before outputting.
-	                   /// (An easy way to make things 1-based instead of
-	                   /// 0-based)
-};
-
-/**
  * Print the given string.  If ws = true, print only up to and not
  * including the first space or tab.  Useful for printing reference
  * names.
@@ -1553,14 +1304,12 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	VerboseHitSink(
-		OutFileBuf* out,
+		OutFileBuf& out,
 		int offBase,
 		bool colorSeq,
 		bool colorQual,
 		bool printCost,
 		const Bitset& suppressOuts,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
 		bool fullRef,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
@@ -1587,60 +1336,13 @@ public:
 		colorQual_(colorQual),
 		cost_(printCost),
 		suppress_(suppressOuts),
-		fullRef_(fullRef),
-		rmap_(rmap), amap_(amap)
-		{ }
-
-	/**
-	 * Construct a multi-stream VerboseHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	VerboseHitSink(
-		size_t numOuts,
-		int offBase,
-		bool colorSeq,
-		bool colorQual,
-		bool printCost,
-		const Bitset& suppressOuts,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
-		bool fullRef,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		std::vector<std::string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize,
-		int partition = 0) :
-		HitSink(
-			numOuts,
-			dumpAl,
-			dumpUnal,
-			dumpMax,
-			onePairFile,
-			sampleMax,
-			refnames,
-			nthreads,
-			perThreadBufSize),
-		partition_(partition),
-		offBase_(offBase),
-		colorSeq_(colorSeq),
-		colorQual_(colorQual),
-		cost_(printCost),
-		suppress_(64),
-		fullRef_(fullRef),
-		rmap_(rmap),
-		amap_(amap)
+		fullRef_(fullRef)
 		{ }
 
 	static void append(
 		BTString& o,
 		const Hit& h,
 		const vector<string>* refnames,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
 		bool fullRef,
 		int partition,
 		int offBase,
@@ -1654,7 +1356,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
-		VerboseHitSink::append(o, h, _refnames, rmap_, amap_,
+		VerboseHitSink::append(o, h, _refnames,
 		                       fullRef_, partition_, offBase_,
 		                       colorSeq_, colorQual_, cost_,
 		                       suppress_);
@@ -1678,18 +1380,6 @@ private:
 	bool     cost_;        /// true -> print statum and cost
 	Bitset   suppress_;    /// output fields to suppress
 	bool fullRef_;         /// print full reference name
-	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
-	AnnotationMap *amap_;  ///
-};
-
-/**
- * Sink that does nothing.
- */
-class StubHitSink : public HitSink {
-public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL, 1, 1) { }
-	
-	virtual void append(BTString& o, const Hit& h, int mapq, int xms) { }
 };
 
 #endif /*HIT_H_*/

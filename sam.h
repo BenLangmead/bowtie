@@ -8,14 +8,10 @@
 #ifndef SAM_H_
 #define SAM_H_
 
-#include "refmap.h"
-#include "annot.h"
 #include "pat.h"
 #include "random_source.h"
 #include "btypes.h"
 
-class ReferenceMap;
-class AnnotationMap;
 class PatternSourcePerThread;
 
 enum {
@@ -41,10 +37,8 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	SAMHitSink(
-		OutFileBuf* out,
+		OutFileBuf& out,
 		int offBase,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
 		bool fullRef,
 		bool noQnameTrunc,
 		const std::string& dumpAl,
@@ -66,43 +60,8 @@ public:
 			nthreads,
 			perThreadBufSize),
 		offBase_(offBase),
-		rmap_(rmap),
-		amap_(amap),
 		fullRef_(fullRef),
 		noQnameTrunc_(noQnameTrunc) { }
-
-	/**
-	 * Construct a multi-stream VerboseHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	SAMHitSink(
-		size_t numOuts,
-		int offBase,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
-		bool fullRef,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		std::vector<std::string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize) :
-		HitSink(
-			numOuts,
-			dumpAl,
-			dumpUnal,
-			dumpMax,
-			onePairFile,
-			sampleMax,
-			refnames,
-			nthreads,
-			perThreadBufSize),
-		offBase_(offBase),
-		rmap_(rmap),
-		amap_(amap),
-		fullRef_(fullRef) { }
 
 	/**
 	 * Append a verbose, readable hit to the output stream
@@ -119,7 +78,6 @@ public:
 		const vector<string>& refnames,
 		bool color,
 		bool nosq,
-		ReferenceMap *rmap,
 		const TIndexOffU* plen,
 		bool fullRef,
 		bool noQnameTrunc,
@@ -159,8 +117,6 @@ private:
 	int  offBase_;        /// Add this to reference offsets before outputting.
 	                      /// (An easy way to make things 1-based instead of
 	                      /// 0-based)
-	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
-	AnnotationMap *amap_; ///
 	bool fullRef_;        /// print full reference name, not just up to whitespace
 	bool noQnameTrunc_;   /// true -> don't truncate QNAME at first whitespace
 };

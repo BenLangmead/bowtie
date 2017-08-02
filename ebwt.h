@@ -35,7 +35,6 @@
 #include "str_util.h"
 #include "mm.h"
 #include "timer.h"
-#include "refmap.h"
 #include "color_dec.h"
 #include "reference.h"
 
@@ -378,7 +377,6 @@ public:
 	    _useMm(false), \
 	    useShmem_(false), \
 	    _refnames(), \
-	    rmap_(NULL), \
 	    mmFile1_(NULL), \
 	    mmFile2_(NULL)
 
@@ -404,7 +402,6 @@ public:
 	     bool useShmem = false,
 	     bool mmSweep = false,
 	     bool loadNames = false,
-	     const ReferenceMap* rmap = NULL,
 	     bool verbose = false,
 	     bool startVerbose = false,
 	     bool passMemExc = false,
@@ -417,7 +414,6 @@ public:
         ProcessorSupport ps; 
         _usePOPCNTinstruction = ps.POPCNTenabled(); 
 #endif 
-		rmap_ = rmap;
 		_useMm = useMm;
 		useShmem_ = useShmem;
 		_in1Str = in + ".1." + gEbwt_ext;
@@ -870,7 +866,6 @@ public:
 	TIndexOffU*   plen() const         { return _plen; }
 	TIndexOffU*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
-	const ReferenceMap* rmap() const { return rmap_; }
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
@@ -1223,7 +1218,6 @@ public:
 	bool       _useMm;        /// use memory-mapped files to hold the index
 	bool       useShmem_;     /// use shared memory to hold large parts of the index
 	vector<string> _refnames; /// names of the reference sequences
-	const ReferenceMap* rmap_; /// mapping into another reference coordinate space
 	char *mmFile1_;
 	char *mmFile2_;
 	EbwtParams _eh;
@@ -1301,7 +1295,6 @@ public:
 	               bool colExEnds,      // true -> exclude nucleotides at extreme ends after decoding
 	               int snpPhred,        // penalty for a SNP
 	               const BitPairReference* ref, // reference (= NULL if not necessary)
-	               const ReferenceMap* rmap, // map to another reference coordinate system
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
 	               const std::vector<TIndexOffU>& mmui32, // mismatch list
 	               const std::vector<uint8_t>& refcs,  // reference characters
@@ -1529,7 +1522,6 @@ public:
 			if(diffs != hit.mms) assert(false);
 		}
 		hit.h = h;
-		if(rmap != NULL) rmap->map(hit.h);
 		hit.patId = ((patid == 0xffffffff) ? _patid : patid);
 		hit.patName = *name;
 		hit.mh = mh;
@@ -2689,7 +2681,6 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			colExEnds,                // true -> exclude nucleotides on ends
 			snpPhred,                 // phred probability of SNP
 			ref,                      // reference sequence
-			rmap_,                    // map to another reference coordinate system
 			_fw,                      // true = index is forward; false = mirror
 			mmui32,                   // mismatch positions
 			refcs,                    // reference characters for mms

@@ -475,7 +475,6 @@ public:
 				colorExEnds,
 				snpPhred,
 				refs_,
-				ra.ebwt->rmap(),
 				ebwtFw,
 				ra.mms,                   // mismatch positions
 				ra.refcs,                 // reference characters for mms
@@ -861,8 +860,7 @@ protected:
 	            TIndexOffU tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
-	            bool ebwtFwR,
-	            const ReferenceMap* rmap)
+	            bool ebwtFwR)
 	{
 		assert(gAllowMateContainment || upstreamOff < dnstreamOff);
 		TIndexOffU spreadL = rL.bot - rL.top;
@@ -889,7 +887,6 @@ protected:
 				colorExEnds,
 				snpPhred,
 				refs_,
-				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -924,7 +921,6 @@ protected:
 				colorExEnds,
 				snpPhred,
 				refs_,
-				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -951,12 +947,11 @@ protected:
 	            TIndexOffU upstreamOff, // offset for upstream mate
 	            TIndexOffU dnstreamOff, // offset for downstream mate
 	            TIndexOffU tlen, // length of ref
-	            bool pairFw,   // whether the pair is being mapped to fw strand
-	            const ReferenceMap* rmap)
+	            bool pairFw)   // whether the pair is being mapped to fw strand
 	{
 		return report(rL, rR, first, upstreamOff,
 		              dnstreamOff, tlen,
-		              pairFw, rL.ebwt->fw(), rR.ebwt->fw(), rmap);
+		              pairFw, rL.ebwt->fw(), rR.ebwt->fw());
 	}
 
 	/**
@@ -1098,8 +1093,7 @@ protected:
 				tlen,       // length of ref
 				!doneFw_,   // whether the pair is being mapped to fw strand
 				ebwtLFw,
-				ebwtRFw,
-				range.ebwt->rmap())) return true;
+				ebwtRFw)) return true;
 		}
 		return false;
 	}
@@ -1739,8 +1733,7 @@ protected:
 	            TIndexOffU tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
-	            bool ebwtFwR,
-	            const ReferenceMap *rmap)
+	            bool ebwtFwR)
 	{
 		assert(gAllowMateContainment || upstreamOff < dnstreamOff);
 		TIndexOffU spreadL = rL.bot - rL.top;
@@ -1767,7 +1760,6 @@ protected:
 				colorExEnds,
 				snpPhred,
 				refs_,
-				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -1802,7 +1794,6 @@ protected:
 				colorExEnds,
 				snpPhred,
 				refs_,
-				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -1849,7 +1840,6 @@ protected:
 			colorExEnds,
 			snpPhred,
 			refs_,
-			r.ebwt->rmap(),
 			ebwtFw,
 			r.mms,                   // mismatch positions
 			r.refcs,                 // reference characters for mms
@@ -2034,8 +2024,7 @@ protected:
 				tlen,       // length of ref
 				pairFw,     // whether the pair is being mapped to fw strand
 				ebwtLFw,
-				ebwtRFw,
-				range.ebwt->rmap())) return true;
+				ebwtRFw)) return true;
 		}
 		return false;
 	}
