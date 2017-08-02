@@ -88,7 +88,6 @@ static uint32_t khits;  // number of hits per read; >1 is much slower
 static uint32_t mhits;  // don't report any hits if there are > mhits
 static bool better;     // true -> guarantee alignments from best possible stratum
 static bool strata;     // true -> don't stop at stratum boundaries
-static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
 static int outBatchSz; // # alignments to write to output file at once
@@ -197,7 +196,6 @@ static void resetOptions() {
 	mhits					= 0xffffffff; // don't report any hits if there are > mhits
 	better					= false; // true -> guarantee alignments from best possible stratum
 	strata					= false; // true -> don't stop at stratum boundaries
-	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	readsPerBatch			= 16;    // # reads to read from input file at once
 	outBatchSz				= 16;    // # alignments to wrote to output file at once
@@ -268,13 +266,11 @@ enum {
 	ARG_SEED,
 	ARG_DUMP_PATS,
 	ARG_RANGE,
-	ARG_CONCISE,
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
 	ARG_VERBOSE,
 	ARG_STARTVERBOSE,
 	ARG_QUIET,
-	ARG_NOOUT,
 	ARG_FAST,
 	ARG_AL,
 	ARG_UN,
@@ -284,7 +280,6 @@ enum {
 	ARG_OLDBEST,
 	ARG_BETTER,
 	ARG_BEST,
-	ARG_REFOUT,
 	ARG_ISARATE,
 	ARG_PARTITION,
 	ARG_READS_PER_BATCH,
@@ -353,8 +348,6 @@ static struct option long_options[] = {
 	{(char*)"pause",        no_argument,       &ipause,      1},
 	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
 	{(char*)"all",          no_argument,       0,            'a'},
-	{(char*)"concise",      no_argument,       0,            ARG_CONCISE},
-	{(char*)"noout",        no_argument,       0,            ARG_NOOUT},
 	{(char*)"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
 	{(char*)"time",         no_argument,       0,            't'},
@@ -679,10 +672,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_RF: mate1fw = false; mate2fw = true;  mateFwSet = true; break;
 			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
 			case ARG_RANGE: rangeMode = true; break;
-			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case 'S': outType = OUTPUT_SAM; break;
-			case ARG_REFOUT: refOut = true; break;
-			case ARG_NOOUT: outType = OUTPUT_NONE; break;
 			case ARG_REFMAP: refMapFile = optarg; break;
 			case ARG_ANNOTMAP: annotMapFile = optarg; break;
 			case ARG_SHMEM: useShmem = true; break;
@@ -978,10 +968,6 @@ static void parseOptions(int argc, const char **argv) {
 	}
 	if(snpPhred <= 10 && color && !quiet) {
 		cerr << "Warning: the colorspace SNP penalty (--snpphred) is very low: " << snpPhred << endl;
-	}
-	if(outType == OUTPUT_SAM && refOut) {
-		cerr << "Error: --refout cannot be combined with -S/--sam" << endl;
-		throw 1;
 	}
 	if(!mateFwSet) {
 		if(color) {
@@ -2762,14 +2748,7 @@ static void driver(const char * type,
 	}
 	OutFileBuf *fout;
 	if(!outfile.empty()) {
-		if(refOut) {
-			fout = NULL;
-			if(!quiet) {
-				cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
-			}
-		} else {
-			fout = new OutFileBuf(outfile.c_str(), false);
-		}
+		fout = new OutFileBuf(outfile.c_str(), false);
 	} else {
 		fout = new OutFileBuf();
 	}
@@ -2872,101 +2851,48 @@ static void driver(const char * type,
 		HitSink *sink;
 		vector<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
-		switch(outType) {
-			case OUTPUT_FULL:
-				if(refOut) {
-					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase,
-							colorSeq, colorQual, printCost,
-							suppressOuts, rmap, amap,
-							fullRef,
-							dumpAlBase,
-							dumpUnalBase,
-							dumpMaxBase,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads,
-							outBatchSz, partitionSz);
-				} else {
-					sink = new VerboseHitSink(
-							fout, offBase,
-							colorSeq, colorQual, printCost,
-							suppressOuts, rmap, amap,
-							fullRef,
-							dumpAlBase,
-							dumpUnalBase,
-							dumpMaxBase,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads,
-							outBatchSz, partitionSz);
+		if(outType == OUTPUT_FULL) {
+			sink = new VerboseHitSink(
+					*fout, offBase,
+					colorSeq, colorQual, printCost,
+					suppressOuts, rmap, amap,
+					fullRef,
+					dumpAlBase,
+					dumpUnalBase,
+					dumpMaxBase,
+					format == TAB_MATE, sampleMax,
+					refnames, nthreads,
+					outBatchSz, partitionSz);
+		} else if(outType == OUTPUT_SAM) {
+			SAMHitSink *sam = new SAMHitSink(
+				*fout, 1, rmap, amap,
+				fullRef, samNoQnameTrunc,
+				dumpAlBase,
+				dumpUnalBase,
+				dumpMaxBase,
+				format == TAB_MATE,
+				sampleMax,
+				refnames,
+				nthreads,
+				outBatchSz);
+			if(!samNoHead) {
+				vector<string> refnames;
+				if(!samNoSQ) {
+					readEbwtRefnames(adjustedEbwtFileBase, refnames);
 				}
-				break;
-			case OUTPUT_SAM:
-				if(refOut) {
-					throw 1;
-				} else {
-					SAMHitSink *sam = new SAMHitSink(
-						fout, 1, rmap, amap,
-						fullRef, samNoQnameTrunc,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz);
-					if(!samNoHead) {
-						vector<string> refnames;
-						if(!samNoSQ) {
-							readEbwtRefnames(adjustedEbwtFileBase, refnames);
-						}
-						sam->appendHeaders(
-							sam->out(0),
-							ebwt.nPat(),
-							refnames, color, samNoSQ, rmap,
-							ebwt.plen(), fullRef,
-							samNoQnameTrunc,
-							argstr.c_str(),
-							rgs.empty() ? NULL : rgs.c_str());
-					}
-					sink = sam;
-				}
-				break;
-			case OUTPUT_CONCISE:
-				if(refOut) {
-					sink = new ConciseHitSink(
-						ebwt.nPat(),
-						offBase,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz,
-						reportOpps);
-				} else {
-					sink = new ConciseHitSink(
-						fout,
-						offBase,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz,
-						reportOpps);
-				}
-				break;
-			case OUTPUT_NONE:
-				sink = new StubHitSink();
-				break;
-			default:
-				cerr << "Invalid output type: " << outType << endl;
-				throw 1;
+				sam->appendHeaders(
+					sam->out(),
+					ebwt.nPat(),
+					refnames, color, samNoSQ, rmap,
+					ebwt.plen(), fullRef,
+					samNoQnameTrunc,
+					argstr.c_str(),
+					rgs.empty() ? NULL : rgs.c_str());
+			}
+			sink = sam;
+		} else {
+			cerr << "Invalid output type: " << outType << endl;
+			throw 1;
 		}
 		if(verbose || startVerbose) {
 			cerr << "Dispatching to search driver: "; logTime(cerr, true);

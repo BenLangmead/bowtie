@@ -41,7 +41,7 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	SAMHitSink(
-		OutFileBuf* out,
+		OutFileBuf& out,
 		int offBase,
 		ReferenceMap *rmap,
 		AnnotationMap *amap,
@@ -70,39 +70,6 @@ public:
 		amap_(amap),
 		fullRef_(fullRef),
 		noQnameTrunc_(noQnameTrunc) { }
-
-	/**
-	 * Construct a multi-stream VerboseHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	SAMHitSink(
-		size_t numOuts,
-		int offBase,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
-		bool fullRef,
-		const std::string& dumpAl,
-		const std::string& dumpUnal,
-		const std::string& dumpMax,
-		bool onePairFile,
-		bool sampleMax,
-		std::vector<std::string>* refnames,
-		size_t nthreads,
-		int perThreadBufSize) :
-		HitSink(
-			numOuts,
-			dumpAl,
-			dumpUnal,
-			dumpMax,
-			onePairFile,
-			sampleMax,
-			refnames,
-			nthreads,
-			perThreadBufSize),
-		offBase_(offBase),
-		rmap_(rmap),
-		amap_(amap),
-		fullRef_(fullRef) { }
 
 	/**
 	 * Append a verbose, readable hit to the output stream
