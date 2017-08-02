@@ -394,21 +394,10 @@ struct PerThreadReadBuf {
  */
 class PatternSource {
 public:
-	PatternSource(
-		const char *dumpfile = NULL) :
+	PatternSource() :
 		readCnt_(0),
-		dumpfile_(dumpfile),
 		mutex()
-	{
-		// Open dumpfile, if specified
-		if(dumpfile_ != NULL) {
-			out_.open(dumpfile_, ios_base::out);
-			if(!out_.good()) {
-				cerr << "Could not open pattern dump file \"" << dumpfile_ << "\" for writing" << endl;
-				throw 1;
-			}
-		}
-	}
+	{ }
 
 	virtual ~PatternSource() { }
 
@@ -440,19 +429,6 @@ public:
 protected:
 
 	/**
-	 * Dump the contents of the ReadBuf to the dump file.
-	 */
-	void dumpBuf(const Read& r) {
-		assert(dumpfile_ != NULL);
-		dump(out_, r.patFw,
-		     empty(r.qual) ? String<char>("(empty)") : r.qual,
-		     empty(r.name) ? String<char>("(empty)") : r.name);
-		dump(out_, r.patRc,
-		     empty(r.qualRev) ? String<char>("(empty)") : r.qualRev,
-		     empty(r.name) ? String<char>("(empty)") : r.name);
-	}
-
-	/**
 	 * Default format for dumping a read to an output stream.  Concrete
 	 * subclasses might want to do something fancier.
 	 */
@@ -467,9 +443,6 @@ protected:
 	/// The number of reads read by this PatternSource
 	volatile uint64_t readCnt_;
 
-	const char *dumpfile_; /// dump patterns to this file before returning them
-	ofstream out_;         /// output stream for dumpfile
-
 	/// Lock enforcing mutual exclusion for (a) file I/O, (b) writing fields
 	/// of this or another other shared object.
 	MUTEX_T mutex;
@@ -483,10 +456,9 @@ protected:
  */
 class TrimmingPatternSource : public PatternSource {
 public:
-	TrimmingPatternSource(const char *dumpfile = NULL,
-	                      int trim3 = 0,
+	TrimmingPatternSource(int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(dumpfile),
+		PatternSource(),
 		trim3_(trim3), trim5_(trim5) { }
 protected:
 	int trim3_;
@@ -506,7 +478,6 @@ public:
 	VectorPatternSource(
 		const vector<string>& v,
 		bool color,
-		const char *dumpfile = NULL,
 		int trim3 = 0,
 		int trim5 = 0);
 	
@@ -560,12 +531,11 @@ private:
 class CFilePatternSource : public TrimmingPatternSource {
 public:
 	CFilePatternSource(
-	    const vector<string>& infiles,
-	    const vector<string>* qinfiles,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
+		const vector<string>& infiles,
+		const vector<string>* qinfiles,
+		int trim3 = 0,
 	    int trim5 = 0) :
-		TrimmingPatternSource(dumpfile, trim3, trim5),
+		TrimmingPatternSource( trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
 		fp_(NULL),
@@ -708,20 +678,18 @@ public:
 
 	FastaPatternSource(
 		const vector<string>& infiles,
-	    const vector<string>* qinfiles,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solexa64 = false,
-	    bool phred64 = false,
-	    bool intQuals = false) :
+		const vector<string>* qinfiles,
+		bool color,
+		int trim3 = 0,
+		int trim5 = 0,
+		bool solexa64 = false,
+		bool phred64 = false,
+		bool intQuals = false) :
 		CFilePatternSource(
 			infiles,
 			qinfiles,
-		    dumpfile,
 			trim3,
-		    trim5),
+			trim5),
 		first_(true),
 		color_(color),
 		solexa64_(solexa64),
@@ -797,18 +765,16 @@ public:
 	TabbedPatternSource(
 		const vector<string>& infiles,
 		bool secondName,  // whether it's --12/--tab5 or --tab6
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solQuals = false,
-	    bool phred64Quals = false,
-	    bool intQuals = false) :
+		bool color,
+		int trim3 = 0,
+		int trim5 = 0,
+		bool solQuals = false,
+		bool phred64Quals = false,
+		bool intQuals = false) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-		    trim3,
+			trim3,
 			trim5),
 		color_(color),
 		solQuals_(solQuals),
@@ -859,12 +825,10 @@ public:
 	FastaContinuousPatternSource(
 			const vector<string>& infiles,
 			size_t length,
-			size_t freq,
-			const char *dumpfile = NULL) :
+			size_t freq) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
 			0,
 			0),
 		length_(length),
@@ -935,20 +899,18 @@ class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(
 		const vector<string>& infiles,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solexa_quals = false,
-	    bool phred64Quals = false,
-	    bool integer_quals = false,
-	    bool interleaved = false,
-	    uint32_t skip = 0) :
+		bool color,
+		int trim3 = 0,
+		int trim5 = 0,
+		bool solexa_quals = false,
+		bool phred64Quals = false,
+		bool integer_quals = false,
+		bool interleaved = false,
+		uint32_t skip = 0) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-		    trim3,
+			trim3,
 			trim5),
 		first_(true),
 		solQuals_(solexa_quals),
@@ -1013,14 +975,12 @@ public:
 
 	RawPatternSource(
 		const vector<string>& infiles,
-	    bool color,
-	    const char *dumpfile = NULL,
+		bool color,
 		int trim3 = 0,
-	    int trim5 = 0) :
+		int trim5 = 0) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
 			trim3,
 			trim5),
 		first_(true),

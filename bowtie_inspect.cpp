@@ -373,7 +373,6 @@ void print_index_summary(
 		false,                // sweep memory-mapped memory
 		true,                 // load names?
 		//false,                // load SA sample?
-		NULL,                 // no reference map
 		verbose,              // be talkative?
 		verbose,              // be talkative at startup?
 		false,                // pass up memory exceptions?
@@ -450,7 +449,6 @@ static void driver(
 			false,                // sweep memory-mapped memory
 			true,                 // load names?
 			//true,                 // load SA sample?
-			NULL,                 // no reference map
 			verbose,              // be talkative?
 			verbose,              // be talkative at startup?
 			false,                // pass up memory exceptions?

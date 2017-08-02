@@ -21,8 +21,6 @@
 #include "bitset.h"
 #include "threading.h"
 #include "range_cache.h"
-#include "refmap.h"
-#include "annot.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
@@ -65,7 +63,6 @@ static int reportOpps;    // whether to report # of other mappings
 static int offRate;       // keep default offRate
 static int isaRate;       // keep default isaRate
 static int mismatches;    // allow 0 mismatches by default
-static char *patDumpfile; // filename to dump patterns to
 static bool solexaQuals;  // quality strings are solexa quals, not phred, and subtract 64 (not 33)
 static bool phred64Quals; // quality chars are phred, but must subtract 64 (not 33)
 static bool integerQuals; // quality strings are space-separated strings of integers, not ASCII
@@ -77,9 +74,6 @@ static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
 static int maxBts;        // max # backtracks allowed in half-and-half mode
 static int nthreads;      // number of pthreads operating concurrently
 static output_types outType;  // style of output
-static bool randReadsNoSync;  // true -> generate reads from per-thread random source
-static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
-static int lenRandomReads;    // len of random reads (see Random*PatternSource in pat.h)
 static bool noRefNames;       // true -> print reference indexes; not names
 static string dumpAlBase;     // basename of same-format files to dump aligned reads to
 static string dumpUnalBase;   // basename of same-format files to dump unaligned reads to
@@ -120,8 +114,6 @@ static int chunkSz;    // size of single chunk disbursed by ChunkPool
 static bool chunkVerbose; // have chunk allocator output status messages?
 static bool useV1;
 static bool reportSe;
-static const char * refMapFile;  // file containing a map from index coordinates to another coordinate system
-static const char * annotMapFile;  // file containing a map from reference coordinates to annotations
 static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
@@ -173,7 +165,6 @@ static void resetOptions() {
 	offRate					= -1; // keep default offRate
 	isaRate					= -1; // keep default isaRate
 	mismatches				= 0; // allow 0 mismatches by default
-	patDumpfile				= NULL; // filename to dump patterns to
 	solexaQuals				= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
 	phred64Quals			= false; // quality chars are phred, but must subtract 64 (not 33)
 	integerQuals			= false; // quality strings are space-separated strings of integers, not ASCII
@@ -185,9 +176,6 @@ static void resetOptions() {
 	maxBts					= 800; // max # backtracks allowed in half-and-half mode
 	nthreads				= 1;     // number of pthreads operating concurrently
 	outType					= OUTPUT_FULL;  // style of output
-	randReadsNoSync			= false; // true -> generate reads from per-thread random source
-	numRandomReads			= 50000000; // # random reads (see Random*PatternSource in pat.h)
-	lenRandomReads			= 35;    // len of random reads (see Random*PatternSource in pat.h)
 	noRefNames				= false; // true -> print reference indexes; not names
 	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
 	dumpUnalBase			= "";    // basename of same-format files to dump unaligned reads to
@@ -228,8 +216,6 @@ static void resetOptions() {
 	chunkVerbose			= false; // have chunk allocator output status messages?
 	useV1					= true;
 	reportSe				= false;
-	refMapFile				= NULL;  // file containing a map from index coordinates to another coordinate system
-	annotMapFile			= NULL;  // file containing a map from reference coordinates to annotations
 	fastaContLen			= 0;
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
@@ -264,7 +250,6 @@ static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I
 enum {
 	ARG_ORIG = 256,
 	ARG_SEED,
-	ARG_DUMP_PATS,
 	ARG_RANGE,
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
@@ -311,8 +296,6 @@ enum {
 	ARG_CHUNKVERBOSE,
 	ARG_STRATA,
 	ARG_PEV2,
-	ARG_REFMAP,
-	ARG_ANNOTMAP,
 	ARG_REPORTSE,
 	ARG_HADOOPOUT,
 	ARG_FUZZY,
@@ -363,7 +346,6 @@ static struct option long_options[] = {
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
 	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
-	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{(char*)"maqerr",       required_argument, 0,            'e'},
 	{(char*)"seedlen",      required_argument, 0,            'l'},
 	{(char*)"seedmms",      required_argument, 0,            'n'},
@@ -415,8 +397,6 @@ static struct option long_options[] = {
 	{(char*)"shmem",        no_argument,       0,            ARG_SHMEM},
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
-	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
-	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
@@ -673,8 +653,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
 			case ARG_RANGE: rangeMode = true; break;
 			case 'S': outType = OUTPUT_SAM; break;
-			case ARG_REFMAP: refMapFile = optarg; break;
-			case ARG_ANNOTMAP: annotMapFile = optarg; break;
 			case ARG_SHMEM: useShmem = true; break;
 			case ARG_COLOR_SEQ: colorSeq = true; break;
 			case ARG_COLOR_QUAL: colorQual = true; break;
@@ -836,7 +814,6 @@ static void parseOptions(int argc, const char **argv) {
 				maxBtsBetter = maxBts;
 				break;
 			}
-			case ARG_DUMP_PATS: patDumpfile = optarg; break;
 			case ARG_STRAND_FIX: strandFix = true; break;
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_READS_PER_BATCH: {
@@ -2553,38 +2530,31 @@ patsrcFromStrings(int format,
 	switch(format) {
 		case FASTA:
 			return new FastaPatternSource (reads, quals, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
 			                               reads, fastaContLen,
-			                               fastaContFreq,
-			                               patDumpfile);
+			                               fastaContFreq);
 		case RAW:
 			return new RawPatternSource   (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		case FASTQ:
 			return new FastqPatternSource (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
 		case INTERLEAVED:
 			return new FastqPatternSource (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, true /* is interleaved */);
 		case TAB_MATE:
 			return new TabbedPatternSource(reads, false, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		case CMDLINE:
 			return new VectorPatternSource(reads, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
@@ -2752,22 +2722,6 @@ static void driver(const char * type,
 	} else {
 		fout = new OutFileBuf();
 	}
-	ReferenceMap* rmap = NULL;
-	if(refMapFile != NULL) {
-		if(verbose || startVerbose) {
-			cerr << "About to load in a reference map file with name "
-			     << refMapFile << ": "; logTime(cerr, true);
-		}
-		rmap = new ReferenceMap(refMapFile, !noRefNames);
-	}
-	AnnotationMap* amap = NULL;
-	if(annotMapFile != NULL) {
-		if(verbose || startVerbose) {
-			cerr << "About to load in an annotation map file with name "
-			     << annotMapFile << ": "; logTime(cerr, true);
-		}
-		amap = new AnnotationMap(annotMapFile);
-	}
 	// Initialize Ebwt object and read in header
 	if(verbose || startVerbose) {
 		cerr << "About to initialize fw Ebwt: "; logTime(cerr, true);
@@ -2782,7 +2736,6 @@ static void driver(const char * type,
 	                useShmem, // whether to use shared memory
 	                mmSweep,  // sweep memory-mapped files
 	                !noRefNames, // load names?
-	                rmap,     // reference map, or NULL if none is needed
 	                verbose, // whether to be talkative
 	                startVerbose, // talkative during initialization
 	                false /*passMemExc*/,
@@ -2804,7 +2757,6 @@ static void driver(const char * type,
 			useShmem, // whether to use shared memory
 			mmSweep,  // sweep memory-mapped files
 			!noRefNames, // load names?
-			rmap,     // reference map, or NULL if none is needed
 			verbose,  // whether to be talkative
 			startVerbose, // talkative during initialization
 			false /*passMemExc*/,
@@ -2855,7 +2807,7 @@ static void driver(const char * type,
 			sink = new VerboseHitSink(
 					*fout, offBase,
 					colorSeq, colorQual, printCost,
-					suppressOuts, rmap, amap,
+					suppressOuts,
 					fullRef,
 					dumpAlBase,
 					dumpUnalBase,
@@ -2865,7 +2817,7 @@ static void driver(const char * type,
 					outBatchSz, partitionSz);
 		} else if(outType == OUTPUT_SAM) {
 			SAMHitSink *sam = new SAMHitSink(
-				*fout, 1, rmap, amap,
+				*fout, 1,
 				fullRef, samNoQnameTrunc,
 				dumpAlBase,
 				dumpUnalBase,
@@ -2883,7 +2835,7 @@ static void driver(const char * type,
 				sam->appendHeaders(
 					sam->out(),
 					ebwt.nPat(),
-					refnames, color, samNoSQ, rmap,
+					refnames, color, samNoSQ,
 					ebwt.plen(), fullRef,
 					samNoQnameTrunc,
 					argstr.c_str(),
@@ -2947,8 +2899,6 @@ static void driver(const char * type,
 		}
 		delete patsrc;
 		delete sink;
-		delete amap;
-		delete rmap;
 		if(fout != NULL) delete fout;
 	}
 }

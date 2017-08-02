@@ -74,8 +74,6 @@ void VerboseHitSink::append(
 	BTString& o,
 	const Hit& h,
 	const vector<string>* refnames,
-	ReferenceMap *rmap,
-	AnnotationMap *amap,
 	bool fullRef,
 	int partition,
 	int offBase,
@@ -107,9 +105,7 @@ void VerboseHitSink::append(
 				else o << '\t';
 				// Output a partitioning key
 				// First component of the key is the reference index
-				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(o, rmap->getName(h.h.first), !fullRef);
-				} else if(refnames != NULL && h.h.first < refnames->size()) {
+				if(refnames != NULL && h.h.first < refnames->size()) {
 					printUptoWs(o, (*refnames)[h.h.first], !fullRef);
 				} else {
 					o << h.h.first;
@@ -195,9 +191,7 @@ void VerboseHitSink::append(
 				if(firstfield) firstfield = false;
 				else o << '\t';
 				// .first is text id, .second is offset
-				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(o, rmap->getName(h.h.first), !fullRef);
-				} else if(refnames != NULL && h.h.first < refnames->size()) {
+				if(refnames != NULL && h.h.first < refnames->size()) {
 					printUptoWs(o, (*refnames)[h.h.first], !fullRef);
 				} else {
 					o << h.h.first;
@@ -236,30 +230,7 @@ void VerboseHitSink::append(
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			// Look for SNP annotations falling within the alignment
-			map<int, char> snpAnnots;
 			const size_t len = length(h.patSeq);
-			if(amap != NULL) {
-				AnnotationMap::Iter ai = amap->lower_bound(h.h);
-				for(; ai != amap->end(); ai++) {
-					assert_geq(ai->first.first, h.h.first);
-					if(ai->first.first != h.h.first) {
-						// Different chromosome
-						break;
-					}
-					if(ai->first.second >= h.h.second + len) {
-						// Doesn't fall into alignment
-						break;
-					}
-					if(ai->second.first != 'S') {
-						// Not a SNP annotation
-						continue;
-					}
-					size_t off = ai->first.second - h.h.second;
-					if(!h.fw) off = len - off - 1;
-					snpAnnots[(int)off] = ai->second.second;
-				}
-			}
 			// Output mismatch column
 			bool firstmm = true;
 			for (unsigned int i = 0; i < len; ++ i) {
@@ -274,12 +245,6 @@ void VerboseHitSink::append(
 					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
 					assert_neq(refChar, qryChar);
 					o << ":" << refChar << ">" << qryChar;
-					firstmm = false;
-				} else if(snpAnnots.find(i) != snpAnnots.end()) {
-					if (!firstmm) o << ",";
-					o << i; // position
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					o << "S:" << snpAnnots[i] << ">" << qryChar;
 					firstmm = false;
 				}
 			}

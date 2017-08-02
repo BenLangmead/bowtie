@@ -17,8 +17,6 @@
 #include "formats.h"
 #include "filebuf.h"
 #include "edit.h"
-#include "refmap.h"
-#include "annot.h"
 #include "sstring.h"
 
 /**
@@ -1312,8 +1310,6 @@ public:
 		bool colorQual,
 		bool printCost,
 		const Bitset& suppressOuts,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
 		bool fullRef,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
@@ -1340,16 +1336,13 @@ public:
 		colorQual_(colorQual),
 		cost_(printCost),
 		suppress_(suppressOuts),
-		fullRef_(fullRef),
-		rmap_(rmap), amap_(amap)
+		fullRef_(fullRef)
 		{ }
 
 	static void append(
 		BTString& o,
 		const Hit& h,
 		const vector<string>* refnames,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
 		bool fullRef,
 		int partition,
 		int offBase,
@@ -1363,7 +1356,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
-		VerboseHitSink::append(o, h, _refnames, rmap_, amap_,
+		VerboseHitSink::append(o, h, _refnames,
 		                       fullRef_, partition_, offBase_,
 		                       colorSeq_, colorQual_, cost_,
 		                       suppress_);
@@ -1387,8 +1380,6 @@ private:
 	bool     cost_;        /// true -> print statum and cost
 	Bitset   suppress_;    /// output fields to suppress
 	bool fullRef_;         /// print full reference name
-	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
-	AnnotationMap *amap_;  ///
 };
 
 #endif /*HIT_H_*/
