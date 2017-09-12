@@ -113,6 +113,7 @@ void SAMHitSink::reportUnOrMax(
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
+			if(!noQnameTrunc_ && isspace((int)p.bufb().name[i])) break;
 			o << p.bufb().name[i];
 		}
 		o << '\t'
