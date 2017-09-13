@@ -1627,7 +1627,7 @@ the `ID` and `SM` fields must both be among them to make the `@RG` line
 legal according to the [SAM Spec][SAM].  `--sam-RG` is ignored unless
 [`-S`/`--sam`] is also specified.
 
-<tr><td id="bowtie-options-no-unal">
+</td></tr><tr><td id="bowtie-options-no-unal">
 
 [`--no-unal`]: #bowtie-options-no-unal
 
@@ -1941,63 +1941,63 @@ right, the fields are:
     `bowtie` outputs some of these optional fields for each alignment,
     depending on the type of the alignment:
 
-    <table><tr><td>
+<table><tr><td>
 
         NM:i:<N>
 
-    </td><td>
+</td><td>
 
-    Aligned read has an edit distance of `<N>`.
+Aligned read has an edit distance of `<N>`.
 
-    </td></tr><tr><td>
+</td></tr><tr><td>
 
         CM:i:<N>
 
-    </td><td>
+</td><td>
 
-    Aligned read has an edit distance of `<N>` in colorspace.  This
-    field is present in addition to the `NM` field in [`-C`/`--color`]
-    mode, but is omitted otherwise.
+Aligned read has an edit distance of `<N>` in colorspace.  This
+field is present in addition to the `NM` field in [`-C`/`--color`]
+mode, but is omitted otherwise.
 
-    </td></tr><tr><td>
+</td></tr><tr><td>
 
         MD:Z:<S>
 
-    </td><td>
+</td><td>
 
-    For aligned reads, `<S>` is a string representation of the
-    mismatched reference bases in the alignment.  See [SAM] format
-    specification for details.  For colorspace alignments, `<S>`
-    describes the decoded *nucleotide* alignment, not the colorspace
-    alignment.
+For aligned reads, `<S>` is a string representation of the
+mismatched reference bases in the alignment.  See [SAM] format
+specification for details.  For colorspace alignments, `<S>`
+describes the decoded *nucleotide* alignment, not the colorspace
+alignment.
 
-    </td></tr><tr><td>
+</td></tr><tr><td>
 
         XA:i:<N>
 
-    </td><td>
+</td><td>
 
-    Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
+Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
 [Strata]: #strata
 
-    </td></tr><tr><td>
+</td></tr><tr><td>
 
         XM:i:<N>
 
-    </td><td>
+</td><td>
 
-    For a read with no reported alignments, `<N>` is 0 if the read had
-    no alignments.  If [`-m`] was specified and the read's alignments
-    were supressed because the [`-m`] ceiling was exceeded, `<N>` equals
-    the [`-m`] ceiling + 1, to indicate that there were at least that
-    many valid alignments (but all were suppressed).  In [`-M`] mode, if
-    the alignment was randomly selected because the [`-M`] ceiling was
-    exceeded, `<N>` equals the [`-M`] ceiling + 1, to indicate that there
-    were at least that many valid alignments (of which one was reported
-    at random).
+For a read with no reported alignments, `<N>` is 0 if the read had
+no alignments.  If [`-m`] was specified and the read's alignments
+were supressed because the [`-m`] ceiling was exceeded, `<N>` equals
+the [`-m`] ceiling + 1, to indicate that there were at least that
+many valid alignments (but all were suppressed).  In [`-M`] mode, if
+the alignment was randomly selected because the [`-M`] ceiling was
+exceeded, `<N>` equals the [`-M`] ceiling + 1, to indicate that there
+were at least that many valid alignments (of which one was reported
+at random).
 
-    </td></tr></table>
+</td></tr></table>
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
 [FASTQ]: http://en.wikipedia.org/wiki/FASTQ_format
