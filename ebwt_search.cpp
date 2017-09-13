@@ -21,8 +21,6 @@
 #include "bitset.h"
 #include "threading.h"
 #include "range_cache.h"
-#include "refmap.h"
-#include "annot.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
@@ -65,7 +63,6 @@ static int reportOpps;    // whether to report # of other mappings
 static int offRate;       // keep default offRate
 static int isaRate;       // keep default isaRate
 static int mismatches;    // allow 0 mismatches by default
-static char *patDumpfile; // filename to dump patterns to
 static bool solexaQuals;  // quality strings are solexa quals, not phred, and subtract 64 (not 33)
 static bool phred64Quals; // quality chars are phred, but must subtract 64 (not 33)
 static bool integerQuals; // quality strings are space-separated strings of integers, not ASCII
@@ -77,9 +74,6 @@ static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
 static int maxBts;        // max # backtracks allowed in half-and-half mode
 static int nthreads;      // number of pthreads operating concurrently
 static output_types outType;  // style of output
-static bool randReadsNoSync;  // true -> generate reads from per-thread random source
-static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
-static int lenRandomReads;    // len of random reads (see Random*PatternSource in pat.h)
 static bool noRefNames;       // true -> print reference indexes; not names
 static string dumpAlBase;     // basename of same-format files to dump aligned reads to
 static string dumpUnalBase;   // basename of same-format files to dump unaligned reads to
@@ -88,7 +82,6 @@ static uint32_t khits;  // number of hits per read; >1 is much slower
 static uint32_t mhits;  // don't report any hits if there are > mhits
 static bool better;     // true -> guarantee alignments from best possible stratum
 static bool strata;     // true -> don't stop at stratum boundaries
-static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
 static int outBatchSz; // # alignments to write to output file at once
@@ -121,8 +114,6 @@ static int chunkSz;    // size of single chunk disbursed by ChunkPool
 static bool chunkVerbose; // have chunk allocator output status messages?
 static bool useV1;
 static bool reportSe;
-static const char * refMapFile;  // file containing a map from index coordinates to another coordinate system
-static const char * annotMapFile;  // file containing a map from reference coordinates to annotations
 static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
@@ -174,7 +165,6 @@ static void resetOptions() {
 	offRate					= -1; // keep default offRate
 	isaRate					= -1; // keep default isaRate
 	mismatches				= 0; // allow 0 mismatches by default
-	patDumpfile				= NULL; // filename to dump patterns to
 	solexaQuals				= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
 	phred64Quals			= false; // quality chars are phred, but must subtract 64 (not 33)
 	integerQuals			= false; // quality strings are space-separated strings of integers, not ASCII
@@ -186,9 +176,6 @@ static void resetOptions() {
 	maxBts					= 800; // max # backtracks allowed in half-and-half mode
 	nthreads				= 1;     // number of pthreads operating concurrently
 	outType					= OUTPUT_FULL;  // style of output
-	randReadsNoSync			= false; // true -> generate reads from per-thread random source
-	numRandomReads			= 50000000; // # random reads (see Random*PatternSource in pat.h)
-	lenRandomReads			= 35;    // len of random reads (see Random*PatternSource in pat.h)
 	noRefNames				= false; // true -> print reference indexes; not names
 	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
 	dumpUnalBase			= "";    // basename of same-format files to dump unaligned reads to
@@ -197,7 +184,6 @@ static void resetOptions() {
 	mhits					= 0xffffffff; // don't report any hits if there are > mhits
 	better					= false; // true -> guarantee alignments from best possible stratum
 	strata					= false; // true -> don't stop at stratum boundaries
-	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	readsPerBatch			= 16;    // # reads to read from input file at once
 	outBatchSz				= 16;    // # alignments to wrote to output file at once
@@ -230,8 +216,6 @@ static void resetOptions() {
 	chunkVerbose			= false; // have chunk allocator output status messages?
 	useV1					= true;
 	reportSe				= false;
-	refMapFile				= NULL;  // file containing a map from index coordinates to another coordinate system
-	annotMapFile			= NULL;  // file containing a map from reference coordinates to annotations
 	fastaContLen			= 0;
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
@@ -266,15 +250,12 @@ static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I
 enum {
 	ARG_ORIG = 256,
 	ARG_SEED,
-	ARG_DUMP_PATS,
 	ARG_RANGE,
-	ARG_CONCISE,
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
 	ARG_VERBOSE,
 	ARG_STARTVERBOSE,
 	ARG_QUIET,
-	ARG_NOOUT,
 	ARG_FAST,
 	ARG_AL,
 	ARG_UN,
@@ -284,7 +265,6 @@ enum {
 	ARG_OLDBEST,
 	ARG_BETTER,
 	ARG_BEST,
-	ARG_REFOUT,
 	ARG_ISARATE,
 	ARG_PARTITION,
 	ARG_READS_PER_BATCH,
@@ -316,8 +296,6 @@ enum {
 	ARG_CHUNKVERBOSE,
 	ARG_STRATA,
 	ARG_PEV2,
-	ARG_REFMAP,
-	ARG_ANNOTMAP,
 	ARG_REPORTSE,
 	ARG_HADOOPOUT,
 	ARG_FUZZY,
@@ -353,8 +331,6 @@ static struct option long_options[] = {
 	{(char*)"pause",        no_argument,       &ipause,      1},
 	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
 	{(char*)"all",          no_argument,       0,            'a'},
-	{(char*)"concise",      no_argument,       0,            ARG_CONCISE},
-	{(char*)"noout",        no_argument,       0,            ARG_NOOUT},
 	{(char*)"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
 	{(char*)"time",         no_argument,       0,            't'},
@@ -370,7 +346,6 @@ static struct option long_options[] = {
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
 	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
-	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{(char*)"maqerr",       required_argument, 0,            'e'},
 	{(char*)"seedlen",      required_argument, 0,            'l'},
 	{(char*)"seedmms",      required_argument, 0,            'n'},
@@ -422,8 +397,6 @@ static struct option long_options[] = {
 	{(char*)"shmem",        no_argument,       0,            ARG_SHMEM},
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
-	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
-	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
@@ -679,12 +652,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_RF: mate1fw = false; mate2fw = true;  mateFwSet = true; break;
 			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
 			case ARG_RANGE: rangeMode = true; break;
-			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case 'S': outType = OUTPUT_SAM; break;
-			case ARG_REFOUT: refOut = true; break;
-			case ARG_NOOUT: outType = OUTPUT_NONE; break;
-			case ARG_REFMAP: refMapFile = optarg; break;
-			case ARG_ANNOTMAP: annotMapFile = optarg; break;
 			case ARG_SHMEM: useShmem = true; break;
 			case ARG_COLOR_SEQ: colorSeq = true; break;
 			case ARG_COLOR_QUAL: colorQual = true; break;
@@ -846,7 +814,6 @@ static void parseOptions(int argc, const char **argv) {
 				maxBtsBetter = maxBts;
 				break;
 			}
-			case ARG_DUMP_PATS: patDumpfile = optarg; break;
 			case ARG_STRAND_FIX: strandFix = true; break;
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_READS_PER_BATCH: {
@@ -978,10 +945,6 @@ static void parseOptions(int argc, const char **argv) {
 	}
 	if(snpPhred <= 10 && color && !quiet) {
 		cerr << "Warning: the colorspace SNP penalty (--snpphred) is very low: " << snpPhred << endl;
-	}
-	if(outType == OUTPUT_SAM && refOut) {
-		cerr << "Error: --refout cannot be combined with -S/--sam" << endl;
-		throw 1;
 	}
 	if(!mateFwSet) {
 		if(color) {
@@ -1349,12 +1312,6 @@ static void exactSearch(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
-
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -1366,9 +1323,11 @@ static void exactSearch(PatternComposer& _patsrc,
 				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -1647,11 +1606,6 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -1663,9 +1617,11 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*)&tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2059,12 +2015,6 @@ static void twoOrThreeMismatchSearchFull(
 	CHUD_START();
 	{
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
-		
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -2076,9 +2026,11 @@ static void twoOrThreeMismatchSearchFull(
 				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2529,11 +2481,6 @@ static void seededQualCutoffSearchFull(
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
-		int mil = 10;
-		struct timespec ts = {0};
-		ts.tv_sec=0;
-		ts.tv_nsec = mil * 1000000L;
-
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
@@ -2545,9 +2492,11 @@ static void seededQualCutoffSearchFull(
 				threads[i] = new std::thread(seededQualSearchWorkerFull, (void*) &tp);
 			}
 			threads[i]->detach();
-			nanosleep(&ts, (struct timespec *) NULL);
+			SLEEP(10);
 		}
-		while(all_threads_done < nthreads);
+		while(all_threads_done < nthreads) {
+			SLEEP(10);
+		}
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2581,38 +2530,31 @@ patsrcFromStrings(int format,
 	switch(format) {
 		case FASTA:
 			return new FastaPatternSource (reads, quals, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
 			                               reads, fastaContLen,
-			                               fastaContFreq,
-			                               patDumpfile);
+			                               fastaContFreq);
 		case RAW:
 			return new RawPatternSource   (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		case FASTQ:
 			return new FastqPatternSource (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
 		case INTERLEAVED:
 			return new FastqPatternSource (reads, color,
-			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, true /* is interleaved */);
 		case TAB_MATE:
 			return new TabbedPatternSource(reads, false, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		case CMDLINE:
 			return new VectorPatternSource(reads, color,
-			                               patDumpfile,
 			                               trim3, trim5);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
@@ -2776,32 +2718,9 @@ static void driver(const char * type,
 	}
 	OutFileBuf *fout;
 	if(!outfile.empty()) {
-		if(refOut) {
-			fout = NULL;
-			if(!quiet) {
-				cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
-			}
-		} else {
-			fout = new OutFileBuf(outfile.c_str(), false);
-		}
+		fout = new OutFileBuf(outfile.c_str(), false);
 	} else {
 		fout = new OutFileBuf();
-	}
-	ReferenceMap* rmap = NULL;
-	if(refMapFile != NULL) {
-		if(verbose || startVerbose) {
-			cerr << "About to load in a reference map file with name "
-			     << refMapFile << ": "; logTime(cerr, true);
-		}
-		rmap = new ReferenceMap(refMapFile, !noRefNames);
-	}
-	AnnotationMap* amap = NULL;
-	if(annotMapFile != NULL) {
-		if(verbose || startVerbose) {
-			cerr << "About to load in an annotation map file with name "
-			     << annotMapFile << ": "; logTime(cerr, true);
-		}
-		amap = new AnnotationMap(annotMapFile);
 	}
 	// Initialize Ebwt object and read in header
 	if(verbose || startVerbose) {
@@ -2817,7 +2736,6 @@ static void driver(const char * type,
 	                useShmem, // whether to use shared memory
 	                mmSweep,  // sweep memory-mapped files
 	                !noRefNames, // load names?
-	                rmap,     // reference map, or NULL if none is needed
 	                verbose, // whether to be talkative
 	                startVerbose, // talkative during initialization
 	                false /*passMemExc*/,
@@ -2839,7 +2757,6 @@ static void driver(const char * type,
 			useShmem, // whether to use shared memory
 			mmSweep,  // sweep memory-mapped files
 			!noRefNames, // load names?
-			rmap,     // reference map, or NULL if none is needed
 			verbose,  // whether to be talkative
 			startVerbose, // talkative during initialization
 			false /*passMemExc*/,
@@ -2886,101 +2803,48 @@ static void driver(const char * type,
 		HitSink *sink;
 		vector<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
-		switch(outType) {
-			case OUTPUT_FULL:
-				if(refOut) {
-					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase,
-							colorSeq, colorQual, printCost,
-							suppressOuts, rmap, amap,
-							fullRef,
-							dumpAlBase,
-							dumpUnalBase,
-							dumpMaxBase,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads,
-							outBatchSz, partitionSz);
-				} else {
-					sink = new VerboseHitSink(
-							fout, offBase,
-							colorSeq, colorQual, printCost,
-							suppressOuts, rmap, amap,
-							fullRef,
-							dumpAlBase,
-							dumpUnalBase,
-							dumpMaxBase,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads,
-							outBatchSz, partitionSz);
+		if(outType == OUTPUT_FULL) {
+			sink = new VerboseHitSink(
+					*fout, offBase,
+					colorSeq, colorQual, printCost,
+					suppressOuts,
+					fullRef,
+					dumpAlBase,
+					dumpUnalBase,
+					dumpMaxBase,
+					format == TAB_MATE, sampleMax,
+					refnames, nthreads,
+					outBatchSz, partitionSz);
+		} else if(outType == OUTPUT_SAM) {
+			SAMHitSink *sam = new SAMHitSink(
+				*fout, 1,
+				fullRef, samNoQnameTrunc,
+				dumpAlBase,
+				dumpUnalBase,
+				dumpMaxBase,
+				format == TAB_MATE,
+				sampleMax,
+				refnames,
+				nthreads,
+				outBatchSz);
+			if(!samNoHead) {
+				vector<string> refnames;
+				if(!samNoSQ) {
+					readEbwtRefnames(adjustedEbwtFileBase, refnames);
 				}
-				break;
-			case OUTPUT_SAM:
-				if(refOut) {
-					throw 1;
-				} else {
-					SAMHitSink *sam = new SAMHitSink(
-						fout, 1, rmap, amap,
-						fullRef, samNoQnameTrunc,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz);
-					if(!samNoHead) {
-						vector<string> refnames;
-						if(!samNoSQ) {
-							readEbwtRefnames(adjustedEbwtFileBase, refnames);
-						}
-						sam->appendHeaders(
-							sam->out(0),
-							ebwt.nPat(),
-							refnames, color, samNoSQ, rmap,
-							ebwt.plen(), fullRef,
-							samNoQnameTrunc,
-							argstr.c_str(),
-							rgs.empty() ? NULL : rgs.c_str());
-					}
-					sink = sam;
-				}
-				break;
-			case OUTPUT_CONCISE:
-				if(refOut) {
-					sink = new ConciseHitSink(
-						ebwt.nPat(),
-						offBase,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz,
-						reportOpps);
-				} else {
-					sink = new ConciseHitSink(
-						fout,
-						offBase,
-						dumpAlBase,
-						dumpUnalBase,
-						dumpMaxBase,
-						format == TAB_MATE,
-						sampleMax,
-						refnames,
-						nthreads,
-						outBatchSz,
-						reportOpps);
-				}
-				break;
-			case OUTPUT_NONE:
-				sink = new StubHitSink();
-				break;
-			default:
-				cerr << "Invalid output type: " << outType << endl;
-				throw 1;
+				sam->appendHeaders(
+					sam->out(),
+					ebwt.nPat(),
+					refnames, color, samNoSQ,
+					ebwt.plen(), fullRef,
+					samNoQnameTrunc,
+					argstr.c_str(),
+					rgs.empty() ? NULL : rgs.c_str());
+			}
+			sink = sam;
+		} else {
+			cerr << "Invalid output type: " << outType << endl;
+			throw 1;
 		}
 		if(verbose || startVerbose) {
 			cerr << "Dispatching to search driver: "; logTime(cerr, true);
@@ -3035,8 +2899,6 @@ static void driver(const char * type,
 		}
 		delete patsrc;
 		delete sink;
-		delete amap;
-		delete rmap;
 		if(fout != NULL) delete fout;
 	}
 }
