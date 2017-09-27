@@ -150,7 +150,7 @@ ifeq (1,$(NO_TBB))
 endif
 
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
-              log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
+              log.cpp hit_set.cpp sam.cpp \
               color.cpp color_dec.cpp hit.cpp
 SEARCH_CPPS_MAIN = $(SEARCH_CPPS) bowtie_main.cpp
 

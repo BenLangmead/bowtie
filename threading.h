@@ -84,6 +84,16 @@ private:
 #endif
 };
 
+#if defined(_TTHREAD_WIN32_)
+#define SLEEP(x) Sleep(x)
+#else
+#define SLEEP(x) { \
+	const static timespec ts_tmp_ = {0, 1000000 * x}; \
+	nanosleep(&ts_tmp_, NULL); \
+}
+#endif
+
+
 #ifdef WITH_TBB
 #ifdef WITH_AFFINITY
 //ripped entirely from;

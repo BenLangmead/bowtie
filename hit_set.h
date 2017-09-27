@@ -15,8 +15,6 @@
 #include "filebuf.h"
 #include "edit.h"
 #include "alphabet.h"
-#include "annot.h"
-#include "refmap.h"
 #include "btypes.h"
 
 /**
@@ -415,14 +413,6 @@ struct HitSet {
 	 */
 	const HitSetEnt& operator[](unsigned x) const {
 		return ents[x];
-	}
-
-	/**
-	 * Apply a reference mappings to all the contained hits.
-	 */
-	void applyReferenceMap(const ReferenceMap& map) {
-		std::vector<HitSetEnt>::iterator it;
-		for(it = ents.begin(); it != ents.end(); it++) map.map(it->h);
 	}
 
 	/**

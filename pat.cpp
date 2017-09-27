@@ -356,10 +356,9 @@ void CFilePatternSource::open() {
 VectorPatternSource::VectorPatternSource(
 	const vector<string>& seqs,
 	bool color,
-	const char *dumpfile,
 	int trim3,
 	int trim5) :
-	TrimmingPatternSource(dumpfile, trim3, trim5),
+	TrimmingPatternSource(trim3, trim5),
 	color_(color),
 	cur_(0),
 	paired_(false),

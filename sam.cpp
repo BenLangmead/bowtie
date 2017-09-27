@@ -24,7 +24,6 @@ void SAMHitSink::appendHeaders(
 	const vector<string>& refnames,
 	bool color,
 	bool nosq,
-	ReferenceMap *rmap,
 	const TIndexOffU* plen,
 	bool fullRef,
 	bool noQnameTrunc,
@@ -37,9 +36,7 @@ void SAMHitSink::appendHeaders(
 		for(size_t i = 0; i < numRefs; i++) {
 			// RNAME
 			o << "@SQ\tSN:";
-			if(!refnames.empty() && rmap != NULL) {
-				printUptoWs(o, rmap->getName(i), !fullRef);
-			} else if(i < refnames.size()) {
+			if(i < refnames.size()) {
 				printUptoWs(o, refnames[i], !fullRef);
 			} else {
 				o << i;
@@ -173,9 +170,7 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	if(h.mate > 0 && !h.mfw) flags |= SAM_FLAG_MATE_STRAND;
 	o << flags << "\t";
 	// RNAME
-	if(_refnames != NULL && rmap_ != NULL) {
-		printUptoWs(o, rmap_->getName(h.h.first), !fullRef_);
-	} else if(_refnames != NULL && h.h.first < _refnames->size()) {
+	if(_refnames != NULL && h.h.first < _refnames->size()) {
 		printUptoWs(o, (*_refnames)[h.h.first], !fullRef_);
 	} else {
 		o << h.h.first;
