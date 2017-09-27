@@ -232,13 +232,13 @@ public:
 		}
 		const Hit& firstHit = (hptr == NULL) ? (*hsptr)[start] : *hptr;
 		bool paired = firstHit.mate > 0;
+		maybeFlush(threadId, 0);
 		BTString& o = ptBufs_[threadId];
 		// Per-thread buffering is active
 		for(size_t i = start; i < end; i++) {
 			const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
 			assert(h.repOk());
 			if(nthreads_ > 1) {
-				maybeFlush(threadId, 0);
 				append(o, h, mapq, xms);
 				ptCounts_[threadId]++;
 			} else {
