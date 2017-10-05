@@ -950,6 +950,22 @@ my @cases = (
 	  hits  => [ { 4 => 1 } ],
 	  color => 1 },
 
+	{ name  => "Colorspace FASTQ - seq + 1",
+	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  fastq =>   "\@r0\n132002320113332231\n+\nIIIIIIIIIIIIIIIIIII\n",
+	  args  => [ "-C -v 2",
+				 "-C -n 2" ],
+	  hits  => [ { 4 => 1 } ],
+	  color => 1 },
+
+	{ name  => "Colorspace FASTQ - seq + 2",
+	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  fastq =>   "\@r0\n132002320113332231\n+\nIIIIIIIIIIIIIIIIIII\n",
+	  args  => [ "-C -v 2",
+				 "-C -n 2" ],
+	  hits  => [ { 4 => 1 } ],
+	  color => 1 },
+
 	{ name  => "Colorspace FASTQ with primer",
 	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
 	  fastq =>   "\@r0\nA0132002320113332231\n+\nIIIIIIIIIIIIIIIIII\n",

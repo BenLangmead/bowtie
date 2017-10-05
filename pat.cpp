@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <seqan/sequence.h>
 #include <seqan/file.h>
+#include <string.h>
 
 #include "pat.h"
 #include "filebuf.h"
@@ -1101,8 +1102,18 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			tooFewQualities(r.name);
 			return false;
 		} else if(qualoff > seqoff) {
-			tooManyQualities(r.name);
-			return false;
+			// if qualoff is at most 2 characters longer than the sequence
+			// then the extra characters will most likely be the quality values
+			// of the primer and the first base (which get discarded by bowtie).
+			// In this case move the remainder of the sequence the (qualoff - seqoff)
+			// positions left.
+			if (r.color && qualoff - seqoff <= 2) {
+				memmove(r.qualBuf, r.qualBuf + (qualoff - seqoff), seqoff);
+			}
+			else {
+				tooManyQualities(r.name);
+				return false;
+			}
 		}
 	}
 	r.qualBuf[seqan::length(r.patFw)] = '\0';
