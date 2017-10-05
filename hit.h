@@ -1137,7 +1137,7 @@ public:
 	 * If there have been any hits reported so far, classify any
 	 * subsequent alignments with higher strata as irrelevant.
 	 */
-	virtual bool irrelevantCost(uint16_t cost) {
+	virtual bool irrelevantCost(uint16_t cost) const {
 		if(hitsForThisRead_) {
 			// irrelevant iff at worse stratum
 			return ((int)cost >> 14) > bestStratum_;
