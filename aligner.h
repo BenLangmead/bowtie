@@ -170,6 +170,8 @@ public:
 					saw_last_read = ret.second;
 					if(ret.first && (*patsrcs_)[i]->rdid() < qUpto_) {
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
+					} else if(ret.first) {
+						saw_last_read = true;
 					}
 				}
 			}
@@ -291,6 +293,8 @@ public:
 							al = (*alignersSE_)[0];
 							seOrPe_[0] = true; // true = unpaired
 						}
+					} else if(ret.first) {
+						break;
 					}
 				}
 				first = false;
@@ -326,7 +330,7 @@ public:
 						// Get a new read
 						pair<bool, bool> ret = ps->nextReadPair();
 						saw_last_read = ret.second;
-						if(ps->rdid() < qUpto_ && ret.first) {
+						if(ret.first && ps->rdid() < qUpto_) {
 							if(ps->paired()) {
 								// Read currently in buffer is paired-end
 								(*alignersPE_)[i]->setQuery(ps);
@@ -336,6 +340,8 @@ public:
 								(*alignersSE_)[i]->setQuery(ps);
 								seOrPe_[i] = true; // true = unpaired
 							}
+						} else if(ret.first) {
+							break;
 						}
 					}
 				}
