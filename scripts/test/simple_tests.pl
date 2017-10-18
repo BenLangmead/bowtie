@@ -960,7 +960,7 @@ my @cases = (
 
 	{ name  => "Colorspace FASTQ - seq + 2",
 	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	  fastq =>   "\@r0\n132002320113332231\n+\nIIIIIIIIIIIIIIIIIII\n",
+	  fastq =>   "\@r0\n132002320113332231\n+\nIIIIIIIIIIIIIIIIIIII\n",
 	  args  => [ "-C -v 2",
 				 "-C -n 2" ],
 	  hits  => [ { 4 => 1 } ],
