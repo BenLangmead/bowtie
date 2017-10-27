@@ -75,6 +75,7 @@ struct PatternParams {
 		bool fileParallel_,
 		uint32_t seed_,
 		size_t max_buf_,
+		size_t buffer_sz_,
 		bool solexa64_,
 		bool phred64_,
 		bool intQuals_,
@@ -100,6 +101,7 @@ struct PatternParams {
 	bool fileParallel;    // true -> wrap files with separate PatternComposers
 	uint32_t seed;        // pseudo-random seed
 	size_t max_buf;       // number of reads to buffer in one read
+	size_t buffer_sz;     // input buffer size
 	bool solexa64;        // true -> qualities are on solexa64 scale
 	bool phred64;         // true -> qualities are on phred64 scale
 	bool intQuals;        // true -> qualities are space-separated numbers
@@ -562,6 +564,7 @@ public:
 	CFilePatternSource(
 	    const vector<string>& infiles,
 	    const vector<string>* qinfiles,
+	    size_t buffer_sz,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
 	    int trim5 = 0) :
@@ -571,7 +574,11 @@ public:
 		fp_(NULL),
 		qfp_(NULL),
 		is_open_(false),
-		first_(true)
+		first_(true),
+		buf_(NULL),
+		qbuf_(NULL),
+		compressed_(false),
+		buffer_sz_(buffer_sz)
 	{
 		qinfiles_.clear();
 		if(qinfiles != NULL) qinfiles_ = *qinfiles;
@@ -584,6 +591,8 @@ public:
 			     << infiles_.size() << "/" << qinfiles_.size() << ")" << endl;
 			throw 1;
 		}
+		buf_ = new char[buffer_sz_];
+		qbuf_ = new char[buffer_sz_];
 		open(); // open first file in the list
 		filecur_++;
 	}
@@ -605,6 +614,14 @@ public:
 			assert(zfp_ == NULL);
 			assert(fp_ == NULL || fp_ == stdin);
 			assert(qfp_ == NULL || qfp_ == stdin);
+		}
+		if(buf_ != NULL) {
+			delete[] buf_;
+			buf_ = NULL;
+		}
+		if(qbuf_ != NULL) {
+			delete[] qbuf_;
+			qbuf_ = NULL;
 		}
 	}
 
@@ -686,8 +703,9 @@ protected:
     gzFile zfp_;
 	bool is_open_; /// whether fp_ is currently open
 	bool first_;
-	char buf_[64*1024]; /// file buffer for sequences
-	char qbuf_[64*1024]; /// file buffer for qualities
+	char *buf_; /// file buffer for sequences
+	char *qbuf_; /// file buffer for qualities
+	size_t buffer_sz_; // buffer size for use w/ setvbuf/gzbuffer
     bool compressed_;
 
 private:
@@ -709,6 +727,7 @@ public:
 	FastaPatternSource(
 		const vector<string>& infiles,
 	    const vector<string>* qinfiles,
+	    size_t input_buffer_sz,
 	    bool color,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
@@ -719,6 +738,7 @@ public:
 		CFilePatternSource(
 			infiles,
 			qinfiles,
+			input_buffer_sz,
 		    dumpfile,
 			trim3,
 		    trim5),
@@ -797,6 +817,7 @@ public:
 	TabbedPatternSource(
 		const vector<string>& infiles,
 		bool secondName,  // whether it's --12/--tab5 or --tab6
+		size_t input_buffer_sz,
 	    bool color,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
@@ -807,6 +828,7 @@ public:
 		CFilePatternSource(
 			infiles,
 			NULL,
+			input_buffer_sz,
 		    dumpfile,
 		    trim3,
 			trim5),
@@ -860,10 +882,12 @@ public:
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
+			size_t input_buffer_sz,
 			const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
+			input_buffer_sz,
 		    dumpfile,
 			0,
 			0),
@@ -935,6 +959,7 @@ class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(
 		const vector<string>& infiles,
+	    size_t input_buffer_sz,
 	    bool color,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
@@ -947,6 +972,7 @@ public:
 		CFilePatternSource(
 			infiles,
 			NULL,
+			input_buffer_sz,
 		    dumpfile,
 		    trim3,
 			trim5),
@@ -1013,6 +1039,7 @@ public:
 
 	RawPatternSource(
 		const vector<string>& infiles,
+		size_t input_buffer_sz,
 	    bool color,
 	    const char *dumpfile = NULL,
 		int trim3 = 0,
@@ -1020,6 +1047,7 @@ public:
 		CFilePatternSource(
 			infiles,
 			NULL,
+			input_buffer_sz,
 		    dumpfile,
 			trim3,
 			trim5),

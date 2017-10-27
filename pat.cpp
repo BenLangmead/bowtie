@@ -321,11 +321,11 @@ void CFilePatternSource::open() {
 			cerr << "Warning: gzbuffer added in zlib v1.2.3.5. Unable to change "
 			        "buffer size from default of 8192." << endl;
 #else
-			gzbuffer(zfp_, 64*1024);
+			gzbuffer(zfp_, (int)buffer_sz_);
 #endif
 		}
 		else {
-			setvbuf(fp_, buf_, _IOFBF, 64*1024);
+			setvbuf(fp_, buf_, _IOFBF, buffer_sz_);
 		}
 		if(!qinfiles_.empty()) {
 			if(qinfiles_[filecur_] == "-") {
@@ -341,7 +341,7 @@ void CFilePatternSource::open() {
 				continue;
 			}
 			assert(qfp_ != NULL);
-			setvbuf(qfp_, qbuf_, _IOFBF, 64*1024);
+			setvbuf(qfp_, qbuf_, _IOFBF, buffer_sz_);
 		}
 		return;
 	}
