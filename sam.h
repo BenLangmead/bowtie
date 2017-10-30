@@ -41,7 +41,8 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	SAMHitSink(
-		OutFileBuf* out,
+		const std::string& ofn,
+		size_t output_buffer_size,
 		int offBase,
 		ReferenceMap *rmap,
 		AnnotationMap *amap,
@@ -56,7 +57,8 @@ public:
 		size_t nthreads,
 		int perThreadBufSize) :
 		HitSink(
-			out,
+			ofn,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -77,6 +79,7 @@ public:
 	 */
 	SAMHitSink(
 		size_t numOuts,
+		size_t output_buffer_size,
 		int offBase,
 		ReferenceMap *rmap,
 		AnnotationMap *amap,
@@ -91,6 +94,7 @@ public:
 		int perThreadBufSize) :
 		HitSink(
 			numOuts,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -114,7 +118,7 @@ public:
 	 * Write the SAM header lines.
 	 */
 	void appendHeaders(
-		OutFileBuf& os,
+		FILE *ofh,
 		size_t numRefs,
 		const vector<string>& refnames,
 		bool color,

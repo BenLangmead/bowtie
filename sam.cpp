@@ -19,7 +19,7 @@ using namespace std;
  * Write the SAM header lines.
  */
 void SAMHitSink::appendHeaders(
-	OutFileBuf& os,
+	FILE *ofh,
 	size_t numRefs,
 	const vector<string>& refnames,
 	bool color,
@@ -51,7 +51,7 @@ void SAMHitSink::appendHeaders(
 		o << "@RG\t" << rgline << '\n';
 	}
 	o << "@PG\tID:Bowtie\tVN:" << BOWTIE_VERSION << "\tCL:\"" << cmdline << "\"\n";
-	os.writeString(o);
+	o.writeTo(ofh);
 }
 
 /**

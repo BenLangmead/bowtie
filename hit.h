@@ -150,7 +150,8 @@ bool operator< (const Hit& a, const Hit& b);
 class HitSink {
 public:
 	explicit HitSink(
-		OutFileBuf* out,
+		const std::string& ofn,
+		size_t output_buffer_size,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
 		const std::string& dumpMax,
@@ -184,12 +185,30 @@ public:
 		ptNumReportedPaired_ = ptNumReported_ + nthreads_;
 		ptNumUnaligned_ = ptNumReportedPaired_ + nthreads_;
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
-		_outs.push_back(out);
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
 		//had to move this below the array inits, otherwise it get's mangled leading to segfaults on access
 		_locks.push_back(new MUTEX_T);
 		initDumps();
+		if(!ofn.empty()) {
+			FILE *fh = fopen(ofn.c_str(), "w");
+			if(fh == NULL) {
+				std::cerr << "Error: Could not open alignment output file "
+				          << ofn << std::endl;
+				throw 1;
+			}
+			char *buf = new char[output_buffer_size];
+			int ret = setvbuf(fh, buf, _IOFBF, output_buffer_size);
+			if(ret != 0) {
+				std::cerr << "Warning: Could not allocate the proper "
+				          << "buffer size for output file stream. "
+				          << "Return value = " << ret << std::endl;
+			}
+			_outs.push_back(fh);
+			_bufs.push_back(buf);
+		} else {
+			_outs.push_back(stdout);
+		}
 	}
 
 	/**
@@ -200,6 +219,7 @@ public:
 	 */
 	explicit HitSink(
 		size_t numOuts,
+		size_t output_buffer_size,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
 		const std::string& dumpMax,
@@ -222,6 +242,7 @@ public:
 		perThreadBufSize_(0),
 		ptNumAligned_(NULL)
 	{
+		throw 1; // don't support --refout
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
 			_outs.push_back(NULL); // we open output streams lazily
@@ -240,17 +261,17 @@ public:
 		}
 		closeOuts();
 		if(_deleteOuts) {
-			// Delete all non-NULL output streams
 			for(size_t i = 0; i < _outs.size(); i++) {
-				if(_outs[i] != NULL) {
-					delete _outs[i];
-					_outs[i] = NULL;
-				}
 				if(_locks[i] != NULL) {
 					delete _locks[i];
-					_locks[i] = NULL;
 				}
 			}
+			_outs.clear();
+			_locks.clear();
+			for(size_t i = 0; i < _bufs.size(); i++) {
+				delete[] _bufs[i];
+			}
+			_bufs.clear();
 		}
 		destroyDumps();
 	}
@@ -331,7 +352,7 @@ public:
 					ptCounts_[threadId]++;
 				} else {
 					append(o, h, mapq, xms);
-					out(0).writeString(o);
+					o.writeTo(out(0));
 					o.clear();
 				}
 			}
@@ -351,7 +372,7 @@ public:
 						append(o, h, mapq, xms);
 						{
 							ThreadSafe _ts(_locks[strIdx]);
-							out(h.h.first).writeString(o);
+							o.writeTo(out(h.h.first));
 						}
 						o.clear();
 						i++;
@@ -447,9 +468,10 @@ public:
 	/**
 	 * Returns alignment output stream, lazily created if needed.
 	 */
-	OutFileBuf& out(size_t refIdx) {
+	FILE * out(size_t refIdx) {
 		const size_t strIdx = refIdxToStreamIdx(refIdx);
 		if(_outs[strIdx] == NULL) {
+			throw 1; // --refout not supported
 			assert(_deleteOuts);
 			{
 				ThreadSafe _ts(&main_mutex_m);
@@ -461,11 +483,11 @@ public:
 					else if(strIdx < 1000)  o << "00";
 					else if(strIdx < 10000) o << "0";
 					o << strIdx << ".map";
-					_outs[strIdx] = new OutFileBuf(o.toZBuf(), false);
+					//_outs[strIdx] = new OutFileBuf(o.toZBuf(), false);
 				}
 			}
 		}
-		return *(_outs[strIdx]);
+		return _outs[strIdx];
 	}
 
 	/**
@@ -688,12 +710,12 @@ protected:
 	void flush(size_t threadId, size_t outId) {
 		{
 			ThreadSafe _ts(_locks[0]); // flush
-			out(outId).writeString(ptBufs_[threadId]);
+			ptBufs_[threadId].writeTo(out(outId));
 		}
 		ptCounts_[threadId] = 0;
 		ptBufs_[threadId].clear();
 	}
-	
+
 	/**
 	 * Flush all output buffers.
 	 */
@@ -719,13 +741,15 @@ protected:
 	void closeOuts() {
 		// Flush and close all non-NULL output streams
 		for(size_t i = 0; i < _outs.size(); i++) {
-			if(_outs[i] != NULL && !_outs[i]->closed()) {
-				_outs[i]->close();
+			if(_outs[i] != NULL) {
+				fclose(_outs[i]);
 			}
 		}
+		_outs.clear();
 	}
 
-	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
+	vector<FILE*>       _outs;        /// the alignment output stream(s)
+	vector<char*>       _bufs;        // output buffers
 	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
@@ -1432,7 +1456,8 @@ public:
 	 * Construct a single-stream ConciseHitSink (default)
 	 */
 	ConciseHitSink(
-		OutFileBuf* out,
+		const std::string& ofn,
+		size_t output_buffer_size,
 		int offBase,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
@@ -1444,7 +1469,8 @@ public:
 		int perThreadBufSize,
 		bool reportOpps = false) :
 		HitSink(
-			out,
+			ofn,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -1462,6 +1488,7 @@ public:
 	 */
 	ConciseHitSink(
 		size_t numOuts,
+		size_t output_buffer_size,
 		int offBase,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
@@ -1474,6 +1501,7 @@ public:
 		bool reportOpps = false) :
 		HitSink(
 			numOuts,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -1554,7 +1582,8 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	VerboseHitSink(
-		OutFileBuf* out,
+		const std::string& ofn,
+		size_t output_buffer_size,
 		int offBase,
 		bool colorSeq,
 		bool colorQual,
@@ -1573,7 +1602,8 @@ public:
 		int perThreadBufSize,
 		int partition = 0) :
 		HitSink(
-			out,
+			ofn,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -1598,6 +1628,7 @@ public:
 	 */
 	VerboseHitSink(
 		size_t numOuts,
+		size_t output_buffer_size,
 		int offBase,
 		bool colorSeq,
 		bool colorQual,
@@ -1617,6 +1648,7 @@ public:
 		int partition = 0) :
 		HitSink(
 			numOuts,
+			output_buffer_size,
 			dumpAl,
 			dumpUnal,
 			dumpMax,
@@ -1688,7 +1720,7 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL, 1, 1) { }
+	StubHitSink() : HitSink(".tmp", 1, "", "", "", false, false, NULL, 1, 1) { }
 	
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) { }
 };
