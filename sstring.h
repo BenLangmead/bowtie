@@ -2074,6 +2074,20 @@ public:
 	 * Return a writeable version of the raw buffer.
 	 */
 	T* wbuf() { return cs_; }
+	
+	/**
+	 * Write to a FILE*
+	 */
+	void writeTo(FILE *out) {
+		const size_t slen = length();
+		size_t nwritten = fwrite(toZBuf(), 1, slen, out);
+		if(nwritten != slen) {
+			cerr << "Wrote only " << nwritten << " out of " << slen
+			     << " bytes to output " << std::endl;
+			perror("fwrite");
+			throw 1;
+		}
+	}
 
 protected:
 	/**
