@@ -204,7 +204,7 @@ static void resetOptions() {
 	outBatchSz				= 16;    // # alignments to wrote to output file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
-	io_buffer_size			= 64*1024; // for setvbuf on input and output streams
+	io_buffer_size			= 512*1024; // for setvbuf on input and output streams
 	useShmem				= false; // use shared memory to hold the index
 	useMm					= false; // use memory-mapped files to hold the index
 	mmSweep					= false; // sweep through memory-mapped files immediately after mapping
