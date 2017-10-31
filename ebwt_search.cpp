@@ -96,6 +96,7 @@ static int readsPerBlock; // # reads in a single input block
 static int outBatchSz; // # alignments to write to output file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
+static size_t io_buffer_size; // for setvbuf on input and output streams
 static bool useShmem;     // use shared memory to hold the index
 static bool useMm;        // use memory-mapped files to hold the index
 static bool mmSweep;      // sweep through memory-mapped files immediately after mapping
@@ -207,6 +208,7 @@ static void resetOptions() {
 	outBatchSz				= 16;    // # alignments to wrote to output file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
+	io_buffer_size			= 512*1024; // for setvbuf on input and output streams
 	useShmem				= false; // use shared memory to hold the index
 	useMm					= false; // use memory-mapped files to hold the index
 	mmSweep					= false; // sweep through memory-mapped files immediately after mapping
@@ -295,6 +297,7 @@ enum {
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
 	ARG_FILEPAR,
+	ARG_BUFFER_SIZE,      // --buffer-size
 	ARG_SHMEM,
 	ARG_MM,
 	ARG_MMSWEEP,
@@ -383,6 +386,7 @@ static struct option long_options[] = {
 	{(char*)"seedlen",      required_argument, 0,            'l'},
 	{(char*)"seedmms",      required_argument, 0,            'n'},
 	{(char*)"filepar",      no_argument,       0,            ARG_FILEPAR},
+	{(char*)"buffer-size",  required_argument, 0,            ARG_BUFFER_SIZE},
 	{(char*)"help",         no_argument,       0,            'h'},
 	{(char*)"threads",      required_argument, 0,            'p'},
 	{(char*)"khits",        required_argument, 0,            'k'},
@@ -805,6 +809,9 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case ARG_FILEPAR:
 				fileParallel = true;
+				break;
+			case ARG_BUFFER_SIZE:
+				io_buffer_size = parseInt(1024, "--input-buffer-size arg must be at least 1024");
 				break;
 			case 'v':
 				maqLike = 0;
@@ -2675,6 +2682,7 @@ static void driver(const char * type,
 		fileParallel,  // true -> wrap files with separate PairedPatternSources
 		seed,          // pseudo-random seed
 		readsPerBatch, // # reads in a light parsing batch
+		io_buffer_size, // size reads to use when reading input
 		solexaQuals,   // true -> qualities are on solexa64 scale
 		phred64Quals,  // true -> qualities are on phred64 scale
 		integerQuals,  // true -> qualities are space-separated numbers
@@ -2800,19 +2808,6 @@ static void driver(const char * type,
 	if(verbose || startVerbose) {
 		cerr << "Opening hit output file: "; logTime(cerr, true);
 	}
-	OutFileBuf *fout;
-	if(!outfile.empty()) {
-		if(refOut) {
-			fout = NULL;
-			if(!quiet) {
-				cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
-			}
-		} else {
-			fout = new OutFileBuf(outfile.c_str(), false);
-		}
-	} else {
-		fout = new OutFileBuf();
-	}
 	ReferenceMap* rmap = NULL;
 	if(refMapFile != NULL) {
 		if(verbose || startVerbose) {
@@ -2916,7 +2911,7 @@ static void driver(const char * type,
 			case OUTPUT_FULL:
 				if(refOut) {
 					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase,
+							ebwt.nPat(), io_buffer_size, offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
 							fullRef,
@@ -2928,7 +2923,7 @@ static void driver(const char * type,
 							outBatchSz, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
-							fout, offBase,
+							outfile, io_buffer_size, offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
 							fullRef,
@@ -2945,7 +2940,8 @@ static void driver(const char * type,
 					throw 1;
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
-						fout, 1, rmap, amap,
+						outfile, io_buffer_size,
+						1, rmap, amap,
 						fullRef, samNoQnameTrunc,
 						dumpAlBase,
 						dumpUnalBase,
@@ -2976,6 +2972,7 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new ConciseHitSink(
 						ebwt.nPat(),
+						io_buffer_size,
 						offBase,
 						dumpAlBase,
 						dumpUnalBase,
@@ -2988,7 +2985,8 @@ static void driver(const char * type,
 						reportOpps);
 				} else {
 					sink = new ConciseHitSink(
-						fout,
+						outfile,
+						io_buffer_size,
 						offBase,
 						dumpAlBase,
 						dumpUnalBase,
@@ -3064,7 +3062,6 @@ static void driver(const char * type,
 		delete sink;
 		delete amap;
 		delete rmap;
-		if(fout != NULL) delete fout;
 	}
 }
 
