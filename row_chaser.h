@@ -106,7 +106,7 @@ public:
 			assert(prepped_);
 			prepped_ = false;
 			if(metrics_ != NULL) metrics_->curBwtOps_++;
-			uint32_t newrow = ebwt_->mapLF(sideloc_);
+			uint64_t newrow = ebwt_->mapLF(sideloc_);
 			ASSERT_ONLY(sideloc_.invalidate());
 			jumps_++;
 			assert_neq(newrow, row_);
