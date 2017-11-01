@@ -161,7 +161,6 @@ public:
 		size_t nthreads,
 		int perThreadBufSize) :
 		_outs(),
-		_deleteOuts(false),
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
@@ -233,7 +232,6 @@ public:
 		size_t nthreads,
 		int perThreadBufSize) :
 		_outs(),
-		_deleteOuts(true),
 		_refnames(refnames),
 		_locks(),
 		dumpAlBase_(dumpAl),
@@ -268,19 +266,16 @@ public:
 			ptNumAligned_ = NULL;
 		}
 		closeOuts();
-		if(_deleteOuts) {
-			for(size_t i = 0; i < _outs.size(); i++) {
-				if(_locks[i] != NULL) {
-					delete _locks[i];
-				}
+		for(size_t i = 0; i < _locks.size(); i++) {
+			if(_locks[i] != NULL) {
+				delete _locks[i];
 			}
-			_outs.clear();
-			_locks.clear();
-			for(size_t i = 0; i < _bufs.size(); i++) {
-				delete[] _bufs[i];
-			}
-			_bufs.clear();
 		}
+		_locks.clear();
+		for(size_t i = 0; i < _bufs.size(); i++) {
+			delete[] _bufs[i];
+		}
+		_bufs.clear();
 		destroyDumps();
 	}
 
@@ -481,7 +476,6 @@ public:
 		const size_t strIdx = refIdxToStreamIdx(refIdx);
 		if(_outs[strIdx] == NULL) {
 			throw 1; // --refout not supported
-			assert(_deleteOuts);
 			{
 				ThreadSafe _ts(&main_mutex_m);
 				if(_outs[strIdx] == NULL) { // avoid race
@@ -759,7 +753,6 @@ protected:
 
 	vector<FILE*>       _outs;        /// the alignment output stream(s)
 	vector<char*>       _bufs;        // output buffers
-	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
 	vector<MUTEX_T*>    _locks;       /// pthreads mutexes for per-file critical sections
