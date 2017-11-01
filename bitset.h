@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include "assert_helpers.h"
 #include "threading.h"
+#include "btypes.h"
 
 /**
  * Given a words array and a size, allocate a new, larger array, moving
@@ -15,9 +16,9 @@
  * words to 0.  Return the new, larger array, which can be substituted
  * for the old one.  The new array is larger than the old by about 50%.
  */
-static inline uint32_t*
-bitsetRealloc(uint32_t& sz, uint32_t* words, const char *errmsg = NULL) {
-	uint32_t oldsz = sz;
+static inline TIndexOffU*
+bitsetRealloc(TIndexOffU& sz, TIndexOffU* words, const char *errmsg = NULL) {
+	TIndexOffU oldsz = sz;
 	if(sz > 0) {
 		sz += (sz >> 1) + 31; // Add 50% more elements, plus a bit
 		sz &= ~31;            // Make sure it's 32-aligned
@@ -26,9 +27,9 @@ bitsetRealloc(uint32_t& sz, uint32_t* words, const char *errmsg = NULL) {
 	}
 	assert_gt(sz, oldsz);
 	assert_eq(0, (sz & 31));
-	uint32_t *newwords;
+	TIndexOffU *newwords;
 	try {
-		newwords = new uint32_t[sz >> 5 /* convert to words */];
+		newwords = new TIndexOffU[sz >> 5 /* convert to words */];
 	} catch(std::bad_alloc& ba) {
 		if(errmsg != NULL) {
 			// Output given error message
@@ -56,10 +57,10 @@ public:
 	 * Allocate enough words to accommodate 'sz' bits.  Output the given
 	 * error message and quit if allocation fails.
 	 */
-	SyncBitset(uint32_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		uint32_t nwords = (sz >> 5)+1; // divide by 32 and add 1
+	SyncBitset(TIndexOffU sz, const char *errmsg = NULL) : _errmsg(errmsg) {
+		TIndexOffU nwords = (sz >> 5)+1; // divide by 32 and add 1
 		try {
-			_words = new uint32_t[nwords];
+			_words = new TIndexOffU[nwords];
 		} catch(std::bad_alloc& ba) {
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
@@ -81,7 +82,7 @@ public:
 	/**
 	 * Test whether the given bit is set in an unsynchronized manner.
 	 */
-	bool testUnsync(uint32_t i) {
+	bool testUnsync(TIndexOffU i) {
 		if(i < _sz) {
 			return ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
 		}
@@ -91,7 +92,7 @@ public:
 	/**
 	 * Test whether the given bit is set in a synchronized manner.
 	 */
-	bool test(uint32_t i) {
+	bool test(TIndexOffU i) {
 		bool ret;
 		ThreadSafe _ts(&mutex_m);
 		ret = testUnsync(i);
@@ -102,12 +103,12 @@ public:
 	 * Set a bit in the vector that hasn't been set before.  Assert if
 	 * it has been set.  Uses synchronization.
 	 */
-	void set(uint32_t i) {
+	void set(TIndexOffU i) {
 		ThreadSafe _ts(&mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(uint32_t oldsz = _sz);
+			ASSERT_ONLY(TIndexOffU oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -122,12 +123,12 @@ public:
 	 * Set a bit in the vector that might have already been set.  Uses
 	 * synchronization.
 	 */
-	void setOver(uint32_t i) {
+	void setOver(TIndexOffU i) {
 		ThreadSafe _ts(&mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(uint32_t oldsz = _sz);
+			ASSERT_ONLY(TIndexOffU oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -145,15 +146,15 @@ private:
 	 * bits.
 	 */
 	void expand() {
-		uint32_t *newwords = bitsetRealloc(_sz, _words, _errmsg);
+		TIndexOffU *newwords = bitsetRealloc(_sz, _words, _errmsg);
 		delete[] _words;   // delete old array
 		_words = newwords; // install new array
 	}
 
 	const char *_errmsg; // error message if an allocation fails
-	uint32_t _sz;        // size as # of bits
+	TIndexOffU _sz;        // size as # of bits
 	MUTEX_T mutex_m;       // mutex
-	uint32_t *_words;    // storage
+	TIndexOffU *_words;    // storage
 };
 
 /**
@@ -162,10 +163,10 @@ private:
 class Bitset {
 
 public:
-	Bitset(uint32_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		uint32_t nwords = (sz >> 5)+1;
+	Bitset(TIndexOffU sz, const char *errmsg = NULL) : _errmsg(errmsg) {
+		TIndexOffU nwords = (sz >> 5)+1;
 		try {
-			_words = new uint32_t[nwords];
+			_words = new TIndexOffU[nwords];
 		} catch(std::bad_alloc& ba) {
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
@@ -189,7 +190,7 @@ public:
 	/**
 	 * Test whether the given bit is set.
 	 */
-	bool test(uint32_t i) const {
+	bool test(TIndexOffU i) const {
 		bool ret = false;
 		if(i < _sz) {
 			ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -201,11 +202,11 @@ public:
 	 * Set a bit in the vector that hasn't been set before.  Assert if
 	 * it has been set.
 	 */
-	void set(uint32_t i) {
+	void set(TIndexOffU i) {
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(uint32_t oldsz = _sz);
+			ASSERT_ONLY(TIndexOffU oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -219,11 +220,11 @@ public:
 	/**
 	 * Set a bit in the vector that might have already been set.
 	 */
-	void setOver(uint32_t i) {
+	void setOver(TIndexOffU i) {
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(uint32_t oldsz = _sz);
+			ASSERT_ONLY(TIndexOffU oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -246,7 +247,7 @@ public:
 	/**
 	 * Return the number of set bits.
 	 */
-	uint32_t count() const {
+	TIndexOffU count() const {
 		return _cnt;
 	}
 
@@ -265,7 +266,7 @@ public:
 		_sz = o._sz;
 		_cnt = o._cnt;
 		if(_words != NULL) delete[] _words;
-		_words = new uint32_t[(_sz+31)>>5];
+		_words = new TIndexOffU[(_sz+31)>>5];
 		for(size_t i = 0; i < (_sz+31)>>5; i++) {
 			_words[i] = o._words[i];
 		}
@@ -279,15 +280,15 @@ private:
 	 * bits.
 	 */
 	void expand() {
-		uint32_t *newwords = bitsetRealloc(_sz, _words, _errmsg);
+		TIndexOffU *newwords = bitsetRealloc(_sz, _words, _errmsg);
 		delete[] _words;   // delete old array
 		_words = newwords; // install new array
 	}
 
-	uint32_t _cnt;       // number of set bits
+	TIndexOffU _cnt;       // number of set bits
 	const char *_errmsg; // error message if an allocation fails
-	uint32_t _sz;        // size as # of bits
-	uint32_t *_words;    // storage
+	TIndexOffU _sz;        // size as # of bits
+	TIndexOffU *_words;    // storage
 };
 
 /**
@@ -311,7 +312,7 @@ public:
 	/**
 	 * Return true iff the bit at offset i has been set.
 	 */
-	bool test(uint32_t i) const {
+	bool test(TIndexOffU i) const {
 		bool ret = false;
 		assert_lt(i, LEN);
 		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -321,7 +322,7 @@ public:
 	/**
 	 * Set the bit at offset i.  Assert if the bit was already set.
 	 */
-	void set(uint32_t i) {
+	void set(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, LEN);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
@@ -337,7 +338,7 @@ public:
 	 * Set the bit at offset i.  Do not assert if the bit was already
 	 * set.
 	 */
-	void setOver(uint32_t i) {
+	void setOver(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, LEN);
 		_words[i >> 5] |= (1 << (i & 0x1f));
@@ -348,15 +349,15 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
 
-	uint32_t count() const { return _cnt; }
-	uint32_t size() const  { return _size; }
+	TIndexOffU count() const { return _cnt; }
+	TIndexOffU size() const  { return _size; }
 
 	/**
 	 * Return true iff this FixedBitset has the same bits set as
 	 * FixedBitset 'that'.
 	 */
 	bool operator== (const FixedBitset<LEN>& that) const {
-		for(uint32_t i = 0; i < (LEN>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return false;
 			}
@@ -369,7 +370,7 @@ public:
 	 * as FixedBitset 'that'.
 	 */
 	bool operator!= (const FixedBitset<LEN>& that) const {
-		for(uint32_t i = 0; i < (LEN>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return true;
 			}
@@ -389,9 +390,9 @@ public:
 	}
 
 private:
-	uint32_t _cnt;
-	uint32_t _size;
-	uint32_t _words[(LEN>>5)+1]; // storage
+	TIndexOffU _cnt;
+	TIndexOffU _size;
+	TIndexOffU _words[(LEN>>5)+1]; // storage
 };
 
 /**
@@ -400,8 +401,8 @@ private:
 class FixedBitset2 {
 
 public:
-	FixedBitset2(uint32_t len) : len_(len), _cnt(0), _size(0) {
-		_words = new uint32_t[((len_ >> 5)+1)];
+	FixedBitset2(TIndexOffU len) : len_(len), _cnt(0), _size(0) {
+		_words = new TIndexOffU[((len_ >> 5)+1)];
 		memset(_words, 0, ((len_ >> 5)+1) * 4);
 	}
 
@@ -419,7 +420,7 @@ public:
 	/**
 	 * Return true iff the bit at offset i has been set.
 	 */
-	bool test(uint32_t i) const {
+	bool test(TIndexOffU i) const {
 		bool ret = false;
 		assert_lt(i, len_);
 		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -429,7 +430,7 @@ public:
 	/**
 	 * Set the bit at offset i.  Assert if the bit was already set.
 	 */
-	void set(uint32_t i) {
+	void set(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
@@ -444,7 +445,7 @@ public:
 	/**
 	 * Clear the bit at offset i.  Assert if the bit was not already set.
 	 */
-	void clear(uint32_t i) {
+	void clear(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
@@ -460,7 +461,7 @@ public:
 	 * Set the bit at offset i.  Do not assert if the bit was already
 	 * set.
 	 */
-	void setOver(uint32_t i) {
+	void setOver(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
 		if(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0) {
@@ -473,15 +474,15 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
 
-	uint32_t count() const { return _cnt; }
-	uint32_t size() const  { return _size; }
+	TIndexOffU count() const { return _cnt; }
+	TIndexOffU size() const  { return _size; }
 
 	/**
 	 * Return true iff this FixedBitset has the same bits set as
 	 * FixedBitset 'that'.
 	 */
 	bool operator== (const FixedBitset2& that) const {
-		for(uint32_t i = 0; i < (len_>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (len_>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return false;
 			}
@@ -494,7 +495,7 @@ public:
 	 * as FixedBitset 'that'.
 	 */
 	bool operator!= (const FixedBitset2& that) const {
-		for(uint32_t i = 0; i < (len_>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (len_>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return true;
 			}
@@ -514,10 +515,10 @@ public:
 	}
 
 private:
-	const uint32_t len_;
-	uint32_t _cnt;
-	uint32_t _size;
-	uint32_t *_words; // storage
+	const TIndexOffU len_;
+	TIndexOffU _cnt;
+	TIndexOffU _size;
+	TIndexOffU *_words; // storage
 };
 
 #endif /* BITSET_H_ */
