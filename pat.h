@@ -88,6 +88,7 @@ struct PatternParams {
 		fileParallel(fileParallel_),
 		seed(seed_),
 		max_buf(max_buf_),
+		buffer_sz(buffer_sz_),
 		solexa64(solexa64_),
 		phred64(phred64_),
 		intQuals(intQuals_),
