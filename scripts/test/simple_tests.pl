@@ -728,12 +728,12 @@ my @cases = (
 		paired   => 1,
 	  pairhits => [ { "*,*" => 1 } ] },
 
-	{ name     => "Interleaved 1",
-	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	  interleaved   => "\@r0/1\nAACGAAAG\n+\nIIIIIIII\n\@r0/2\nCCATCTA\n+\nIIIIIII",
-	  args     => "-v 0",
-	  paired   => 1,
-	  pairhits => [{ "2,16" => 1 }] },
+	#{ name     => "Interleaved 1",
+	#  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#  interleaved   => "\@r0/1\nAACGAAAG\n+\nIIIIIIII\n\@r0/2\nCCATCTA\n+\nIIIIIII",
+	#  args     => "-v 0",
+	#  paired   => 1,
+	#  pairhits => [{ "2,16" => 1 }] },
 
 	# Check paired-end exclusions
 
