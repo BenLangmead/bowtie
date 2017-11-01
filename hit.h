@@ -204,7 +204,8 @@ public:
 	 * alignments or because of -m.
 	 */
 	void tallyAlignments(size_t threadId, size_t numAl, bool paired) {
-		ptNumAligned_[threadId]++;
+        assert(!paired || (numAl % 2) == 0);
+        ptNumAligned_[threadId] += paired ? (numAl >> 1) : numAl;
 		if(paired) {
 			ptNumReportedPaired_[threadId] += numAl;
 		} else {
