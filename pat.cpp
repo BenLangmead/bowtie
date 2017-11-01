@@ -321,11 +321,11 @@ void CFilePatternSource::open() {
 			gzclose(zfp_);
 			zfp_ = NULL;
 		}
-		else if (fp_ != stdin) {
+		if(fp_ != stdin && fp_ == NULL) {
 			fclose(fp_);
 			fp_ = NULL;
 		}
-		if(qfp_ != NULL && qfp_ != stdin) {
+		if(qfp_ != stdin && qfp_ != NULL) {
 			fclose(qfp_);
 			qfp_ = NULL;
 		}
