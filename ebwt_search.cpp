@@ -9,6 +9,12 @@
 #include <getopt.h>
 #include <vector>
 #include <time.h>
+
+#ifndef _WIN32
+#include <dirent.h>
+#include <signal.h>
+#endif
+
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian_swap.h"
@@ -33,8 +39,13 @@
 #include <CHUD/CHUD.h>
 #endif
 
+static int FNAME_SIZE;
 #ifdef WITH_TBB
- #include <tbb/compat/thread>
+#include <tbb/compat/thread>
+static tbb::atomic<int> thread_counter;
+#else
+static int thread_counter;
+static MUTEX_T thread_counter_mutex;
 #endif
 
 using namespace std;
@@ -73,6 +84,9 @@ static int qualThresh;    // max qual-weighted hamming dist (maq's -e)
 static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
 static int maxBts;        // max # backtracks allowed in half-and-half mode
 static int nthreads;      // number of pthreads operating concurrently
+static int thread_ceiling;// maximum number of threads user wants bowtie to use
+static string thread_stealing_dir; // keep track of pids in this directory
+static bool thread_stealing;// true iff thread stealing is in use
 static output_types outType;  // style of output
 static bool noRefNames;       // true -> print reference indexes; not names
 static string dumpAlBase;     // basename of same-format files to dump aligned reads to
@@ -175,6 +189,10 @@ static void resetOptions() {
 	maxBtsBetter			= 125; // max # backtracks allowed in half-and-half mode
 	maxBts					= 800; // max # backtracks allowed in half-and-half mode
 	nthreads				= 1;     // number of pthreads operating concurrently
+	thread_ceiling			= 0;     // max # threads user asked for
+	thread_stealing_dir		= ""; // keep track of pids in this directory
+	thread_stealing			= false; // true iff thread stealing is in use
+	FNAME_SIZE				= 200;
 	outType					= OUTPUT_FULL;  // style of output
 	noRefNames				= false; // true -> print reference indexes; not names
 	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
@@ -321,6 +339,8 @@ enum {
 	ARG_WRAPPER,
 	ARG_INTERLEAVED_FASTQ,
 	ARG_SAM_NO_UNAL,
+	ARG_THREAD_CEILING,
+	ARG_THREAD_PIDDIR
 };
 
 static struct option long_options[] = {
@@ -422,6 +442,8 @@ static struct option long_options[] = {
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"interleaved",  required_argument, 0,            ARG_INTERLEAVED_FASTQ},
 	{(char*)"no-unal",      no_argument,       0,            ARG_SAM_NO_UNAL},
+	{(char*)"thread-ceiling",required_argument, 0,           ARG_THREAD_CEILING},
+	{(char*)"thread-piddir",    required_argument, 0,        ARG_THREAD_PIDDIR},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -763,6 +785,12 @@ static void parseOptions(int argc, const char **argv) {
 			case 'p':
 				nthreads = parseInt(1, "-p/--threads arg must be at least 1");
 				break;
+			case ARG_THREAD_CEILING:
+				thread_ceiling = parseInt(0, "--thread-ceiling must be at least 0");
+				break;
+			case ARG_THREAD_PIDDIR:
+				thread_stealing_dir = optarg;
+				break;
 			case ARG_FILEPAR:
 				fileParallel = true;
 				break;
@@ -962,6 +990,14 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "         --suppress is only available for the default output type." << endl;
 		suppressOuts.clear();
 	}
+	thread_stealing = thread_ceiling > nthreads;
+#ifdef _WIN32
+	thread_stealing = false;
+#endif
+	if(thread_stealing && thread_stealing_dir.empty()) {
+		cerr << "When --thread-ceiling is specified, must also specify --thread-piddir" << endl;
+		throw 1;
+	}
 }
 
 static const char *argv0 = NULL;
@@ -1066,6 +1102,102 @@ createSinkFactory(HitSink& _sink, size_t threadId) {
 	return sink;
 }
 
+void increment_thread_counter() {
+#ifdef WITH_TBB
+	thread_counter.fetch_and_increment();
+#else
+	ThreadSafe ts(&thread_counter_mutex);
+	thread_counter++;
+#endif
+}
+
+void decrement_thread_counter() {
+#ifdef WITH_TBB
+	thread_counter.fetch_and_decrement();
+#else
+	ThreadSafe ts(&thread_counter_mutex);
+	thread_counter--;
+#endif
+}
+
+void del_pid(const char* dirname,int pid) {
+	struct stat finfo;
+	char* fname = (char*) calloc(FNAME_SIZE,sizeof(char));
+	sprintf(fname,"%s/%d",dirname,pid);
+	if(stat( fname, &finfo) != 0) {
+		free(fname);
+		return;
+	}
+	unlink(fname);
+	free(fname);
+} 
+
+//from http://stackoverflow.com/questions/18100097/portable-way-to-check-if-directory-exists-windows-linux-c
+static void write_pid(const char* dirname,int pid) {
+	struct stat dinfo;
+	if(stat(dirname, &dinfo) != 0) {
+		mkdir(dirname,0755);
+	}
+	char* fname = (char*) calloc(FNAME_SIZE,sizeof(char));
+	sprintf(fname,"%s/%d",dirname,pid);
+	FILE* f = fopen(fname,"w");
+	fclose(f);
+	free(fname);
+}
+
+#ifndef _WIN32
+//from  http://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+static int read_dir(const char* dirname,int* num_pids) {
+	DIR *dir;
+	struct dirent *ent;
+	char* fname = (char*) calloc(FNAME_SIZE,sizeof(char));
+	int lowest_pid = -1;
+	if ((dir = opendir (dirname)) != NULL) {
+		while ((ent = readdir (dir)) != NULL) {
+			if(ent->d_name[0] == '.')
+				continue;
+			int pid = atoi(ent->d_name);
+			sprintf(fname,"/proc/%s", ent->d_name);
+			if(kill(pid, 0) != 0) {
+				//deleting pids can lead to race conditions if
+				//2 or more BT2 processes both try to delete
+				//so just skip instead
+				//del_pid(dirname,pid);
+				continue;
+			}
+			(*num_pids)++;
+			if(pid < lowest_pid || lowest_pid == -1)
+				lowest_pid = pid;
+		}
+		closedir (dir);
+	} else {
+		perror (""); // could not open directory
+	}
+	free(fname);
+	return lowest_pid;
+}
+
+static bool steal_thread(int pid, int orig_nthreads) {
+	int ncpu = thread_ceiling;
+	if(thread_ceiling <= nthreads) {
+		return false;
+	}
+	int num_pids = 0;
+	int lowest_pid = read_dir(thread_stealing_dir.c_str(), &num_pids);
+	if(lowest_pid != pid) {
+		return false;
+	}
+	int in_use = ((num_pids-1) * orig_nthreads) + nthreads; //in_use is now baseline + ours
+	float spare = ncpu - in_use;
+	int spare_r = floor(spare);
+	float r = rand() % 100/100.0;
+	if(r <= (spare - spare_r)) {
+		spare_r = ceil(spare);
+	}
+	return spare_r > 0;
+}
+#endif
+
 /**
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
@@ -1084,6 +1216,9 @@ static void exactSearchWorker(void *vp) {
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1147,6 +1282,9 @@ static void exactSearchWorker(void *vp) {
 			#include "search_exact.c"
 		}
 		FINISH_READ(patsrc);
+		if(thread_stealing) {
+			decrement_thread_counter();
+		}
 #ifdef PER_THREAD_TIMING
 		ss.str("");
 		ss.clear();
@@ -1173,6 +1311,9 @@ static void exactSearchWorkerStateful(void *vp) {
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1246,6 +1387,10 @@ static void exactSearchWorkerStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
+	if(thread_stealing) {
+		decrement_thread_counter();
+	}
+
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
@@ -1299,10 +1444,10 @@ static void exactSearch(PatternComposer& _patsrc,
 	}
 	exactSearch_refs   = refs;
 #ifdef WITH_TBB
-	AutoArray<std::thread*> threads(nthreads);
+	vector<std::thread*> threads;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	vector<tthread::thread*> threads;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -1312,37 +1457,98 @@ static void exactSearch(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
+
+		int pid = 0;
+		if(thread_stealing) {
+			pid = getpid();
+			write_pid(thread_stealing_dir.c_str(), pid);
+			thread_counter = 0;
+		}
+		
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(exactSearchWorkerStateful, (void*) &tp);
+				threads.push_back(new std::thread(exactSearchWorkerStateful, (void*) &tp));
 			} else {
-				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
+				threads.push_back(new std::thread(exactSearchWorker, (void*) &tp));
 			}
 			threads[i]->detach();
 			SLEEP(10);
+#else
+			tids[i] = i;
+			if(stateful) {
+				threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + i)));
+			} else {
+				threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + i)));
+			}
+#endif
 		}
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			int orig_threads = nthreads, steal_ctr = 1;
+			for(int j = 0; j < 10; j++) {
+				sleep(1);
+			}
+			while(thread_counter > 0) {
+				if(steal_thread(pid, orig_threads)) { 
+					nthreads++;
+#ifdef WITH_TBB
+					thread_tracking_pair tp;
+					tp.tid = nthreads - 1;
+					tp.done = &all_threads_done;
+					if(stateful) {
+						threads.push_back(new std::thread(exactSearchWorkerStateful, (void*) &tp));
+					} else {
+						threads.push_back(new std::thread(exactSearchWorker, (void*) &tp));
+					}
+					threads[nthreads-1]->detach();
+					SLEEP(10);
+#else
+					tids[nthreads-1] = nthreads;
+					if(stateful) {
+						threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + nthreads - 1)));
+					} else {
+						threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + nthreads - 1)));
+					}
+#endif
+					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
+				}
+				steal_ctr++;
+				for(int j = 0; j < 10; j++) {
+					sleep(1);
+				}
+			}
+		}
+#endif
+		
+#ifdef WITH_TBB
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
 #else
-			tids[i] = i;
-			if(stateful) {
-				threads[i] = new tthread::thread(exactSearchWorkerStateful, (void*)&tids[i]);
-			} else {
-				threads[i] = new tthread::thread(exactSearchWorker, (void*)&tids[i]);
-			}
-		}
-
-		for(int i = 0; i < nthreads; i++) {
+		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
+		}
+		delete[] tids;
+#endif
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 #endif
 	}
 	if(refs != NULL) delete refs;
+
+	for (int i = 0; i < nthreads; i++) {
+		if (threads[i] != NULL) {
+			delete threads[i];
+		}
+	}
 }
 
 /**
@@ -1375,6 +1581,9 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&   _patsrc = *mismatchSearch_patsrc;
 	HitSink&               _sink   = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
@@ -1448,6 +1657,10 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
+
+	if(thread_stealing) {
+		decrement_thread_counter();
+	}
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -1466,6 +1679,9 @@ static void mismatchSearchWorkerFull(void *vp){
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&   _patsrc   = *mismatchSearch_patsrc;
 	HitSink&               _sink     = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw    = *mismatchSearch_ebwtFw;
@@ -1592,10 +1808,10 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	mismatchSearch_refs = refs;
 
 #ifdef WITH_TBB
-	AutoArray<std::thread*> threads(nthreads);
+	vector<std::thread*> threads;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	vector<tthread::thread*> threads;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -1606,37 +1822,100 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
+
+#ifndef _WIN32
+		int pid = 0;
+		if(thread_stealing) {
+			pid = getpid();
+			write_pid(thread_stealing_dir.c_str(), pid);
+			thread_counter = 0;
+		}
+#endif
+
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp);
+				threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
 			} else {
-				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*)&tp);
+				threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
 			}
 			threads[i]->detach();
 			SLEEP(10);
+#else
+			tids[i] = i;
+			if(stateful) {
+				threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + i)));
+			} else {
+				threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + i)));
+			}
+#endif
 		}
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			int orig_threads = nthreads, steal_ctr = 1;
+			for(int j = 0; j < 10; j++) {
+				sleep(1);
+			}
+			while(thread_counter > 0) {
+				if(steal_thread(pid, orig_threads)) {
+					nthreads++;
+#ifdef WITH_TBB
+					thread_tracking_pair tp;
+					tp.tid = nthreads - 1;
+					tp.done = &all_threads_done;
+					if(stateful) {
+						threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
+					} else {
+						threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
+					}
+					threads[nthreads - 1]->detach();
+					SLEEP(10);
+#else
+					tids[nthreads-1] = nthreads;
+					if(stateful) {
+						threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
+					} else {
+						threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + nthreads - 1)));
+					}
+#endif
+					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
+				}
+				steal_ctr++;
+				for(int j = 0; j < 10; j++) {
+					sleep(1);
+				}
+			}
+		}
+#endif
+		
+#ifdef WITH_TBB
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
 #else
-			tids[i] = i;
-			if(stateful) {
-				threads[i] = new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids[i]);
-			} else {
-				threads[i] = new tthread::thread(mismatchSearchWorkerFull, (void*)&tids[i]);
-			}
-		}
-
-		for(int i = 0; i < nthreads; i++) {
+		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
+		}
+		delete[] tids;
+#endif
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 #endif
 	}
 	if(refs != NULL) delete refs;
+
+	for (int i = 0; i < nthreads; i++) {
+		if (threads[i] != NULL) {
+			delete threads[i];
+		}
+	}
 }
 
 #define SWITCH_TO_FW_INDEX() { \
@@ -1734,6 +2013,9 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
@@ -1810,15 +2092,20 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
+
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
+	if(thread_stealing) {
+		decrement_thread_counter();
+	}
 
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
 	return;
 }
+
 #ifdef WITH_TBB
 //void twoOrThreeMismatchSearchWorkerFull::operator()() const {
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
@@ -1828,6 +2115,9 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
@@ -1945,6 +2235,9 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			#undef DONEMASK_SET
 		}
 		FINISH_READ(patsrc);
+		if(thread_stealing) {
+			decrement_thread_counter();
+		}
 #ifdef PER_THREAD_TIMING
 		ss.str("");
 		ss.clear();
@@ -2001,10 +2294,10 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef WITH_TBB
-	AutoArray<std::thread*> threads(nthreads);
+	vector<std::thread*> threads;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	vector<tthread::thread*> threads;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -2015,37 +2308,100 @@ static void twoOrThreeMismatchSearchFull(
 	CHUD_START();
 	{
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
+
+#ifndef _WIN32
+		int pid = 0;
+		if(thread_stealing) {
+			pid = getpid();
+			write_pid(thread_stealing_dir.c_str(), pid);
+			thread_counter = 0;
+		}
+#endif
+
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp);
+				threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp));
 			} else {
-				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp);
+				threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp));
 			}
 			threads[i]->detach();
 			SLEEP(10);
+#else
+			tids[i] = i;
+			if(stateful) {
+				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + i)));
+			} else {
+				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + i)));
+			}
+#endif
 		}
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			int orig_threads = nthreads, steal_ctr = 1;
+			for(int j = 0; j < 10; j++) {
+				sleep(1);
+			}
+			while(thread_counter > 0) {
+				if(steal_thread(pid, orig_threads)) {
+					nthreads++;
+#ifdef WITH_TBB
+					thread_tracking_pair tp;
+					tp.tid = nthreads - 1;
+					tp.done = &all_threads_done;
+					if(stateful) {
+						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp));
+					} else {
+						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp));
+					}
+					threads[nthreads-1]->detach();
+					SLEEP(10);
+#else
+					tids[nthreads-1] = nthreads;
+					if(stateful) {
+						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + nthreads - 1)));
+					} else {
+						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + nthreads - 1)));
+					}
+#endif
+					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
+				}
+				steal_ctr++;
+				for(int j = 0; j < 10; j++) {
+					sleep(1);
+				}
+			}
+		}
+#endif
+		
+#ifdef WITH_TBB
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
 #else
-			tids[i] = i;
-			if(stateful) {
-				threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids[i]);
-			} else {
-				threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids[i]);
-			}
-		}
-
-		for(int i = 0; i < nthreads; i++) {
+		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
+		}
+		delete[] tids;
+#endif
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 #endif
 	}
 	if(refs != NULL) delete refs;
+
+	for (int i = 0; i < nthreads; i++) {
+		if (threads[i] != NULL) {
+			delete threads[i];
+		}
+	}
 	return;
 }
 
@@ -2070,6 +2426,9 @@ static void seededQualSearchWorkerFull(void *vp) {
 static void seededQualSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;
@@ -2279,6 +2638,9 @@ static void seededQualSearchWorkerFull(void *vp) {
 			#undef DONEMASK_SET
 		}
 		FINISH_READ(patsrc);
+		if(thread_stealing) {
+			decrement_thread_counter();
+		}
 		if(seedMms > 0) {
 			delete pamRc;
 			delete pamFw;
@@ -2305,6 +2667,9 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
+	if(thread_stealing) {
+		increment_thread_counter();
+	}
 	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
@@ -2397,9 +2762,13 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 		metrics->printSummary();
 		delete metrics;
 	}
+
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
+	if(thread_stealing) {
+		decrement_thread_counter();
+	}
 
 	delete patsrcFact;
 	delete sinkFact;
@@ -2458,11 +2827,10 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_refs = refs;
 
 #ifdef WITH_TBB
-	//tbb::task_group tbb_grp;
-	AutoArray<std::thread*> threads(nthreads);
+	vector<std::thread*> threads;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	vector<tthread::thread*> threads;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -2481,39 +2849,104 @@ static void seededQualCutoffSearchFull(
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
+
+#ifndef _WIN32
+		int pid = 0;
+		if(thread_stealing) {
+			pid = getpid();
+			write_pid(thread_stealing_dir.c_str(), pid);
+			thread_counter = 0;
+		}
+#endif
+
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp);
+				threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp));
 			} else {
-				threads[i] = new std::thread(seededQualSearchWorkerFull, (void*) &tp);
+				threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*) &tp));
 			}
 			threads[i]->detach();
 			SLEEP(10);
+#else
+			tids[i] = i;
+			if(stateful) {
+				threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + i)));
+			} else {
+				threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + i)));
+			}
+#endif
 		}
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			int orig_threads = nthreads, steal_ctr = 1;
+			for(int j = 0; j < 10; j++) {
+				sleep(1);
+			}
+			while(thread_counter > 0) {
+				if(steal_thread(pid, orig_threads)) {
+					nthreads++;
+#ifdef WITH_TBB
+					thread_tracking_pair tp;
+					tp.tid = nthreads - 1;
+					tp.done = &all_threads_done;
+					if(stateful) {
+						threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp));
+					} else {
+						threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*) &tp));
+					}
+					threads[nthreads-1]->detach();
+					SLEEP(10);
+#else
+					tids[nthreads-1] = nthreads - 1;
+					if(stateful) {
+						threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
+					} else {
+						threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + nthreads - 1)));
+					}
+#endif
+					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
+				}
+				steal_ctr++;
+				for(int j = 0; j < 10; j++) {
+					sleep(1);
+				}
+			}
+		}
+#endif
+		
+#ifdef WITH_TBB
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
 #else
-			tids[i] = i;
-			if(stateful) {
-				threads[i] = new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids[i]);
-			} else {
-				threads[i] = new tthread::thread(seededQualSearchWorkerFull, (void*)&tids[i]);
-			}
-		}
-
-		for(int i = 0; i < nthreads; i++) {
+		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
+		}
+		delete[] tids;
+#endif
+
+#ifndef _WIN32
+		if(thread_stealing) {
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 #endif
 	}
+
 	if(refs != NULL) {
 		delete refs;
 	}
+
+	for (int i = 0; i < nthreads; i++) {
+		if (threads[i] != NULL) {
+			delete threads[i];
+		}
+	}
+
 	ebwtBw.evictFromMemory();
 }
 
