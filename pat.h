@@ -1320,6 +1320,8 @@ public:
 		// Free the vector
 		delete composers;
 	}
+
+    virtual ~PatternSourcePerThreadFactory() {}
 	
 private:
 	/// Container for obtaining paired reads from PatternSources
