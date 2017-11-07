@@ -8,11 +8,11 @@ bindir = $(prefix)/bin
 SEQAN_DIR = ./SeqAn-1.1
 # treat SeqAn as a sysdir to suppress warnings
 SEQAN_INC = -isystem $(SEQAN_DIR)
-INC = $(SEQAN_INC) -I third_party
+INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) $(SEQAN_INC) -I third_party
 CPP = g++
 CXX = $(CPP)
 CC = gcc
-LIBS = $(LDFLAGS) -lz
+LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -23,12 +23,14 @@ CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
 WARNING_FLAGS = -Wall -Wno-unused-private-field \
                 -Wno-unused-parameter -Wno-reorder \
-				-Wno-unused-local-typedef
+				-Wno-unused-local-typedefs
+
+RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
 
 # Detect Cygwin or MinGW
-WINDOWS = 0
-CYGWIN = 0
-MINGW = 0
+WINDOWS =
+CYGWIN =
+MINGW =
 ifneq (,$(findstring CYGWIN,$(shell uname)))
     WINDOWS = 1
     CYGWIN = 1
@@ -45,7 +47,7 @@ else
     endif
 endif
 
-MACOS = 0
+MACOS =
 ifneq (,$(findstring Darwin,$(shell uname)))
     MACOS = 1
 	ifneq (,$(findstring 13,$(shell uname -r)))
@@ -53,14 +55,12 @@ ifneq (,$(findstring Darwin,$(shell uname)))
 		CC = clang
 		override EXTRA_FLAGS += -stdlib=libstdc++
 	endif
-	ifneq (,$(findstring 14,$(shell uname -r)))
-		CPP = clang++
-		CC = clang
-		override EXTRA_FLAGS += -stdlib=libstdc++
+	ifeq (1, $(RELEASE_BUILD))
+		EXTRA_FLAGS += -mmacosx-version-min=10.9
 	endif
 endif
 
-LINUX = 0
+LINUX =
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
     override EXTRA_FLAGS += -Wl,--hash-style=both
@@ -96,11 +96,7 @@ endif
 
 ifneq (1,$(NO_TBB))
 	LIBS += $(PTHREAD_LIB) -ltbb
-	ifeq (1, $(RELEASE_BIN))
-		LIBS += -ltbbmalloc
-	else
-		LIBS += -ltbbmalloc_proxy
-	endif
+	LIBS += -ltbbmalloc$(if $(RELEASE_BUILD),,_proxy)
 	override EXTRA_FLAGS += -DWITH_TBB
 else
 	LIBS += $(PTHREAD_LIB)
@@ -403,20 +399,21 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	cp .src.tmp/$@ .
 	rm -rf .src.tmp
 
-bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
+bowtie-bin.zip: $(RELEASE_DEPENDENCIES) $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
+	$(eval PKG_DIR=bowtie-$(VERSION)-$(if $(MACOS),macos,$(if $(MINGW),mingw,linux))-x86_64)
 	chmod a+x scripts/*.sh scripts/*.pl
 	rm -rf .bin.tmp
 	mkdir .bin.tmp
-	mkdir .bin.tmp/bowtie-$(VERSION)
+	mkdir -p .bin.tmp/$(PKG_DIR)
 	if [ -f bowtie-align-s.exe ] ; then \
 		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
 		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
 	fi
-	mv tmp.zip .bin.tmp/bowtie-$(VERSION)
-	cd .bin.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
-	cp .bin.tmp/$@ .
+	mv tmp.zip .bin.tmp/$(PKG_DIR)
+	cd .bin.tmp/$(PKG_DIR) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .bin.tmp ; zip -r $(PKG_DIR).zip $(PKG_DIR)
+	cp .bin.tmp/$(PKG_DIR).zip .
 	rm -rf .bin.tmp
 
 .PHONY: doc
@@ -459,6 +456,23 @@ perl-deps:
 		cpanm --force Math::Random Clone Test::Deep Sys::Info -n --quiet; \
 	fi
 
+static-libs:
+	if [[ ! -d $(CURDIR)/.lib || ! -d $(CURDIR)/.inc ]]; then \
+		mkdir $(CURDIR)/.lib $(CURDIR)/.include ; \
+	fi ; \
+	if [[ `uname` = "Darwin" ]]; then \
+		export CFLAGS=-mmacosx-version-min=10.9 ; \
+		export CXXFLAGS=-mmacosx-version-min=10.9 ; \
+	fi ; \
+	DL=$$([ `which wget` ] && echo "wget --no-check-certificate" || echo "curl -LO") ; \
+	cd /tmp ; \
+	$$DL https://zlib.net/zlib-1.2.11.tar.gz && tar xzf zlib-1.2.11.tar.gz && cd zlib-1.2.11 ; \
+	$(if $(MINGW), mingw32-make -f win32/Makefile.gcc, ./configure --static && make) && cp libz.a $(CURDIR)/.lib && cp zconf.h zlib.h $(CURDIR)/.include ; \
+	cd .. ; \
+	$$DL https://github.com/01org/tbb/archive/2017_U8.tar.gz && tar xzf 2017_U8.tar.gz && cd tbb-2017_U8; \
+	$(if $(MINGW), mingw32-make comiler=gcc arch=ia64 runtime=mingw, make) extra_inc=big_iron.inc -j4 \
+	&& cp -r include/tbb $(CURDIR)/.include && cp build/*_release/*.a $(CURDIR)/.lib
+
 
 .PHONY: clean
 clean:
@@ -468,3 +482,4 @@ clean:
 	bowtie-src.zip bowtie-bin.zip
 	rm -f core.*
 	rm -f bowtie-align-s-master* bowtie-align-s-no-io* 
+	rm -rf .lib .include
