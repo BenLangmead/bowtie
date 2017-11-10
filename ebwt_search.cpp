@@ -84,6 +84,7 @@ static int qualThresh;    // max qual-weighted hamming dist (maq's -e)
 static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
 static int maxBts;        // max # backtracks allowed in half-and-half mode
 static int nthreads;      // number of pthreads operating concurrently
+static bool reorder;      // reorder SAM output when running multi-threaded
 static int thread_ceiling;// maximum number of threads user wants bowtie to use
 static string thread_stealing_dir; // keep track of pids in this directory
 static bool thread_stealing;// true iff thread stealing is in use
@@ -98,7 +99,7 @@ static bool better;     // true -> guarantee alignments from best possible strat
 static bool strata;     // true -> don't stop at stratum boundaries
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
-static int outBatchSz; // # alignments to write to output file at once
+static size_t outBatchSz; // # alignments to write to output file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -189,6 +190,7 @@ static void resetOptions() {
 	maxBtsBetter			= 125; // max # backtracks allowed in half-and-half mode
 	maxBts					= 800; // max # backtracks allowed in half-and-half mode
 	nthreads				= 1;     // number of pthreads operating concurrently
+    reorder                 = false; // reorder SAM output
 	thread_ceiling			= 0;     // max # threads user asked for
 	thread_stealing_dir		= ""; // keep track of pids in this directory
 	thread_stealing			= false; // true iff thread stealing is in use
@@ -340,111 +342,113 @@ enum {
 	ARG_INTERLEAVED_FASTQ,
 	ARG_SAM_NO_UNAL,
 	ARG_THREAD_CEILING,
-	ARG_THREAD_PIDDIR
+	ARG_THREAD_PIDDIR,
+	ARG_REORDER_SAM,
 };
 
 static struct option long_options[] = {
-	{(char*)"verbose",      no_argument,       0,            ARG_VERBOSE},
-	{(char*)"startverbose", no_argument,       0,            ARG_STARTVERBOSE},
-	{(char*)"quiet",        no_argument,       0,            ARG_QUIET},
-	{(char*)"sanity",       no_argument,       0,            ARG_SANITY},
-	{(char*)"pause",        no_argument,       &ipause,      1},
-	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
-	{(char*)"all",          no_argument,       0,            'a'},
-	{(char*)"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
-	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
-	{(char*)"time",         no_argument,       0,            't'},
-	{(char*)"trim3",        required_argument, 0,            '3'},
-	{(char*)"trim5",        required_argument, 0,            '5'},
-	{(char*)"seed",         required_argument, 0,            ARG_SEED},
-	{(char*)"qupto",        required_argument, 0,            'u'},
-	{(char*)"al",           required_argument, 0,            ARG_AL},
-	{(char*)"un",           required_argument, 0,            ARG_UN},
-	{(char*)"max",          required_argument, 0,            ARG_MAXDUMP},
-	{(char*)"offrate",      required_argument, 0,            'o'},
-	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
-	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
-	{(char*)"version",      no_argument,       &showVersion, 1},
-	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
-	{(char*)"maqerr",       required_argument, 0,            'e'},
-	{(char*)"seedlen",      required_argument, 0,            'l'},
-	{(char*)"seedmms",      required_argument, 0,            'n'},
-	{(char*)"filepar",      no_argument,       0,            ARG_FILEPAR},
-	{(char*)"help",         no_argument,       0,            'h'},
-	{(char*)"threads",      required_argument, 0,            'p'},
-	{(char*)"khits",        required_argument, 0,            'k'},
-	{(char*)"mhits",        required_argument, 0,            'm'},
-	{(char*)"minins",       required_argument, 0,            'I'},
-	{(char*)"maxins",       required_argument, 0,            'X'},
-	{(char*)"quals",        required_argument, 0,            'Q'},
-	{(char*)"Q1",           required_argument, 0,            ARG_QUALS1},
-	{(char*)"Q2",           required_argument, 0,            ARG_QUALS2},
-	{(char*)"best",         no_argument,       0,            ARG_BEST},
-	{(char*)"better",       no_argument,       0,            ARG_BETTER},
-	{(char*)"oldbest",      no_argument,       0,            ARG_OLDBEST},
-	{(char*)"strata",       no_argument,       0,            ARG_STRATA},
-	{(char*)"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
-	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
-	{(char*)"range",        no_argument,       0,            ARG_RANGE},
-	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
-	{(char*)"phased",       no_argument,       0,            'z'},
-	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
-	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
-	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
-	{(char*)"ff",           no_argument,       0,            ARG_FF},
-	{(char*)"fr",           no_argument,       0,            ARG_FR},
-	{(char*)"rf",           no_argument,       0,            ARG_RF},
-	{(char*)"mixthresh",    required_argument, 0,            'x'},
-	{(char*)"pairtries",    required_argument, 0,            ARG_MIXED_ATTEMPTS},
-	{(char*)"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
-	{(char*)"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
-	{(char*)"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
-	{(char*)"nofw",         no_argument,       0,            ARG_NO_FW},
-	{(char*)"norc",         no_argument,       0,            ARG_NO_RC},
-	{(char*)"offbase",      required_argument, 0,            'B'},
-	{(char*)"tryhard",      no_argument,       0,            'y'},
-	{(char*)"skip",         required_argument, 0,            's'},
-	{(char*)"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
-	{(char*)"stats",        no_argument,       0,            ARG_STATS},
-	{(char*)"12",           required_argument, 0,            ARG_ONETWO},
-	{(char*)"phred33-quals", no_argument,      0,            ARG_PHRED33},
-	{(char*)"phred64-quals", no_argument,      0,            ARG_PHRED64},
-	{(char*)"solexa1.3-quals", no_argument,    0,            ARG_PHRED64},
-	{(char*)"chunkmbs",     required_argument, 0,            ARG_CHUNKMBS},
-	{(char*)"chunksz",      required_argument, 0,            ARG_CHUNKSZ},
-	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
-	{(char*)"mm",           no_argument,       0,            ARG_MM},
-	{(char*)"shmem",        no_argument,       0,            ARG_SHMEM},
-	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
-	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
-	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
-	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
-	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
-	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
-	{(char*)"sam",          no_argument,       0,            'S'},
-	{(char*)"sam-no-qname-trunc", no_argument, 0,            ARG_SAM_NO_QNAME_TRUNC},
-	{(char*)"sam-nohead",   no_argument,       0,            ARG_SAM_NOHEAD},
-	{(char*)"sam-nosq",     no_argument,       0,            ARG_SAM_NOSQ},
-	{(char*)"sam-noSQ",     no_argument,       0,            ARG_SAM_NOSQ},
-	{(char*)"color",        no_argument,       0,            'C'},
-	{(char*)"sam-RG",       required_argument, 0,            ARG_SAM_RG},
-	{(char*)"snpphred",     required_argument, 0,            ARG_SNPPHRED},
-	{(char*)"snpfrac",      required_argument, 0,            ARG_SNPFRAC},
-	{(char*)"suppress",     required_argument, 0,            ARG_SUPPRESS_FIELDS},
-	{(char*)"mapq",         required_argument, 0,            ARG_DEFAULT_MAPQ},
-	{(char*)"col-cseq",     no_argument,       0,            ARG_COLOR_SEQ},
-	{(char*)"col-cqual",    no_argument,       0,            ARG_COLOR_QUAL},
-	{(char*)"col-keepends", no_argument,       0,            ARG_COLOR_KEEP_ENDS},
-	{(char*)"cost",         no_argument,       0,            ARG_COST},
-	{(char*)"showseed",     no_argument,       0,            ARG_SHOWSEED},
-	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
-	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
-	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
-	{(char*)"interleaved",  required_argument, 0,            ARG_INTERLEAVED_FASTQ},
-	{(char*)"no-unal",      no_argument,       0,            ARG_SAM_NO_UNAL},
-	{(char*)"thread-ceiling",required_argument, 0,           ARG_THREAD_CEILING},
-	{(char*)"thread-piddir",    required_argument, 0,        ARG_THREAD_PIDDIR},
-	{(char*)0, 0, 0, 0} // terminator
+{(char*)"verbose",                           no_argument,        0,                    ARG_VERBOSE},
+{(char*)"startverbose",                      no_argument,        0,                    ARG_STARTVERBOSE},
+{(char*)"quiet",                             no_argument,        0,                    ARG_QUIET},
+{(char*)"sanity",                            no_argument,        0,                    ARG_SANITY},
+{(char*)"pause",                             no_argument,        &ipause,              1},
+{(char*)"orig",                              required_argument,  0,                    ARG_ORIG},
+{(char*)"all",                               no_argument,        0,                    'a'},
+{(char*)"solexa-quals",                      no_argument,        0,                    ARG_SOLEXA_QUALS},
+{(char*)"integer-quals",                     no_argument,        0,                    ARG_integerQuals},
+{(char*)"time",                              no_argument,        0,                    't'},
+{(char*)"trim3",                             required_argument,  0,                    '3'},
+{(char*)"trim5",                             required_argument,  0,                    '5'},
+{(char*)"seed",                              required_argument,  0,                    ARG_SEED},
+{(char*)"qupto",                             required_argument,  0,                    'u'},
+{(char*)"al",                                required_argument,  0,                    ARG_AL},
+{(char*)"un",                                required_argument,  0,                    ARG_UN},
+{(char*)"max",                               required_argument,  0,                    ARG_MAXDUMP},
+{(char*)"offrate",                           required_argument,  0,                    'o'},
+{(char*)"isarate",                           required_argument,  0,                    ARG_ISARATE},
+{(char*)"reportopps",                        no_argument,        &reportOpps,          1},
+{(char*)"version",                           no_argument,        &showVersion,         1},
+{(char*)"reads-per-batch",                   required_argument,  0,                    ARG_READS_PER_BATCH},
+{(char*)"maqerr",                            required_argument,  0,                    'e'},
+{(char*)"seedlen",                           required_argument,  0,                    'l'},
+{(char*)"seedmms",                           required_argument,  0,                    'n'},
+{(char*)"filepar",                           no_argument,        0,                    ARG_FILEPAR},
+{(char*)"help",                              no_argument,        0,                    'h'},
+{(char*)"threads",                           required_argument,  0,                    'p'},
+{(char*)"khits",                             required_argument,  0,                    'k'},
+{(char*)"mhits",                             required_argument,  0,                    'm'},
+{(char*)"minins",                            required_argument,  0,                    'I'},
+{(char*)"maxins",                            required_argument,  0,                    'X'},
+{(char*)"quals",                             required_argument,  0,                    'Q'},
+{(char*)"Q1",                                required_argument,  0,                    ARG_QUALS1},
+{(char*)"Q2",                                required_argument,  0,                    ARG_QUALS2},
+{(char*)"best",                              no_argument,        0,                    ARG_BEST},
+{(char*)"better",                            no_argument,        0,                    ARG_BETTER},
+{(char*)"oldbest",                           no_argument,        0,                    ARG_OLDBEST},
+{(char*)"strata",                            no_argument,        0,                    ARG_STRATA},
+{(char*)"nomaqround",                        no_argument,        0,                    ARG_NOMAQROUND},
+{(char*)"refidx",                            no_argument,        0,                    ARG_REFIDX},
+{(char*)"range",                             no_argument,        0,                    ARG_RANGE},
+{(char*)"maxbts",                            required_argument,  0,                    ARG_MAXBTS},
+{(char*)"phased",                            no_argument,        0,                    'z'},
+{(char*)"partition",                         required_argument,  0,                    ARG_PARTITION},
+{(char*)"stateful",                          no_argument,        0,                    ARG_STATEFUL},
+{(char*)"prewidth",                          required_argument,  0,                    ARG_PREFETCH_WIDTH},
+{(char*)"ff",                                no_argument,        0,                    ARG_FF},
+{(char*)"fr",                                no_argument,        0,                    ARG_FR},
+{(char*)"rf",                                no_argument,        0,                    ARG_RF},
+{(char*)"mixthresh",                         required_argument,  0,                    'x'},
+{(char*)"pairtries",                         required_argument,  0,                    ARG_MIXED_ATTEMPTS},
+{(char*)"noreconcile",                       no_argument,        0,                    ARG_NO_RECONCILE},
+{(char*)"cachelim",                          required_argument,  0,                    ARG_CACHE_LIM},
+{(char*)"cachesz",                           required_argument,  0,                    ARG_CACHE_SZ},
+{(char*)"nofw",                              no_argument,        0,                    ARG_NO_FW},
+{(char*)"norc",                              no_argument,        0,                    ARG_NO_RC},
+{(char*)"offbase",                           required_argument,  0,                    'B'},
+{(char*)"tryhard",                           no_argument,        0,                    'y'},
+{(char*)"skip",                              required_argument,  0,                    's'},
+{(char*)"strandfix",                         no_argument,        0,                    ARG_STRAND_FIX},
+{(char*)"stats",                             no_argument,        0,                    ARG_STATS},
+{(char*)"12",                                required_argument,  0,                    ARG_ONETWO},
+{(char*)"phred33-quals",                     no_argument,        0,                    ARG_PHRED33},
+{(char*)"phred64-quals",                     no_argument,        0,                    ARG_PHRED64},
+{(char*)"solexa1.3-quals",                   no_argument,        0,                    ARG_PHRED64},
+{(char*)"chunkmbs",                          required_argument,  0,                    ARG_CHUNKMBS},
+{(char*)"chunksz",                           required_argument,  0,                    ARG_CHUNKSZ},
+{(char*)"chunkverbose",                      no_argument,        0,                    ARG_CHUNKVERBOSE},
+{(char*)"mm",                                no_argument,        0,                    ARG_MM},
+{(char*)"shmem",                             no_argument,        0,                    ARG_SHMEM},
+{(char*)"mmsweep",                           no_argument,        0,                    ARG_MMSWEEP},
+{(char*)"pev2",                              no_argument,        0,                    ARG_PEV2},
+{(char*)"reportse",                          no_argument,        0,                    ARG_REPORTSE},
+{(char*)"hadoopout",                         no_argument,        0,                    ARG_HADOOPOUT},
+{(char*)"fullref",                           no_argument,        0,                    ARG_FULLREF},
+{(char*)"usage",                             no_argument,        0,                    ARG_USAGE},
+{(char*)"sam",                               no_argument,        0,                    'S'},
+{(char*)"sam-no-qname-trunc",                no_argument,        0,                    ARG_SAM_NO_QNAME_TRUNC},
+{(char*)"sam-nohead",                        no_argument,        0,                    ARG_SAM_NOHEAD},
+{(char*)"sam-nosq",                          no_argument,        0,                    ARG_SAM_NOSQ},
+{(char*)"sam-noSQ",                          no_argument,        0,                    ARG_SAM_NOSQ},
+{(char*)"color",                             no_argument,        0,                    'C'},
+{(char*)"sam-RG",                            required_argument,  0,                    ARG_SAM_RG},
+{(char*)"snpphred",                          required_argument,  0,                    ARG_SNPPHRED},
+{(char*)"snpfrac",                           required_argument,  0,                    ARG_SNPFRAC},
+{(char*)"suppress",                          required_argument,  0,                    ARG_SUPPRESS_FIELDS},
+{(char*)"mapq",                              required_argument,  0,                    ARG_DEFAULT_MAPQ},
+{(char*)"col-cseq",                          no_argument,        0,                    ARG_COLOR_SEQ},
+{(char*)"col-cqual",                         no_argument,        0,                    ARG_COLOR_QUAL},
+{(char*)"col-keepends",                      no_argument,        0,                    ARG_COLOR_KEEP_ENDS},
+{(char*)"cost",                              no_argument,        0,                    ARG_COST},
+{(char*)"showseed",                          no_argument,        0,                    ARG_SHOWSEED},
+{(char*)"allow-contain",no_argument,         0,                  ARG_ALLOW_CONTAIN},
+{(char*)"col-primer",                        no_argument,        0,                    ARG_COLOR_PRIMER},
+{(char*)"wrapper",                           required_argument,  0,                    ARG_WRAPPER},
+{(char*)"interleaved",                       required_argument,  0,                    ARG_INTERLEAVED_FASTQ},
+{(char*)"no-unal",                           no_argument,        0,                    ARG_SAM_NO_UNAL},
+{(char*)"thread-ceiling",required_argument,  0,                  ARG_THREAD_CEILING},
+{(char*)"thread-piddir",                     required_argument,  0,                    ARG_THREAD_PIDDIR},
+{(char*)"reorder",                           no_argument,        0,                    ARG_REORDER_SAM},
+{(char*)0,                                   0,                  0,                    0} //  terminator
 };
 
 /**
@@ -549,6 +553,7 @@ static void printUsage(ostream& out) {
 #ifdef BOWTIE_SHARED_MEM
 	    << "  --shmem            use shared mem for index; many 'bowtie's can share" << endl
 #endif
+		<< "  --reorder          force SAM output order to match order of input reads" << endl
 	    << "Other:" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
@@ -791,6 +796,9 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_THREAD_PIDDIR:
 				thread_stealing_dir = optarg;
 				break;
+			case ARG_REORDER_SAM:
+				reorder = true;
+				break;
 			case ARG_FILEPAR:
 				fileParallel = true;
 				break;
@@ -871,6 +879,11 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
+	if (outType != OUTPUT_SAM) {
+		cerr << "Bowtie will attempt to reorder records only when outputting SAM." << endl
+			 << "Please specify the `-S` parameter if you intend on using this option." << endl;
+		reorder = false;
+	}
 	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
 		// Tell the Ebwt loader to ignore the suffix-array portion of
@@ -3259,7 +3272,8 @@ static void driver(const char * type,
 				sampleMax,
 				refnames,
 				nthreads,
-				outBatchSz);
+				outBatchSz,
+				reorder);
 			if(!samNoHead) {
 				vector<string> refnames;
 				if(!samNoSQ) {

@@ -18,6 +18,7 @@
 #include "filebuf.h"
 #include "edit.h"
 #include "sstring.h"
+#include <algorithm>
 
 /**
  * Classes for dealing with reporting alignments.
@@ -154,7 +155,8 @@ public:
 		bool sampleMax,
 		vector<string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		size_t perThreadBufSize,
+		bool reorder) :
 		out_(out),
 		_refnames(refnames),
 		mutex_(),
@@ -167,8 +169,10 @@ public:
 		nthreads_((nthreads > 0) ? nthreads : 1),
 		ptBufs_(),
 		ptCounts_(nthreads_),
+		batchIds_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
-		ptNumAligned_(NULL)
+		ptNumAligned_(NULL),
+		reorder_(reorder)
 	{
 		size_t nelt = 5 * nthreads_;
 		ptNumAligned_ = new uint64_t[nelt];
@@ -179,6 +183,8 @@ public:
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
+		batchIds_.assign(nthreads_, 0);
+		lastBatchIdSeen = 0;
 	}
 
 	/**
@@ -224,7 +230,7 @@ public:
 		size_t threadId,
 		int mapq,
 		int xms,
-		bool tally)
+		bool tally, size_t rdid)
 	{
 		assert_geq(end, start);
 		assert(nthreads_ > 1 || threadId == 0);
@@ -233,20 +239,21 @@ public:
 		}
 		const Hit& firstHit = (hptr == NULL) ? (*hsptr)[start] : *hptr;
 		bool paired = firstHit.mate > 0;
-		maybeFlush(threadId, 0);
+		maybeFlush(threadId);
 		BTString& o = ptBufs_[threadId];
 		// Per-thread buffering is active
 		for(size_t i = start; i < end; i++) {
 			const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
 			assert(h.repOk());
-			if(nthreads_ > 1) {
-				append(o, h, mapq, xms);
-				ptCounts_[threadId]++;
-			} else {
-				append(o, h, mapq, xms);
+			append(o, h, mapq, xms);
+			if(nthreads_ == 1) {
 				out_.writeString(o);
 				o.clear();
 			}
+		}
+		ptCounts_[threadId]++;
+		if (reorder_) {
+			batchIds_[threadId] = rdid / perThreadBufSize_ + 1;
 		}
 		if(tally) {
 			tallyAlignments(threadId, end - start, paired);
@@ -259,7 +266,7 @@ public:
 	 */
 	void finish(bool hadoopOut) {
 		// Flush all per-thread buffers
-		flushAll(0);
+		flushAll();
 		
 		// Close all output streams
 		closeOuts();
@@ -270,7 +277,7 @@ public:
 			uint64_t numReported = 0, numReportedPaired = 0;
 			uint64_t numAligned = 0, numUnaligned = 0;
 			uint64_t numMaxed = 0;
-			for(int i = 0; i < nthreads_; i++) {
+			for(size_t i = 0; i < nthreads_; i++) {
 				numReported += ptNumReported_[i];
 				numReportedPaired += ptNumReportedPaired_[i];
 				numAligned += ptNumAligned_[i];
@@ -552,10 +559,33 @@ protected:
 	/**
 	 * Flush thread's output buffer and reset both buffer and count.
 	 */
-	void flush(size_t threadId, size_t outId) {
+	void flush(size_t threadId, bool finalBatch) {
 		{
 			ThreadSafe _ts(&mutex_); // flush
-			out_.writeString(ptBufs_[threadId]);
+			if (reorder_) {
+				nchars += ptBufs_[threadId].length();
+				batch b = {ptBufs_[threadId], batchIds_[threadId], false};
+				unwrittenBatches_.push_back(b);
+				// consider writing if we have enough data to fill the buffer
+				// or we're ready to output the final batch
+				if (finalBatch || nchars >= OutFileBuf::BUF_SZ) {
+					// sort by batch ID
+					std::sort(unwrittenBatches_.begin(), unwrittenBatches_.end());
+					for (int i = 0; i < unwrittenBatches_.size(); i++) {
+						if (unwrittenBatches_[i].batchId - lastBatchIdSeen == 1) {
+							nchars -= out_.writeString(unwrittenBatches_[i].btString);
+							lastBatchIdSeen = unwrittenBatches_[i].batchId;
+							unwrittenBatches_[i].isWritten = true;
+						}
+					}
+					unwrittenBatches_.erase(std::remove_if(unwrittenBatches_.begin(),
+					                        unwrittenBatches_.end(), batch::remove_written_batches),
+					                        unwrittenBatches_.end());
+				}
+			}
+			else {
+				out_.writeString(ptBufs_[threadId]);
+			}
 		}
 		ptCounts_[threadId] = 0;
 		ptBufs_[threadId].clear();
@@ -564,9 +594,9 @@ protected:
 	/**
 	 * Flush all output buffers.
 	 */
-	void flushAll(size_t outId) {
-		for(int i = 0; i < nthreads_; i++) {
-			flush(i, outId);
+	void flushAll() {
+		for(size_t i = 0; i < nthreads_; i++) {
+			flush(i, i == nthreads_ - 1);
 		}
 	}
 
@@ -574,9 +604,9 @@ protected:
 	 * If the thread's output buffer is currently full, flush it and
 	 * reset both buffer and count.
 	 */
-	void maybeFlush(size_t threadId, size_t outId) {
+	void maybeFlush(size_t threadId) {
 		if(ptCounts_[threadId] >= perThreadBufSize_) {
-			flush(threadId, outId);
+			flush(threadId, false /* final batch? */);
 		}
 	}
 	
@@ -596,6 +626,27 @@ protected:
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
+	bool reorder_;
+
+	struct batch {
+		BTString btString;
+		size_t batchId;
+		bool isWritten;
+
+		bool operator< (const batch& other) const {
+			return batchId < other.batchId;
+		}
+
+		static bool remove_written_batches(const batch& b) {
+			return b.isWritten;
+		}
+	};
+
+
+	std::vector<batch> unwrittenBatches_;
+	std::vector<size_t> batchIds_;
+	size_t lastBatchIdSeen;
+	size_t nchars;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -794,7 +845,7 @@ public:
 			}
 			xms++;
 			_sink.reportHits(NULL, &_bufferedHits, 0, _bufferedHits.size(),
-			                 threadId_, mapq, xms, true);
+			                 threadId_, mapq, xms, true, p.rdid());
 			_sink.dumpAlign(p);
 			ret = (uint32_t)_bufferedHits.size();
 			_bufferedHits.clear();
@@ -1319,7 +1370,7 @@ public:
 		bool sampleMax,
 		std::vector<std::string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize,
+		size_t perThreadBufSize,
 		int partition = 0) :
 		HitSink(
 			out,
@@ -1330,7 +1381,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			false),
 		partition_(partition),
 		offBase_(offBase),
 		colorSeq_(colorSeq),

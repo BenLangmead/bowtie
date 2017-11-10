@@ -38,6 +38,7 @@ static inline bool isspace_notnl(int c) {
  */
 class FileBuf {
 public:
+
 	FileBuf() {
 		init();
 	}
@@ -431,6 +432,8 @@ class OutFileBuf {
 
 public:
 
+    static const size_t BUF_SZ = 16 * 1024;
+
 	/**
 	 * Open a new output stream to a file with given name.
 	 */
@@ -529,11 +532,15 @@ public:
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
 	template<typename T>
-	void writeString(const T& s) {
+	size_t writeString(const T& s) {
 		assert(!closed_);
 		size_t slen = s.length();
+		size_t bytes_written = 0;
 		if(cur_ + slen > BUF_SZ) {
-			if(cur_ > 0) flush();
+			if(cur_ > 0) {
+				flush();
+				bytes_written += cur_;;
+			}
 			if(slen >= BUF_SZ) {
 				fwrite(s.toZBuf(), slen, 1, out_);
 			} else {
@@ -545,7 +552,9 @@ public:
 			memcpy(&buf_[cur_], s.toZBuf(), slen);
 			cur_ += slen;
 		}
+		bytes_written += slen;
 		assert_leq(cur_, BUF_SZ);
+		return bytes_written;
 	}
 
 	/**
@@ -625,8 +634,6 @@ public:
 	}
 
 private:
-
-	static const size_t BUF_SZ = 16 * 1024;
 
 	const char *name_;
 	FILE       *out_;

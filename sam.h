@@ -48,7 +48,8 @@ public:
 		bool sampleMax,
 		std::vector<std::string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		int perThreadBufSize,
+		bool reorder) :
 		HitSink(
 			out,
 			dumpAl,
@@ -58,7 +59,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			reorder),
 		offBase_(offBase),
 		fullRef_(fullRef),
 		noQnameTrunc_(noQnameTrunc) { }
