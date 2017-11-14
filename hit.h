@@ -211,7 +211,7 @@ public:
 	 */
 	void tallyAlignments(size_t threadId, size_t numAl, bool paired) {
         assert(!paired || (numAl % 2) == 0);
-        ptNumAligned_[threadId] += paired ? (numAl >> 1) : numAl;
+        ptNumAligned_[threadId] ++;
 		if(paired) {
 			ptNumReportedPaired_[threadId] += numAl;
 		} else {
