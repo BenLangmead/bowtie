@@ -879,10 +879,15 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
-	if (outType != OUTPUT_SAM) {
-		cerr << "Bowtie will attempt to reorder records only when outputting SAM." << endl
-			 << "Please specify the `-S` parameter if you intend on using this option." << endl;
-		reorder = false;
+	if (reorder == true) {
+		if (nthreads == 1 && !thread_stealing) {
+			reorder = false;
+		}
+		if (outType != OUTPUT_SAM) {
+			cerr << "Bowtie will attempt to reorder its output only when outputting SAM." << endl
+				<< "Please specify the `-S` parameter if you intend on using this option." << endl;
+			reorder = false;
+		}
 	}
 	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
