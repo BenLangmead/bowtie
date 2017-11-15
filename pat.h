@@ -610,7 +610,8 @@ protected:
 	 */
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a) = 0;
+		bool batch_a,
+		size_t read_idx) = 0;
 
 	/**
 	 * Reset state to handle a fresh file
@@ -717,7 +718,8 @@ protected:
 	 */
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a);
+		bool batch_a,
+		size_t read_idx);
 
 	/**
 	 * Reset state to handle a fresh file
@@ -793,7 +795,8 @@ protected:
 	 */
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a);
+		bool batch_a,
+		size_t read_idx);
 	
 	/**
 	 * Dump a FASTQ-style record for the read.
@@ -860,7 +863,8 @@ protected:
 	 */
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a);
+		bool batch_a,
+		size_t read_idx);
 
 	/**
 	 * Reset state to be read for the next file.
@@ -940,7 +944,8 @@ protected:
 	 */
 	virtual pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a);
+		bool batch_a,
+		size_t read_idx);
 
 	virtual void resetForNextFile() {
 		first_ = true;
@@ -1003,7 +1008,8 @@ protected:
 	 */
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
-		bool batch_a);
+		bool batch_a,
+		size_t read_idx);
 
 	virtual void resetForNextFile() {
 		first_ = true;
@@ -1321,7 +1327,7 @@ public:
 		delete composers;
 	}
 
-    virtual ~PatternSourcePerThreadFactory() {}
+	virtual ~PatternSourcePerThreadFactory() {}
 	
 private:
 	/// Container for obtaining paired reads from PatternSources
