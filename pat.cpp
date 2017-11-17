@@ -232,11 +232,11 @@ pair<bool, int> CFilePatternSource::nextBatchImpl(
 	bool batch_a)
 {
 	bool done = false;
-	int nread = 0;
+	size_t nread = 0;
 	pt.setReadId(readCnt_);
 	while(true) { // loop that moves on to next file when needed
 		do {
-			pair<bool, int> ret = nextBatchFromFile(pt, batch_a);
+			pair<bool, int> ret = nextBatchFromFile(pt, batch_a, nread);
 			done = ret.first;
 			nread = ret.second;
 		} while(!done && nread == 0); // not sure why this would happen
@@ -244,9 +244,10 @@ pair<bool, int> CFilePatternSource::nextBatchImpl(
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
 			filecur_++;
-			if(nread == 0) {
+			if(nread == 0 || nread < pt.max_buf_) {
 				continue;
 			}
+			done = false;
 		}
 		break;
 	}
@@ -572,7 +573,8 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
  */
 pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
-	bool batch_a)
+	bool batch_a,
+	size_t readi)
 {
 	int c;
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
@@ -591,7 +593,6 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 		first_ = false;
 	}
 	bool done = false;
-	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && !done; readi++) {
 		readbuf[readi].readOrigBuf[0] = '>';
@@ -739,11 +740,11 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
  */
 pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
-	bool batch_a)
+	bool batch_a,
+	size_t readi)
 {
 	int c = -1;
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
-	size_t readi = 0;
 	int nameoff = 0;
 	while(readi < pt.max_buf_) {
 		c = getc_wrapper();
@@ -903,7 +904,8 @@ bool FastaContinuousPatternSource::parse(
  */
 pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
-	bool batch_a)
+	bool batch_a,
+	size_t readi)
 {
 	int c = 0;
 	vector<Read>* readBuf = batch_a ? &pt.bufa_ : &pt.bufb_;
@@ -917,11 +919,10 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 			throw 1;
 		}
 		first_ = false;
-		(*readBuf)[0].readOrigBuf[0] = c;
-		(*readBuf)[0].readOrigBufLen = 1;
+		(*readBuf)[readi].readOrigBuf[0] = c;
+		(*readBuf)[readi].readOrigBufLen = 1;
 	}
 	bool done = false, aborted = false;
-	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	while (readi < pt.max_buf_ && !done) {
 		char* buf = (*readBuf)[readi].readOrigBuf;
@@ -1138,14 +1139,14 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
  */
 pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
-	bool batch_a)
+	bool batch_a,
+	size_t readi)
 {
 	int c = getc_wrapper();
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_wrapper();
 	}
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
-	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;
@@ -1317,14 +1318,14 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
  */
 pair<bool, int> RawPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
-	bool batch_a)
+	bool batch_a,
+	size_t readi)
 {
 	int c = getc_wrapper();
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_wrapper();
 	}
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
-	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;

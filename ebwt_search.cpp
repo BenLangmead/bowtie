@@ -1488,19 +1488,37 @@ static void exactSearch(PatternComposer& _patsrc,
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
-			if(stateful) {
-				threads.push_back(new std::thread(exactSearchWorkerStateful, (void*) &tp));
-			} else {
-				threads.push_back(new std::thread(exactSearchWorker, (void*) &tp));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					exactSearchWorkerStateful((void*)&tp);
+				} else {
+					exactSearchWorker((void*)&tp);
+				}
 			}
-			threads[i]->detach();
-			SLEEP(10);
+			else {
+				if(stateful) {
+					threads.push_back(new std::thread(exactSearchWorkerStateful, (void*)&tp));
+				} else {
+					threads.push_back(new std::thread(exactSearchWorker, (void*)&tp));
+				}
+				threads[i]->detach();
+				SLEEP(10);
+			}
 #else
 			tids[i] = i;
-			if(stateful) {
-				threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + i)));
-			} else {
-				threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + i)));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					exactSearchWorkerStateful((void*)(tids + i));
+				} else {
+					exactSearchWorker((void*)(tids + i));
+				}
+			}
+			else {
+				if(stateful) {
+					threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + i)));
+				} else {
+					threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + i)));
+				}
 			}
 #endif
 		}
@@ -1562,7 +1580,7 @@ static void exactSearch(PatternComposer& _patsrc,
 	}
 	if(refs != NULL) delete refs;
 
-	for (int i = 0; i < nthreads; i++) {
+	for (int i = 0; i < nthreads - 1; i++) {
 		if (threads[i] != NULL) {
 			delete threads[i];
 		}
@@ -1855,19 +1873,37 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
-			if(stateful) {
-				threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
-			} else {
-				threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					mismatchSearchWorkerFullStateful((void*)&tp);
+				} else {
+					mismatchSearchWorkerFull((void*)&tp);
+				}
 			}
-			threads[i]->detach();
-			SLEEP(10);
+			else {
+				if(stateful) {
+					threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
+				} else {
+					threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
+				}
+				threads[i]->detach();
+				SLEEP(10);
+			}
 #else
 			tids[i] = i;
-			if(stateful) {
-				threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + i)));
-			} else {
-				threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + i)));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					mismatchSearchWorkerFullStateful((void*)(tids + i));
+				} else {
+					mismatchSearchWorkerFull((void*)(tids + i));
+				}
+			}
+			else {
+				if(stateful) {
+					threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + i)));
+				} else {
+					threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + i)));
+				}
 			}
 #endif
 		}
@@ -1929,7 +1965,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	}
 	if(refs != NULL) delete refs;
 
-	for (int i = 0; i < nthreads; i++) {
+	for (int i = 0; i < nthreads - 1; i++) {
 		if (threads[i] != NULL) {
 			delete threads[i];
 		}
@@ -2341,19 +2377,37 @@ static void twoOrThreeMismatchSearchFull(
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
-			if(stateful) {
-				threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp));
-			} else {
-				threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					twoOrThreeMismatchSearchWorkerStateful((void*)&tp);
+				} else {
+					twoOrThreeMismatchSearchWorkerFull((void*)&tp);
+				}
 			}
-			threads[i]->detach();
-			SLEEP(10);
+			else {
+				if(stateful) {
+					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tp));
+				} else {
+					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tp));
+				}
+				threads[i]->detach();
+				SLEEP(10);
+			}
 #else
 			tids[i] = i;
-			if(stateful) {
-				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + i)));
-			} else {
-				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + i)));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					twoOrThreeMismatchSearchWorkerStateful((void*)(tids + i));
+				} else {
+					twoOrThreeMismatchSearchWorkerFull((void*)(tids + i));
+				}
+			}
+			else {
+				if(stateful) {
+					threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + i)));
+				} else {
+					threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + i)));
+				}
 			}
 #endif
 		}
@@ -2415,7 +2469,7 @@ static void twoOrThreeMismatchSearchFull(
 	}
 	if(refs != NULL) delete refs;
 
-	for (int i = 0; i < nthreads; i++) {
+	for (int i = 0; i < nthreads - 1; i++) {
 		if (threads[i] != NULL) {
 			delete threads[i];
 		}
@@ -2882,19 +2936,37 @@ static void seededQualCutoffSearchFull(
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
-			if(stateful) {
-				threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp));
-			} else {
-				threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*) &tp));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					seededQualSearchWorkerFullStateful((void*)&tp);
+				} else {
+					seededQualSearchWorkerFull((void*)&tp);
+				}
 			}
-			threads[i]->detach();
-			SLEEP(10);
+			else {
+				if(stateful) {
+					threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*)&tp));
+				} else {
+					threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*)&tp));
+				}
+				threads[i]->detach();
+				SLEEP(10);
+		    }
 #else
 			tids[i] = i;
-			if(stateful) {
-				threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + i)));
-			} else {
-				threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + i)));
+			if (i == nthreads - 1) {
+				if(stateful) {
+					seededQualSearchWorkerFullStateful((void*)(tids + i));
+				} else {
+					seededQualSearchWorkerFull((void*)(tids + i));
+				}
+			}
+			else {
+				if(stateful) {
+					threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + i)));
+				} else {
+					threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + i)));
+				}
 			}
 #endif
 		}
@@ -2959,7 +3031,7 @@ static void seededQualCutoffSearchFull(
 		delete refs;
 	}
 
-	for (int i = 0; i < nthreads; i++) {
+	for (int i = 0; i < nthreads - 1; i++) {
 		if (threads[i] != NULL) {
 			delete threads[i];
 		}
