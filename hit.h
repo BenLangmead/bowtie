@@ -185,6 +185,7 @@ public:
 		ptCounts_.resize(nthreads_, 0);
 		batchIds_.assign(nthreads_, 0);
 		lastBatchIdSeen = 0;
+		initDumps();
 	}
 
 	/**
