@@ -20,16 +20,16 @@ static inline TIndexOffU*
 bitsetRealloc(TIndexOffU& sz, TIndexOffU* words, const char *errmsg = NULL) {
 	TIndexOffU oldsz = sz;
 	if(sz > 0) {
-		sz += (sz >> 1) + 31; // Add 50% more elements, plus a bit
-		sz &= ~31;            // Make sure it's 32-aligned
+		sz += (sz >> 1) + BITSET_MASK; // Add 50% more elements, plus a bit
+		sz &= ~BITSET_MASK;            // Make sure it's 32-aligned
 	} else {
 		sz = 1024; // Start off at 1024 bits to avoid many expansions
 	}
 	assert_gt(sz, oldsz);
-	assert_eq(0, (sz & 31));
+	assert_eq(0, (sz & BITSET_MASK));
 	TIndexOffU *newwords;
 	try {
-		newwords = new TIndexOffU[sz >> 5 /* convert to words */];
+		newwords = new TIndexOffU[sz / WORD_SIZE /* convert to words */];
 	} catch(std::bad_alloc& ba) {
 		if(errmsg != NULL) {
 			// Output given error message
@@ -42,7 +42,7 @@ bitsetRealloc(TIndexOffU& sz, TIndexOffU* words, const char *errmsg = NULL) {
 		memcpy(newwords, words, oldsz >> 3 /* convert to bytes */);
 	}
 	// Initialize all new words to 0
-	memset(newwords + (oldsz >> 5 /*convert to words*/), 0,
+	memset(newwords + (oldsz / WORD_SIZE /*convert to words*/), 0,
 	       (sz - oldsz) >> 3 /* convert to bytes */);
 	return newwords; // return new array
 }
@@ -58,7 +58,7 @@ public:
 	 * error message and quit if allocation fails.
 	 */
 	SyncBitset(TIndexOffU sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		TIndexOffU nwords = (sz >> 5)+1; // divide by 32 and add 1
+		TIndexOffU nwords = (sz / WORD_SIZE)+1; // divide by 32 and add 1
 		try {
 			_words = new TIndexOffU[nwords];
 		} catch(std::bad_alloc& ba) {
@@ -68,8 +68,8 @@ public:
 			throw 1;
 		}
 		assert(_words != NULL);
-		memset(_words, 0, nwords * 4 /* words to bytes */);
-		_sz = nwords << 5 /* words to bits */;
+		memset(_words, 0, nwords * OFF_SIZE /* words to bytes */);
+		_sz = nwords * WORD_SIZE /* words to bits */;
 	}
 
 	/**
@@ -84,7 +84,7 @@ public:
 	 */
 	bool testUnsync(TIndexOffU i) {
 		if(i < _sz) {
-			return ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+			return ((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) != 0;
 		}
 		return false;
 	}
@@ -114,9 +114,9 @@ public:
 		}
 		// Fast path
 		assert_lt(i, _sz);
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
-		_words[i >> 5] |= (1 << (i & 0x1f));
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0);
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	/**
@@ -134,8 +134,8 @@ public:
 		}
 		// Fast path
 		assert_lt(i, _sz);
-		_words[i >> 5] |= (1 << (i & 0x1f));
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 
@@ -164,7 +164,7 @@ class Bitset {
 
 public:
 	Bitset(TIndexOffU sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		TIndexOffU nwords = (sz >> 5)+1;
+		TIndexOffU nwords = (sz / WORD_SIZE)+1;
 		try {
 			_words = new TIndexOffU[nwords];
 		} catch(std::bad_alloc& ba) {
@@ -174,8 +174,8 @@ public:
 			throw 1;
 		}
 		assert(_words != NULL);
-		memset(_words, 0, nwords * 4);
-		_sz = nwords << 5;
+		memset(_words, 0, nwords * OFF_SIZE);
+		_sz = nwords * WORD_SIZE;
 		_cnt = 0;
 	}
 
@@ -193,7 +193,7 @@ public:
 	bool test(TIndexOffU i) const {
 		bool ret = false;
 		if(i < _sz) {
-			ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+			ret = ((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) != 0;
 		}
 		return ret;
 	}
@@ -211,10 +211,10 @@ public:
 			assert_gt(_sz, oldsz);
 		}
 		// Fast path
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0);
 		_cnt++;
-		_words[i >> 5] |= (1 << (i & 0x1f));
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	/**
@@ -229,16 +229,16 @@ public:
 			assert_gt(_sz, oldsz);
 		}
 		// Fast path
-		if(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0) _cnt++;
-		_words[i >> 5] |= (1 << (i & 0x1f));
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		if(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0) _cnt++;
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	/**
 	 * Unset all entries.  Don't adjust size.
 	 */
 	void clear() {
-		for(size_t i = 0; i < ((_sz+31)>>5); i++) {
+		for(size_t i = 0; i < ((_sz+BITSET_MASK) / WORD_SIZE); i++) {
 			_words[i] = 0;
 		}
 		_cnt = 0;
@@ -266,8 +266,8 @@ public:
 		_sz = o._sz;
 		_cnt = o._cnt;
 		if(_words != NULL) delete[] _words;
-		_words = new TIndexOffU[(_sz+31)>>5];
-		for(size_t i = 0; i < (_sz+31)>>5; i++) {
+		_words = new TIndexOffU[(_sz+BITSET_MASK) / WORD_SIZE];
+		for(size_t i = 0; i < (_sz+BITSET_MASK) / WORD_SIZE; i++) {
 			_words[i] = o._words[i];
 		}
 		return *this;
@@ -299,14 +299,14 @@ class FixedBitset {
 
 public:
 	FixedBitset() : _cnt(0), _size(0) {
-		memset(_words, 0, ((LEN>>5)+1) * 4);
+		memset(_words, 0, ((LEN / WORD_SIZE)+1) * OFF_SIZE);
 	}
 
 	/**
 	 * Unset all bits.
 	 */
 	void clear() {
-		memset(_words, 0, ((LEN>>5)+1) * 4);
+		memset(_words, 0, ((LEN / WORD_SIZE)+1) * OFF_SIZE);
 	}
 
 	/**
@@ -315,7 +315,7 @@ public:
 	bool test(TIndexOffU i) const {
 		bool ret = false;
 		assert_lt(i, LEN);
-		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+		ret = ((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) != 0;
 		return ret;
 	}
 
@@ -325,13 +325,13 @@ public:
 	void set(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, LEN);
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
-		_words[i >> 5] |= (1 << (i & 0x1f));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0);
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
 		_cnt++;
 		if(i >= _size) {
 			_size = i+1;
 		}
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	/**
@@ -341,12 +341,12 @@ public:
 	void setOver(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, LEN);
-		_words[i >> 5] |= (1 << (i & 0x1f));
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
 		_cnt++;
 		if(i >= _size) {
 			_size = i+1;
 		}
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	TIndexOffU count() const { return _cnt; }
@@ -357,7 +357,7 @@ public:
 	 * FixedBitset 'that'.
 	 */
 	bool operator== (const FixedBitset<LEN>& that) const {
-		for(TIndexOffU i = 0; i < (LEN>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (LEN / WORD_SIZE)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return false;
 			}
@@ -370,7 +370,7 @@ public:
 	 * as FixedBitset 'that'.
 	 */
 	bool operator!= (const FixedBitset<LEN>& that) const {
-		for(TIndexOffU i = 0; i < (LEN>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (LEN / WORD_SIZE)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return true;
 			}
@@ -392,7 +392,7 @@ public:
 private:
 	TIndexOffU _cnt;
 	TIndexOffU _size;
-	TIndexOffU _words[(LEN>>5)+1]; // storage
+	TIndexOffU _words[(LEN / WORD_SIZE)+1]; // storage
 };
 
 /**
@@ -402,8 +402,8 @@ class FixedBitset2 {
 
 public:
 	FixedBitset2(TIndexOffU len) : len_(len), _cnt(0), _size(0) {
-		_words = new TIndexOffU[((len_ >> 5)+1)];
-		memset(_words, 0, ((len_ >> 5)+1) * 4);
+		_words = new TIndexOffU[((len_ / WORD_SIZE)+1)];
+		memset(_words, 0, ((len_ / WORD_SIZE)+1) * OFF_SIZE);
 	}
 
 	~FixedBitset2() { delete[] _words; }
@@ -412,7 +412,7 @@ public:
 	 * Unset all bits.
 	 */
 	void clear() {
-		memset(_words, 0, ((len_ >> 5)+1) * 4);
+		memset(_words, 0, ((len_ / WORD_SIZE)+1) * OFF_SIZE);
 		_cnt = 0;
 		_size = 0;
 	}
@@ -423,7 +423,7 @@ public:
 	bool test(TIndexOffU i) const {
 		bool ret = false;
 		assert_lt(i, len_);
-		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+		ret = ((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) != 0;
 		return ret;
 	}
 
@@ -433,13 +433,13 @@ public:
 	void set(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
-		_words[i >> 5] |= (1 << (i & 0x1f));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0);
+		_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
 		_cnt++;
 		if(i >= _size) {
 			_size = i+1;
 		}
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	/**
@@ -448,13 +448,13 @@ public:
 	void clear(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
-		_words[i >> 5] &= ~(1 << (i & 0x1f));
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
+		_words[i / WORD_SIZE] &= ~((TIndexOffU)1 << (i & BITSET_MASK));
 		_cnt--;
 		if(i >= _size) {
 			_size = i+1;
 		}
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0);
 	}
 
 	/**
@@ -464,14 +464,14 @@ public:
 	void setOver(TIndexOffU i) {
 		// Fast path
 		assert_lt(i, len_);
-		if(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0) {
-			_words[i >> 5] |= (1 << (i & 0x1f));
+		if(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 0) {
+			_words[i / WORD_SIZE] |= ((TIndexOffU)1 << (i & BITSET_MASK));
 			_cnt++;
 		}
 		if(i >= _size) {
 			_size = i+1;
 		}
-		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		assert(((_words[i / WORD_SIZE] >> (i & BITSET_MASK)) & 1) == 1);
 	}
 
 	TIndexOffU count() const { return _cnt; }
@@ -482,7 +482,7 @@ public:
 	 * FixedBitset 'that'.
 	 */
 	bool operator== (const FixedBitset2& that) const {
-		for(TIndexOffU i = 0; i < (len_>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (len_ / WORD_SIZE)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return false;
 			}
@@ -495,7 +495,7 @@ public:
 	 * as FixedBitset 'that'.
 	 */
 	bool operator!= (const FixedBitset2& that) const {
-		for(TIndexOffU i = 0; i < (len_>>5)+1; i++) {
+		for(TIndexOffU i = 0; i < (len_ / WORD_SIZE)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return true;
 			}

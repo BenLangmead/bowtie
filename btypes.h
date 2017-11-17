@@ -1,5 +1,3 @@
-
-
 #ifndef BOWTIE_INDEX_TYPES_H
 #define	BOWTIE_INDEX_TYPES_H
 
@@ -9,6 +7,8 @@
 #define LS_SIZE 0x100000000000000
 #define OFF_SIZE 8
 #define CACHE_WRAPPER_BIT 0x8000000000000000
+#define WORD_SIZE 64
+#define BITSET_MASK 0x000000000000003f
 
 typedef uint64_t TIndexOffU;
 typedef int64_t TIndexOff;
@@ -19,6 +19,8 @@ typedef int64_t TIndexOff;
 #define LS_SIZE 0x10000000
 #define OFF_SIZE 4
 #define CACHE_WRAPPER_BIT 0x80000000
+#define WORD_SIZE 32
+#define BITSET_MASK 0x0000001f
 
 typedef uint32_t TIndexOffU;
 typedef int TIndexOff;
@@ -28,4 +30,3 @@ typedef int TIndexOff;
 extern const std::string gEbwt_ext;
 
 #endif	/* BOWTIE_INDEX_TYPES_H */
-
