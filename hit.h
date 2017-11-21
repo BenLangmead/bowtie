@@ -640,7 +640,7 @@ protected:
 		}
 
 		batch& operator=(batch& other) {
-			if (&other != *this) {
+			if (&other != this) {
 				batchId = other.batchId;
 				isWritten = other.isWritten;
 				other.btString.moveTo(btString);
