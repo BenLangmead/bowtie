@@ -565,15 +565,14 @@ protected:
 			ThreadSafe _ts(&mutex_); // flush
 			if (reorder_) {
 				nchars += ptBufs_[threadId].length();
-				batch b = { .batchId = batchIds_[threadId], .isWritten = false };
-				ptBufs_[threadId].moveTo(b.btString);
+				batch b(ptBufs_[threadId], batchIds_[threadId], false /* has batch been written */);
 				unwrittenBatches_.push_back(b);
 				// consider writing if we have enough data to fill the buffer
 				// or we're ready to output the final batch
 				if (finalBatch || nchars >= OutFileBuf::BUF_SZ) {
 					// sort by batch ID
 					std::sort(unwrittenBatches_.begin(), unwrittenBatches_.end());
-					for (int i = 0; i < unwrittenBatches_.size(); i++) {
+					for (std::vector<batch>::size_type i = 0; i < unwrittenBatches_.size(); i++) {
 						if (unwrittenBatches_[i].batchId - lastBatchIdSeen == 1) {
 							nchars -= out_.writeString(unwrittenBatches_[i].btString);
 							lastBatchIdSeen = unwrittenBatches_[i].batchId;
@@ -634,6 +633,12 @@ protected:
 		BTString btString;
 		size_t batchId;
 		bool isWritten;
+
+		batch(BTString& s, size_t id, bool b)
+			: batchId(id), isWritten(b)
+		{
+			s.moveTo(btString);
+		}
 
 		bool operator<(const batch& other) const {
 			return batchId < other.batchId;
