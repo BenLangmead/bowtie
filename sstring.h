@@ -2075,6 +2075,15 @@ public:
 	 */
 	T* wbuf() { return cs_; }
 
+	void moveTo(SStringExpandable<T,S>& o) {
+		if (&o != this) {
+			o.sz_ = sz_; sz_ = 0;
+			o.cs_ = cs_; cs_ = NULL;
+			o.len_ = len_; len_ = 0;
+			o.printcs_ = printcs_; printcs_ = NULL;
+		}
+	}
+
 protected:
 	/**
 	 * Allocate new, bigger buffer and copy old contents into it.  If

@@ -565,7 +565,8 @@ protected:
 			ThreadSafe _ts(&mutex_); // flush
 			if (reorder_) {
 				nchars += ptBufs_[threadId].length();
-				batch b = {ptBufs_[threadId], batchIds_[threadId], false};
+				batch b = { .batchId = batchIds_[threadId], .isWritten = false };
+				ptBufs_[threadId].moveTo(b.btString);
 				unwrittenBatches_.push_back(b);
 				// consider writing if we have enough data to fill the buffer
 				// or we're ready to output the final batch
@@ -634,8 +635,17 @@ protected:
 		size_t batchId;
 		bool isWritten;
 
-		bool operator< (const batch& other) const {
+		bool operator<(const batch& other) const {
 			return batchId < other.batchId;
+		}
+
+		batch& operator=(batch& other) {
+			if (&other != *this) {
+				batchId = other.batchId;
+				isWritten = other.isWritten;
+				other.btString.moveTo(btString);
+			}
+			return *this;
 		}
 
 		static bool remove_written_batches(const batch& b) {
