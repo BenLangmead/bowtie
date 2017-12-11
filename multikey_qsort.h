@@ -820,9 +820,6 @@ void qsortSufDcU8(const T1& host1,
 #define BUCKET_SORT_CUTOFF (4 * 1024 * 1024)
 #define SELECTION_SORT_CUTOFF 6
 
-// 5 64-element buckets for bucket-sorting A, C, G, T, $
-static TIndexOffU bkts[4][4 * 1024 * 1024];
-
 /**
  * Straightforwardly obtain a uint8_t-ized version of t[off].  This
  * works fine as long as TStr is not packed.
