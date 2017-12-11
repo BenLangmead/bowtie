@@ -26,6 +26,18 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+Version 1.2.2 - Dec 11, 2017
+    * Fixed major issue causing corrupt SAM output when using many threads (-p/--threads) on certain systems
+    * Fixed major issue with incorrect alignment offsets being reported in --large-index mode
+    * Fixed major issue with reads files being skipped when multiple inputs were specified together with -p/--threads
+    * The official LICENSE of Bowtie was changed to Artistic License 2.0.  This fixes an issue with the previous LICENSE, which mistakenly combined elements of different open-source licenses.
+    * Fixed issue where bowtie would still run for a long time even when -u was set to a small number.
+    * Fixed spurious "Reads file contained a pattern with more than 1024 quality values" error for some colorspace inputs.
+    * Fixed issue with --strata sometimes failing to suppress alignments at lower strata.
+    * Fixed issue with ends of paired-end reads sometimes appearing in non-adjacent lines of the SAM output with -p/--threads >1
+    * Fixed issue whereby the read name of end #2 was not always truncated at the first whitespace character
+    * Code simplifications
+
 Version 1.2.1.1 - Jun 13, 2017
     * Fixed an issue causing Bowtie to segfault when processing reads from stdin
 

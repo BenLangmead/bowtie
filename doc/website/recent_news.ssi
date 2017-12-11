@@ -1,3 +1,17 @@
+<h2>1.2.2 - 12/11/2017</h2>
+<ul>
+    <li>Fixed major issue causing corrupt SAM output when using many threads (-p/--threads) on certain systems</li>
+    <li>Fixed major issue with incorrect alignment offsets being reported in --large-index mode</li>
+    <li>Fixed major issue with reads files being skipped when multiple inputs were specified together with -p/--threads</li>
+    <li>The official LICENSE of Bowtie was changed to Artistic License 2.0. This fixes an issue with the previous LICENSE, which mistakenly combined elements of different open-source licenses.</li>
+    <li>Fixed issue where bowtie would still run for a long time even when -u was set to a small number.</li>
+    <li>Fixed spurious "Reads file contained a pattern with more than 1024 quality values" error for some colorspace inputs.</li>
+    <li>Fixed issue with --strata sometimes failing to suppress alignments at lower strata.</li>
+    <li>Fixed issue with ends of paired-end reads sometimes appearing in non-adjacent lines of the SAM output with -p/--threads >1</li>
+    <li>Fixed issue whereby the read name of end #2 was not always truncated at the first whitespace character</li>
+    <li>Code simplifications</li>
+</ul>
+
 <h2>1.2.1.1 - 06/13/2017</h2>
 <ul>
     <li>Fixed an issue causing Bowtie to segfault when processing reads from stdin</li>
@@ -43,42 +57,3 @@ these libraries be pre-installed.</p>
    <li>  Added minor corrections/addition to the manual.</li>
    <li>  Fixed bug that caused the wrapper to incorrectly identify the bowtie binary.</li>
 </ul>
-
-<h2>Lighter released</h2>
-<ul>
-   <li>Lighter is an extremely fast and memory-efficient program for correcting sequencing errors in DNA sequencing data.  For details on how error correction can help improve the speed and accuracy of downstream analysis tools, see the <a href="http://genomebiology.com/2014/15/11/509">paper in Genome Biology</a>.  Source and software <a href="https://github.com/mourisl/Lighter">available at GitHub</a>.
-</ul>
-
-<h2>1.1.1 - 10/1/2014</h2>
-<ul>
-   <li> Fixed a compiling linkage problem related with Mac OS X Mavericks.</li>
-   <li> Improved performance for cases where the reference contains many stretches of Ns.</li>
-   <li> Some minor automatic tests updates.</li>
-</ul>
-
-
-<h2>1.1.0 - 7/19/2014</h2>
-<ul>
-   <li> Added support for large and small indexes, removing 4-billion-nucleotide
-     barrier.  Bowtie can now be used with reference genomes of any size.</li>
-   <li> No longer releasing 32-bit binaries. Simplified manual and Makefile accordingly.</li>
-   <li> Phased out CygWin support.</li>
-   <li> Improved efficiency of index files loading.</li>
-   <li> Fixed a bug that made <tt>bowtie-inspect</tt> fail in some situations.</li>
-   <li> (This release was briefly given version number 2.0.0, but we changed it to 1.1.0
-        to avoid confusion with Bowtie 2.)</li>
-</ul>
-
-<h2>1.0.1 release - 3/14/2014</h2>
-<ul>
- <li>Improved index querying efficiency using "population count" instructions
-     available since SSE4.2.</li>
- <li>Credits to the Intel(r) enabling team for performance optimizations
-     included in this release.  Thank you!</li>
-</ul>
-
-<h2>Bowtie on GitHub - 4/11/13</h2>
-<ul>
- <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
-</ul>
-

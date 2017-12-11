@@ -756,6 +756,8 @@ T2302111203131231130300111123220
 </td>
 <td>
 <p>Add <code>&lt;text&gt;</code> (usually of the form <code>TAG:VAL</code>, e.g. <code>ID:IL7LANE2</code>) as a field on the <code>@RG</code> header line. Specify <code>--sam-RG</code> multiple times to set multiple fields. See the <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM Spec</a> for details about what fields are legal. Note that, if any <code>@RG</code> fields are set using this option, the <code>ID</code> and <code>SM</code> fields must both be among them to make the <code>@RG</code> line legal according to the <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM Spec</a>. <code>--sam-RG</code> is ignored unless <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> is also specified.</p>
+</td>
+</tr>
 <tr>
 <td id="bowtie-options-no-unal">
 <pre><code>--no-unal</code></pre>
@@ -934,11 +936,12 @@ T2302111203131231130300111123220
 <li><p>Inferred insert size. Size is negative if the mate's alignment occurs upstream of this alignment. Size is 0 if there is no mate.</p></li>
 <li><p>Read sequence (reverse-complemented if aligned to the reverse strand)</p></li>
 <li><p>ASCII-encoded read qualities (reverse-complemented if the read aligned to the reverse strand). The encoded quality values are on the <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations">Phred quality</a> scale and the encoding is ASCII-offset by 33 (ASCII char <code>!</code>), similarly to a <a href="http://en.wikipedia.org/wiki/FASTQ_format">FASTQ</a> file.</p></li>
-<li><p>Optional fields. Fields are tab-separated. For descriptions of all possible optional fields, see the SAM format specification. <code>bowtie</code> outputs some of these optional fields for each alignment, depending on the type of the alignment:</p>
+<li><p>Optional fields. Fields are tab-separated. For descriptions of all possible optional fields, see the SAM format specification. <code>bowtie</code> outputs some of these optional fields for each alignment, depending on the type of the alignment:</p></li>
+</ol>
 <table>
 <tr>
 <td>
-<pre><code>NM:i:&lt;N&gt;</code></pre>
+<pre><code>    NM:i:&lt;N&gt;</code></pre>
 </td>
 <td>
 <p>Aligned read has an edit distance of <code>&lt;N&gt;</code>.</p>
@@ -946,7 +949,7 @@ T2302111203131231130300111123220
 </tr>
 <tr>
 <td>
-<pre><code>CM:i:&lt;N&gt;</code></pre>
+<pre><code>    CM:i:&lt;N&gt;</code></pre>
 </td>
 <td>
 <p>Aligned read has an edit distance of <code>&lt;N&gt;</code> in colorspace. This field is present in addition to the <code>NM</code> field in <a href="#bowtie-options-C"><code>-C</code>/<code>--color</code></a> mode, but is omitted otherwise.</p>
@@ -954,7 +957,7 @@ T2302111203131231130300111123220
 </tr>
 <tr>
 <td>
-<pre><code>MD:Z:&lt;S&gt;</code></pre>
+<pre><code>    MD:Z:&lt;S&gt;</code></pre>
 </td>
 <td>
 <p>For aligned reads, <code>&lt;S&gt;</code> is a string representation of the mismatched reference bases in the alignment. See <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format specification for details. For colorspace alignments, <code>&lt;S&gt;</code> describes the decoded <em>nucleotide</em> alignment, not the colorspace alignment.</p>
@@ -962,28 +965,21 @@ T2302111203131231130300111123220
 </tr>
 <tr>
 <td>
-<pre><code>XA:i:&lt;N&gt;</code></pre>
+<pre><code>    XA:i:&lt;N&gt;</code></pre>
 </td>
 <td>
-<p>Aligned read belongs to stratum <code>&lt;N&gt;</code>. See <a href="#strata">Strata</a> for definition.</p></li>
-</ol>
-<pre><code>&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;
-
-    XM:i:&lt;N&gt;
-
-&lt;/td&gt;&lt;td&gt;
-
-For a read with no reported alignments, `&lt;N&gt;` is 0 if the read had
-no alignments.  If [`-m`] was specified and the read&#39;s alignments
-were supressed because the [`-m`] ceiling was exceeded, `&lt;N&gt;` equals
-the [`-m`] ceiling + 1, to indicate that there were at least that
-many valid alignments (but all were suppressed).  In [`-M`] mode, if
-the alignment was randomly selected because the [`-M`] ceiling was
-exceeded, `&lt;N&gt;` equals the [`-M`] ceiling + 1, to indicate that there
-were at least that many valid alignments (of which one was reported
-at random).
-
-&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre>
+<p>Aligned read belongs to stratum <code>&lt;N&gt;</code>. See <a href="#strata">Strata</a> for definition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<pre><code>    XM:i:&lt;N&gt;</code></pre>
+</td>
+<td>
+<p>For a read with no reported alignments, <code>&lt;N&gt;</code> is 0 if the read had no alignments. If <a href="#bowtie-options-m"><code>-m</code></a> was specified and the read's alignments were supressed because the <a href="#bowtie-options-m"><code>-m</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-m</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (but all were suppressed). In <a href="#bowtie-options-m"><code>-M</code></a> mode, if the alignment was randomly selected because the <a href="#bowtie-options-m"><code>-M</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-M</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (of which one was reported at random).</p>
+</td>
+</tr>
+</table>
 <h1 id="the-bowtie-build-indexer">The <code>bowtie-build</code> indexer</h1>
 <p><code>bowtie-build</code> builds a Bowtie index from a set of DNA sequences. <code>bowtie-build</code> outputs a set of 6 files with suffixes <code>.1.ebwt</code>, <code>.2.ebwt</code>, <code>.3.ebwt</code>, <code>.4.ebwt</code>, <code>.rev.1.ebwt</code>, and <code>.rev.2.ebwt</code>. (If the total length of all the input sequences is greater than about 4 billion, then the index files will end in <code>ebwtl</code> instead of <code>ebwt</code>.) These files together constitute the index: they are all that is needed to align reads to that reference. The original sequence files are no longer used by Bowtie once the index is built.</p>
 <p>Use of Karkkainen's <a href="http://portal.acm.org/citation.cfm?id=1314852">blockwise algorithm</a> allows <code>bowtie-build</code> to trade off between running time and memory usage. <code>bowtie-build</code> has three options governing how it makes this trade: <a href="#bowtie-build-options-p"><code>-p</code>/<code>--packed</code></a>, <a href="#bowtie-build-options-bmax"><code>--bmax</code></a>/<a href="#bowtie-build-options-bmaxdivn"><code>--bmaxdivn</code></a>, and <a href="#bowtie-build-options-dcv"><code>--dcv</code></a>. By default, <code>bowtie-build</code> will automatically search for the settings that yield the best running time without exhausting memory. This behavior can be disabled using the <a href="#bowtie-build-options-a"><code>-a</code>/<code>--noauto</code></a> option.</p>

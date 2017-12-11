@@ -1399,37 +1399,37 @@ right, the fields are:
 
         NM:i:<N>
 
-    Aligned read has an edit distance of `<N>`.
+Aligned read has an edit distance of `<N>`.
 
         CM:i:<N>
 
-    Aligned read has an edit distance of `<N>` in colorspace.  This
-    field is present in addition to the `NM` field in `-C`/`--color`
-    mode, but is omitted otherwise.
+Aligned read has an edit distance of `<N>` in colorspace.  This
+field is present in addition to the `NM` field in `-C`/`--color`
+mode, but is omitted otherwise.
 
         MD:Z:<S>
 
-    For aligned reads, `<S>` is a string representation of the
-    mismatched reference bases in the alignment.  See [SAM] format
-    specification for details.  For colorspace alignments, `<S>`
-    describes the decoded *nucleotide* alignment, not the colorspace
-    alignment.
+For aligned reads, `<S>` is a string representation of the
+mismatched reference bases in the alignment.  See [SAM] format
+specification for details.  For colorspace alignments, `<S>`
+describes the decoded *nucleotide* alignment, not the colorspace
+alignment.
 
         XA:i:<N>
 
-    Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
+Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
         XM:i:<N>
 
-    For a read with no reported alignments, `<N>` is 0 if the read had
-    no alignments.  If `-m` was specified and the read's alignments
-    were supressed because the `-m` ceiling was exceeded, `<N>` equals
-    the `-m` ceiling + 1, to indicate that there were at least that
-    many valid alignments (but all were suppressed).  In `-M` mode, if
-    the alignment was randomly selected because the `-M` ceiling was
-    exceeded, `<N>` equals the `-M` ceiling + 1, to indicate that there
-    were at least that many valid alignments (of which one was reported
-    at random).
+For a read with no reported alignments, `<N>` is 0 if the read had
+no alignments.  If `-m` was specified and the read's alignments
+were supressed because the `-m` ceiling was exceeded, `<N>` equals
+the `-m` ceiling + 1, to indicate that there were at least that
+many valid alignments (but all were suppressed).  In `-M` mode, if
+the alignment was randomly selected because the `-M` ceiling was
+exceeded, `<N>` equals the `-M` ceiling + 1, to indicate that there
+were at least that many valid alignments (of which one was reported
+at random).
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
 [FASTQ]: http://en.wikipedia.org/wiki/FASTQ_format
