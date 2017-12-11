@@ -1344,6 +1344,7 @@ static void exactSearch(PatternComposer& _patsrc,
 	exactSearch_refs   = refs;
 #ifdef WITH_TBB
 	AutoArray<std::thread*> threads(nthreads);
+	AutoArray<thread_tracking_pair> tps(nthreads);
 #else
 	AutoArray<tthread::thread*> threads(nthreads);
 	AutoArray<int> tids(nthreads);
@@ -1358,13 +1359,12 @@ static void exactSearch(PatternComposer& _patsrc,
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
-			thread_tracking_pair tp;
-			tp.tid = i;
-			tp.done = &all_threads_done;
+			tps[i].tid = i;
+			tps[i].done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(exactSearchWorkerStateful, (void*) &tp);
+				threads[i] = new std::thread(exactSearchWorkerStateful, (void*)&tps[i]);
 			} else {
-				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
+				threads[i] = new std::thread(exactSearchWorker, (void*)&tps[i]);
 			}
 			threads[i]->detach();
 			SLEEP(10);
