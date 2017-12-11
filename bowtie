@@ -88,11 +88,17 @@ def main():
             if os.path.exists(args.index + idx_ext_l):
                 bin_spec = os.path.join(ex_path, bin_l)
         bowtie_args.insert(0, args.index)
+    else:
+        for arg in bowtie_args:
+            if arg[0] == '-':
+                continue
+            if os.path.exists(arg + idx_ext_l):
+                bin_spec = os.path.join(ex_path, bin_l)
 
     if args.debug:
         bin_spec += '-debug'
 
-    bowtie_args.insert(0, bin_name)
+    bowtie_args.insert(0, bin_spec)
     bowtie_args.insert(1, 'basic-0')
     bowtie_args.insert(1, '--wrapper')
 
