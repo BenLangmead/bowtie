@@ -21,8 +21,7 @@ EXTRA_CFLAGS =
 EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
-WARNING_FLAGS = -Wall -Wno-unused-private-field \
-                -Wno-unused-parameter -Wno-reorder \
+WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
 				-Wno-unused-local-typedefs
 
 RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
@@ -464,13 +463,13 @@ static-libs:
 		export CFLAGS=-mmacosx-version-min=10.9 ; \
 		export CXXFLAGS=-mmacosx-version-min=10.9 ; \
 	fi ; \
-	DL=$$([ `which wget` ] && echo "wget --no-check-certificate" || echo "curl -LO") ; \
+	DL=$$([ `which wget` ] && echo "wget --no-check-certificate --content-disposition" || echo "curl -LJkO") ; \
 	cd /tmp ; \
 	$$DL https://zlib.net/zlib-1.2.11.tar.gz && tar xzf zlib-1.2.11.tar.gz && cd zlib-1.2.11 ; \
 	$(if $(MINGW), mingw32-make -f win32/Makefile.gcc, ./configure --static && make) && cp libz.a $(CURDIR)/.lib && cp zconf.h zlib.h $(CURDIR)/.include ; \
 	cd .. ; \
 	$$DL https://github.com/01org/tbb/archive/2017_U8.tar.gz && tar xzf 2017_U8.tar.gz && cd tbb-2017_U8; \
-	$(if $(MINGW), mingw32-make comiler=gcc arch=ia64 runtime=mingw, make) extra_inc=big_iron.inc -j4 \
+	$(if $(MINGW), mingw32-make compiler=gcc arch=ia64 runtime=mingw, make) extra_inc=big_iron.inc -j4 \
 	&& cp -r include/tbb $(CURDIR)/.include && cp build/*_release/*.a $(CURDIR)/.lib
 
 
