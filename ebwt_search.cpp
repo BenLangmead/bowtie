@@ -553,7 +553,6 @@ static void printUsage(ostream& out) {
 #ifdef BOWTIE_SHARED_MEM
 	    << "  --shmem            use shared mem for index; many 'bowtie's can share" << endl
 #endif
-		<< "  --reorder          force SAM output order to match order of input reads" << endl
 	    << "Other:" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
