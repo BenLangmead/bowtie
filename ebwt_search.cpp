@@ -879,15 +879,14 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
-	if (reorder == true) {
-		if (nthreads == 1 && !thread_stealing) {
-			reorder = false;
-		}
-		if (outType != OUTPUT_SAM) {
-			cerr << "Bowtie will attempt to reorder its output only when outputting SAM." << endl
-				<< "Please specify the `-S` parameter if you intend on using this option." << endl;
-			reorder = false;
-		}
+
+	if (nthreads == 1 && !thread_stealing) {
+		reorder = false;
+	}
+	if (reorder == true && outType != OUTPUT_SAM) {
+		cerr << "Bowtie will attempt to reorder its output only when outputting SAM." << endl
+			<< "Please specify the `-S` parameter if you intend on using this option." << endl;
+		reorder = false;
 	}
 	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
@@ -1461,11 +1460,14 @@ static void exactSearch(PatternComposer& _patsrc,
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
+	vector<int> tids;
+	tids.reserve(max(nthreads, thread_ceiling));
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
+	vector<thread_tracking_pair> tps;
+	tps.reserve(max(nthreads, thread_ceiling));
 #else
 	vector<tthread::thread*> threads;
-	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -1484,28 +1486,27 @@ static void exactSearch(PatternComposer& _patsrc,
 		}
 		
 		for(int i = 0; i < nthreads; i++) {
+			tids[i] = i;
 #ifdef WITH_TBB
-			thread_tracking_pair tp;
-			tp.tid = i;
-			tp.done = &all_threads_done;
+			tps[i].tid = i;
+			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
-					exactSearchWorkerStateful((void*)&tp);
+					exactSearchWorkerStateful((void*)&tps[i]);
 				} else {
-					exactSearchWorker((void*)&tp);
+					exactSearchWorker((void*)&tps[i]);
 				}
 			}
 			else {
 				if(stateful) {
-					threads.push_back(new std::thread(exactSearchWorkerStateful, (void*)&tp));
+					threads.push_back(new std::thread(exactSearchWorkerStateful, (void*)&tps[i]));
 				} else {
-					threads.push_back(new std::thread(exactSearchWorker, (void*)&tp));
+					threads.push_back(new std::thread(exactSearchWorker, (void*)&tps[i]));
 				}
 				threads[i]->detach();
 				SLEEP(10);
 			}
 #else
-			tids[i] = i;
 			if (i == nthreads - 1) {
 				if(stateful) {
 					exactSearchWorkerStateful((void*)(tids + i));
@@ -1532,19 +1533,18 @@ static void exactSearch(PatternComposer& _patsrc,
 			while(thread_counter > 0) {
 				if(steal_thread(pid, orig_threads)) { 
 					nthreads++;
+					tids[nthreads-1] = nthreads;
 #ifdef WITH_TBB
-					thread_tracking_pair tp;
-					tp.tid = nthreads - 1;
-					tp.done = &all_threads_done;
+					tps[nthreads-1].tid = nthreads - 1;
+					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
-						threads.push_back(new std::thread(exactSearchWorkerStateful, (void*) &tp));
+						threads.push_back(new std::thread(exactSearchWorkerStateful, (void*)&tps[nthreads-1]));
 					} else {
-						threads.push_back(new std::thread(exactSearchWorker, (void*) &tp));
+						threads.push_back(new std::thread(exactSearchWorker, (void*)&tps[nthreads-1]));
 					}
 					threads[nthreads-1]->detach();
 					SLEEP(10);
 #else
-					tids[nthreads-1] = nthreads;
 					if(stateful) {
 						threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + nthreads - 1)));
 					} else {
@@ -1843,11 +1843,14 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	}
 	mismatchSearch_refs = refs;
 
+	vector<int> tids;
+	tids.reserve(max(nthreads, thread_ceiling));
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
+	vector<thread_tracking_pair> tps;
+	tps.reserve(max(nthreads, thread_ceiling));
 #else
 	vector<tthread::thread*> threads;
-	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -1869,28 +1872,27 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 #endif
 
 		for(int i = 0; i < nthreads; i++) {
+			tids[i] = i;
 #ifdef WITH_TBB
-			thread_tracking_pair tp;
-			tp.tid = i;
-			tp.done = &all_threads_done;
+			tps[i].tid = i;
+			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
-					mismatchSearchWorkerFullStateful((void*)&tp);
+					mismatchSearchWorkerFullStateful((void*)&tps[i]);
 				} else {
-					mismatchSearchWorkerFull((void*)&tp);
+					mismatchSearchWorkerFull((void*)&tps[i]);
 				}
 			}
 			else {
 				if(stateful) {
-					threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
+					threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tps[i]));
 				} else {
-					threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
+					threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tps[i]));
 				}
 				threads[i]->detach();
 				SLEEP(10);
 			}
 #else
-			tids[i] = i;
 			if (i == nthreads - 1) {
 				if(stateful) {
 					mismatchSearchWorkerFullStateful((void*)(tids + i));
@@ -1917,19 +1919,18 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 			while(thread_counter > 0) {
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
+					tids[nthreads-1] = nthreads;
 #ifdef WITH_TBB
-					thread_tracking_pair tp;
-					tp.tid = nthreads - 1;
-					tp.done = &all_threads_done;
+					tps[nthreads-1].tid = nthreads - 1;
+					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
-						threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp));
+						threads.push_back(new std::thread(mismatchSearchWorkerFullStateful, (void*)&tps[nthreads-1]));
 					} else {
-						threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tp));
+						threads.push_back(new std::thread(mismatchSearchWorkerFull, (void*)&tps[nthreads-1]));
 					}
 					threads[nthreads - 1]->detach();
 					SLEEP(10);
 #else
-					tids[nthreads-1] = nthreads;
 					if(stateful) {
 						threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
 					} else {
@@ -2347,11 +2348,14 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_hitMask  = NULL;
 	twoOrThreeMismatchSearch_two      = two;
 
+	vector<int> tids;
+	tids.reserve(max(nthreads, thread_ceiling));
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
+	vector<thread_tracking_pair> tps;
+	tps.reserve(max(nthreads, thread_ceiling));
 #else
 	vector<tthread::thread*> threads;
-	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -2373,28 +2377,27 @@ static void twoOrThreeMismatchSearchFull(
 #endif
 
 		for(int i = 0; i < nthreads; i++) {
+			tids[i] = i;
 #ifdef WITH_TBB
-			thread_tracking_pair tp;
-			tp.tid = i;
-			tp.done = &all_threads_done;
+			tps[i].tid = i;
+			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
-					twoOrThreeMismatchSearchWorkerStateful((void*)&tp);
+					twoOrThreeMismatchSearchWorkerStateful((void*)&tps[i]);
 				} else {
-					twoOrThreeMismatchSearchWorkerFull((void*)&tp);
+					twoOrThreeMismatchSearchWorkerFull((void*)&tps[i]);
 				}
 			}
 			else {
 				if(stateful) {
-					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tp));
+					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tps[i]));
 				} else {
-					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tp));
+					threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tps[i]));
 				}
 				threads[i]->detach();
 				SLEEP(10);
 			}
 #else
-			tids[i] = i;
 			if (i == nthreads - 1) {
 				if(stateful) {
 					twoOrThreeMismatchSearchWorkerStateful((void*)(tids + i));
@@ -2421,19 +2424,18 @@ static void twoOrThreeMismatchSearchFull(
 			while(thread_counter > 0) {
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
+					tids[nthreads-1] = nthreads;
 #ifdef WITH_TBB
-					thread_tracking_pair tp;
-					tp.tid = nthreads - 1;
-					tp.done = &all_threads_done;
+					tps[nthreads-1].tid = nthreads - 1;
+					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
-						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp));
+						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tps[nthreads-1]));
 					} else {
-						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp));
+						threads.push_back(new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tps[nthreads-1]));
 					}
 					threads[nthreads-1]->detach();
 					SLEEP(10);
 #else
-					tids[nthreads-1] = nthreads;
 					if(stateful) {
 						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + nthreads - 1)));
 					} else {
@@ -2898,11 +2900,14 @@ static void seededQualCutoffSearchFull(
 	}
 	seededQualSearch_refs = refs;
 
+	vector<int> tids;
+	tids.reserve(max(nthreads, thread_ceiling));
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
+	vector<thread_tracking_pair> tps;
+	tps.reserve(max(nthreads, thread_ceiling));
 #else
 	vector<tthread::thread*> threads;
-	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 #ifdef WITH_TBB
@@ -2932,28 +2937,27 @@ static void seededQualCutoffSearchFull(
 #endif
 
 		for(int i = 0; i < nthreads; i++) {
+			tids[i] = i;
 #ifdef WITH_TBB
-			thread_tracking_pair tp;
-			tp.tid = i;
-			tp.done = &all_threads_done;
+			tps[i].tid = i;
+			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
-					seededQualSearchWorkerFullStateful((void*)&tp);
+					seededQualSearchWorkerFullStateful((void*)&tps[i]);
 				} else {
-					seededQualSearchWorkerFull((void*)&tp);
+					seededQualSearchWorkerFull((void*)&tps[i]);
 				}
 			}
 			else {
 				if(stateful) {
-					threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*)&tp));
+					threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*)&tps[i]));
 				} else {
-					threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*)&tp));
+					threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*)&tps[i]));
 				}
 				threads[i]->detach();
 				SLEEP(10);
 		    }
 #else
-			tids[i] = i;
 			if (i == nthreads - 1) {
 				if(stateful) {
 					seededQualSearchWorkerFullStateful((void*)(tids + i));
@@ -2980,19 +2984,18 @@ static void seededQualCutoffSearchFull(
 			while(thread_counter > 0) {
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
+					tids[nthreads-1] = nthreads - 1;
 #ifdef WITH_TBB
-					thread_tracking_pair tp;
-					tp.tid = nthreads - 1;
-					tp.done = &all_threads_done;
+					tps[nthreads-1].tid = nthreads - 1;
+					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
-						threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp));
+						threads.push_back(new std::thread(seededQualSearchWorkerFullStateful, (void*)&tps[nthreads-1]));
 					} else {
-						threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*) &tp));
+						threads.push_back(new std::thread(seededQualSearchWorkerFull, (void*)&tps[nthreads-1]));
 					}
 					threads[nthreads-1]->detach();
 					SLEEP(10);
 #else
-					tids[nthreads-1] = nthreads - 1;
 					if(stateful) {
 						threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
 					} else {
