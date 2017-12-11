@@ -1136,6 +1136,7 @@ void decrement_thread_counter() {
 #endif
 }
 
+#ifndef _WIN32
 void del_pid(const char* dirname,int pid) {
 	struct stat finfo;
 	char* fname = (char*) calloc(FNAME_SIZE,sizeof(char));
@@ -1161,7 +1162,6 @@ static void write_pid(const char* dirname,int pid) {
 	free(fname);
 }
 
-#ifndef _WIN32
 //from  http://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 static int read_dir(const char* dirname,int* num_pids) {
 	DIR *dir;
@@ -1477,12 +1477,14 @@ static void exactSearch(PatternComposer& _patsrc,
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 
+#ifndef _WIN32
 		int pid = 0;
 		if(thread_stealing) {
 			pid = getpid();
 			write_pid(thread_stealing_dir.c_str(), pid);
 			thread_counter = 0;
 		}
+#endif
 		
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
