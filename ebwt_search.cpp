@@ -1459,8 +1459,7 @@ static void exactSearch(PatternComposer& _patsrc,
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
-	vector<int> tids;
-	tids.reserve(max(nthreads, thread_ceiling));
+	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
@@ -1570,7 +1569,6 @@ static void exactSearch(PatternComposer& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete[] tids;
 #endif
 
 #ifndef _WIN32
@@ -1844,8 +1842,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	}
 	mismatchSearch_refs = refs;
 
-	vector<int> tids;
-	tids.reserve(max(nthreads, thread_ceiling));
+	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
@@ -1956,7 +1953,6 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete[] tids;
 #endif
 
 #ifndef _WIN32
@@ -2349,8 +2345,7 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_hitMask  = NULL;
 	twoOrThreeMismatchSearch_two      = two;
 
-	vector<int> tids;
-	tids.reserve(max(nthreads, thread_ceiling));
+	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
@@ -2461,7 +2456,6 @@ static void twoOrThreeMismatchSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete[] tids;
 #endif
 
 #ifndef _WIN32
@@ -2901,8 +2895,7 @@ static void seededQualCutoffSearchFull(
 	}
 	seededQualSearch_refs = refs;
 
-	vector<int> tids;
-	tids.reserve(max(nthreads, thread_ceiling));
+	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
@@ -3021,7 +3014,6 @@ static void seededQualCutoffSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete[] tids;
 #endif
 
 #ifndef _WIN32
