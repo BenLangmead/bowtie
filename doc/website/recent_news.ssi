@@ -1,4 +1,5 @@
 <h2>1.2.2 - 12/11/2017</h2>
+<p>Update (12/12/2017): We have had to re-release this version of bowtie to address an issue when compiling with pthreads (<tt>make NO_TBB=1</tt>).</p>
 <ul>
     <li>Fixed major issue causing corrupt SAM output when using many threads (<tt><a href="manual.shtml#bowtie-options-p">-p/--threads</a></tt>) on certain systems</li>
     <li>Fixed major issue with incorrect alignment offsets being reported in <tt><a href="manual.shtml#bowtie-options-large-index">--large-index</a></tt> mode</li>
