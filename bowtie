@@ -85,14 +85,16 @@ def main():
             if tot_size > small_index_max_size:
                 bin_spec = os.path.join(ex_path, bin_l)
         else:
-            if os.path.exists(args.index + idx_ext_l):
+            if not os.path.exists(arg + idx_ext_s)\
+                    and os.path.exists(args.index + idx_ext_l):
                 bin_spec = os.path.join(ex_path, bin_l)
         bowtie_args.insert(0, args.index)
     else:
         for arg in bowtie_args:
             if arg[0] == '-':
                 continue
-            if os.path.exists(arg + idx_ext_l):
+            if not os.path.exists(arg + idx_ext_s)\
+                    and os.path.exists(arg + idx_ext_l):
                 bin_spec = os.path.join(ex_path, bin_l)
 
     if args.debug:
