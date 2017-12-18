@@ -861,9 +861,9 @@ bool FastaContinuousPatternSource::parse(
 
 	// Parse sequence
 	assert_eq(0, seqan::length(ra.patFw));
-	c = ra.readOrigBuf[cur++];
 	int nchar = 0, seqoff = 0;
 	while(cur < buflen) {
+		c = ra.readOrigBuf[cur++];
 		if(isalpha(c)) {
 			assert_in(toupper(c), "ACGTN");
 			if(nchar++ >= this->trim5_) {
@@ -871,7 +871,6 @@ bool FastaContinuousPatternSource::parse(
 				ra.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 			}
 		}
-		c = ra.readOrigBuf[cur++];
 	}
 	ra.patBufFw[seqoff] = '\0';
 	_setBegin(ra.patFw, (Dna5*)ra.patBufFw);
