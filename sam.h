@@ -55,7 +55,8 @@ public:
 		bool sampleMax,
 		std::vector<std::string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		int perThreadBufSize,
+		int nOutput) :
 		HitSink(
 			ofn,
 			output_buffer_size,
@@ -66,7 +67,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		offBase_(offBase),
 		rmap_(rmap),
 		amap_(amap),
@@ -91,7 +93,8 @@ public:
 		bool sampleMax,
 		std::vector<std::string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		int perThreadBufSize,
+		int nOutput) :
 		HitSink(
 			numOuts,
 			output_buffer_size,
@@ -102,7 +105,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		offBase_(offBase),
 		rmap_(rmap),
 		amap_(amap),

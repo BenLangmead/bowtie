@@ -80,7 +80,11 @@ void SAMHitSink::reportUnOrMax(
 	assert(!un || hs == NULL || hs->size() == 0);
 	size_t hssz = 0;
 	if(hs != NULL) hssz = hs->size();
+#if 0
 	maybeFlush(threadId, 0);
+#else
+	maybeFlush(threadId);
+#endif
 	BTString& o = ptBufs_[threadId];
 	for(int i = 0; i < (int)seqan::length(p.bufa().name) - (paired ? 2 : 0); i++) {
 		if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;

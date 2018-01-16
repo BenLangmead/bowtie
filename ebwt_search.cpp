@@ -91,6 +91,7 @@ static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
+static int nOutputs;      // # output files
 static int blockBytes;    // bytes in a single input block
 static int readsPerBlock; // # reads in a single input block
 static int outBatchSz; // # alignments to write to output file at once
@@ -203,6 +204,7 @@ static void resetOptions() {
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	readsPerBatch			= 16;    // # reads to read from input file at once
+	nOutputs				= 1;     // # output files
 	blockBytes				= 65536; // bytes in a single input block
 	readsPerBlock			= 128;   // # reads in a single input block
 	outBatchSz				= 16;    // # alignments to wrote to output file at once
@@ -294,6 +296,7 @@ enum {
 	ARG_ISARATE,
 	ARG_PARTITION,
 	ARG_READS_PER_BATCH,
+	ARG_NUM_OUTPUTS,
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
 	ARG_FILEPAR,
@@ -379,6 +382,7 @@ static struct option long_options[] = {
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
 	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
+	{(char*)"num-outputs",  required_argument, 0,            ARG_NUM_OUTPUTS},
 	{(char*)"block-bytes",     required_argument, 0,         ARG_BLOCK_BYTES},
 	{(char*)"reads-per-block", required_argument, 0,         ARG_READS_PER_BLOCK},
 	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
@@ -526,6 +530,7 @@ static void printUsage(ostream& out) {
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
 	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 64)" << endl
 	    << " --reads-per-batch   # of reads to read from input file at once (default: 16)" << endl
+	    << " --num-outputs <int> # output files; alignments distribute randomly (default: 1)" << endl
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
@@ -874,6 +879,9 @@ static void parseOptions(int argc, const char **argv) {
 				readsPerBatch = outBatchSz = parse<int>(optarg);
 				break;
 			}
+			case ARG_NUM_OUTPUTS:
+				nOutputs = parseInt(1, "--num-outputs arg must be at least 1", optarg);
+				break;
 			case ARG_BLOCK_BYTES:
 				blockBytes = parseInt(0, "--block-bytes arg must be non-negative", optarg);
 				break;
@@ -2920,7 +2928,8 @@ static void driver(const char * type,
 							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
 							refnames, nthreads,
-							outBatchSz, partitionSz);
+							outBatchSz, nOutputs,
+							partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							outfile, io_buffer_size, offBase,
@@ -2932,7 +2941,8 @@ static void driver(const char * type,
 							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
 							refnames, nthreads,
-							outBatchSz, partitionSz);
+							outBatchSz, nOutputs,
+							partitionSz);
 				}
 				break;
 			case OUTPUT_SAM:
@@ -2950,14 +2960,19 @@ static void driver(const char * type,
 						sampleMax,
 						refnames,
 						nthreads,
-						outBatchSz);
+						outBatchSz,
+						nOutputs);
 					if(!samNoHead) {
 						vector<string> refnames;
 						if(!samNoSQ) {
 							readEbwtRefnames(adjustedEbwtFileBase, refnames);
 						}
 						sam->appendHeaders(
+#if 0
 							sam->out(0),
+#else
+							sam->out0(),
+#endif
 							ebwt.nPat(),
 							refnames, color, samNoSQ, rmap,
 							ebwt.plen(), fullRef,
@@ -2982,6 +2997,7 @@ static void driver(const char * type,
 						refnames,
 						nthreads,
 						outBatchSz,
+						nOutputs,
 						reportOpps);
 				} else {
 					sink = new ConciseHitSink(
@@ -2996,6 +3012,7 @@ static void driver(const char * type,
 						refnames,
 						nthreads,
 						outBatchSz,
+						nOutputs,
 						reportOpps);
 				}
 				break;

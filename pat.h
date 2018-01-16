@@ -371,6 +371,7 @@ public:
 		filecur_(0),
 		fp_(NULL),
 		qfp_(NULL),
+		zfp_(NULL),
 		is_open_(false),
 		first_(true),
 		buf_(NULL),

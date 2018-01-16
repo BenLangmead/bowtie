@@ -142,6 +142,18 @@ public:
 /// Sort by text-id then by text-offset
 bool operator< (const Hit& a, const Hit& b);
 
+static std::string compose_multisam_name(const std::string& fn, int idx) {
+	assert_geq(idx, 0);
+	const size_t len = fn.length();
+	std::ostringstream os;
+	if(fn.substr(len-4, 4) == ".sam") {
+		os << fn.substr(0, len-3) << "part" << (idx+1) << ".sam";
+		return os.str();
+	}
+	os << fn << ".part" << (idx+1);
+	return os.str();
+}
+
 /**
  * Encapsulates an object that accepts hits, optionally retains them in
  * a vector, and does something else with them according to
@@ -159,7 +171,8 @@ public:
 		bool sampleMax,
 		vector<string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		int perThreadBufSize,
+		int nOutput) :
 		_outs(),
 		_refnames(refnames),
 		_numWrappers(0),
@@ -171,10 +184,11 @@ public:
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
 		quiet_(false),
-		nthreads_((nthreads > 0) ? nthreads : 1),
+		nthreads_((nthreads > 0) ? (int)nthreads : 1),
 		ptBufs_(),
 		ptCounts_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
+		nOutput_(nOutput),
 		ptNumAligned_(NULL),
 		ptNumReported_(NULL),
 		ptNumReportedPaired_(NULL),
@@ -190,27 +204,38 @@ public:
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
-		//had to move this below the array inits, otherwise it get's mangled leading to segfaults on access
-		_locks.push_back(new MUTEX_T);
 		initDumps();
+		assert_gt(nOutput_, 0);
 		if(!ofn.empty()) {
-			FILE *fh = fopen(ofn.c_str(), "w");
-			if(fh == NULL) {
-				std::cerr << "Error: Could not open alignment output file "
-				          << ofn << std::endl;
-				throw 1;
+			if(ofn == "/dev/null") {
+				nOutput_ = 1;
 			}
-			char *buf = new char[output_buffer_size];
-			int ret = setvbuf(fh, buf, _IOFBF, output_buffer_size);
-			if(ret != 0) {
-				std::cerr << "Warning: Could not allocate the proper "
-				          << "buffer size for output file stream. "
-				          << "Return value = " << ret << std::endl;
+			std::string ofn_l = ofn;
+			for(int i = 0; i < nOutput_; i++) {
+				if(nOutput_ > 1) {
+					ofn_l = compose_multisam_name(ofn, i);
+				}
+				FILE *ofh = fopen(ofn_l.c_str(), "w");
+				if(ofh == NULL) {
+					std::cerr << "Error: Could not open alignment output file "
+							  << ofn_l << std::endl;
+					throw 1;
+				}
+				char *obuf = new char[output_buffer_size];
+				int ret = setvbuf(ofh, obuf, _IOFBF, output_buffer_size);
+				if(ret != 0) {
+					std::cerr << "Warning: Could not allocate the proper "
+							  << "buffer size for output file stream. "
+							  << "Return value = " << ret << std::endl;
+				}
+				_bufs.push_back(obuf);
+				_outs.push_back(ofh);
+				_locks.push_back(new MUTEX_T());
 			}
-			_outs.push_back(fh);
-			_bufs.push_back(buf);
 		} else {
+			nOutput_ = 1;
 			_outs.push_back(stdout);
+			_locks.push_back(new MUTEX_T());
 		}
 	}
 
@@ -230,7 +255,8 @@ public:
 		bool sampleMax,
 		vector<string>* refnames,
 		size_t nthreads,
-		int perThreadBufSize) :
+		int perThreadBufSize,
+		int nOutput) :
 		_outs(),
 		_refnames(refnames),
 		_locks(),
@@ -242,6 +268,7 @@ public:
 		quiet_(false),
 		nthreads_(0),
 		perThreadBufSize_(0),
+		nOutput_(nOutput),
 		ptNumAligned_(NULL),
 		ptNumReported_(NULL),
 		ptNumReportedPaired_(NULL),
@@ -269,11 +296,15 @@ public:
 		for(size_t i = 0; i < _locks.size(); i++) {
 			if(_locks[i] != NULL) {
 				delete _locks[i];
+				_locks[i] = NULL;
 			}
 		}
 		_locks.clear();
 		for(size_t i = 0; i < _bufs.size(); i++) {
-			delete[] _bufs[i];
+			if(_bufs[i] != NULL) {
+				delete[] _bufs[i];
+				_bufs[i] = NULL;
+			}
 		}
 		_bufs.clear();
 		destroyDumps();
@@ -344,22 +375,33 @@ public:
 			sort(hsptr->begin() + start, hsptr->begin() + end);
 		}
 		BTString& o = ptBufs_[threadId];
+#if 0
 		if(_outs.size() == 1) {
+#endif
 			// Per-thread buffering is active
 			for(size_t i = start; i < end; i++) {
 				const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
 				assert(h.repOk());
 				if(nthreads_ > 1) {
+#if 0
 					maybeFlush(threadId, 0);
+#else
+					maybeFlush(threadId);
+#endif
 					append(o, h, mapq, xms);
 					ptCounts_[threadId]++;
 				} else {
 					assert_leq(mapq, 255);
 					append(o, h, mapq, xms);
+#if 0
 					o.writeTo(out(0));
+#else
+					o.writeTo(_outs[0]);
+#endif
 					o.clear();
 				}
 			}
+#if 0
 		} else {
 			// multiple output streams or alignments
 			// Note: in this case we basically don't get the benefit
@@ -384,6 +426,7 @@ public:
 				}
 			}
 		}
+#endif
 		if(tally) {
 			tallyAlignments(threadId, end - start, paired);
 		}
@@ -395,7 +438,13 @@ public:
 	 */
 	void finish(bool hadoopOut) {
 		// Flush all per-thread buffers
+#if 0
 		flushAll(0);
+#else
+		for(int i = 0; i < nthreads_; i++) {
+			flush(i, i % nOutput_);
+		}
+#endif
 		
 		// Close all output streams
 		closeOuts();
@@ -469,6 +518,7 @@ public:
 		}
 	}
 
+#if 0
 	/**
 	 * Returns alignment output stream, lazily created if needed.
 	 */
@@ -492,6 +542,9 @@ public:
 		}
 		return _outs[strIdx];
 	}
+#else
+	FILE * out0() { return _outs[0]; }
+#endif
 
 	/**
 	 * Return true iff this HitSink dumps aligned reads to an output
@@ -712,8 +765,13 @@ protected:
 	 */
 	void flush(size_t threadId, size_t outId) {
 		{
-			ThreadSafe _ts(_locks[0]); // flush
+#if 0
+			ThreadSafe _ts(_locks[0]);
 			ptBufs_[threadId].writeTo(out(outId));
+#else
+			ThreadSafe _ts(_locks[outId]);
+			ptBufs_[threadId].writeTo(_outs[outId]);
+#endif
 		}
 		ptCounts_[threadId] = 0;
 		ptBufs_[threadId].clear();
@@ -732,12 +790,20 @@ protected:
 	 * If the thread's output buffer is currently full, flush it and
 	 * reset both buffer and count.
 	 */
+#if 0
 	void maybeFlush(size_t threadId, size_t outId) {
 		if(ptCounts_[threadId] >= perThreadBufSize_) {
 			flush(threadId, outId);
 		}
 	}
-	
+#else
+	void maybeFlush(size_t threadId) {
+		if(ptCounts_[threadId] >= perThreadBufSize_) {
+			flush(threadId, threadId % nOutput_);
+		}
+	}
+#endif
+
 	/**
 	 * Close (and flush) all OutFileBufs.
 	 */
@@ -746,6 +812,7 @@ protected:
 		for(size_t i = 0; i < _outs.size(); i++) {
 			if(_outs[i] != NULL) {
 				fclose(_outs[i]);
+				_outs[i] = NULL;
 			}
 		}
 		_outs.clear();
@@ -766,6 +833,7 @@ protected:
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
+	int nOutput_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -1471,6 +1539,7 @@ public:
 		std::vector<std::string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize,
+		int nOutput,
 		bool reportOpps = false) :
 		HitSink(
 			ofn,
@@ -1482,7 +1551,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1502,6 +1572,7 @@ public:
 		std::vector<std::string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize,
+		int nOutput,
 		bool reportOpps = false) :
 		HitSink(
 			numOuts,
@@ -1513,7 +1584,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1604,6 +1676,7 @@ public:
 		std::vector<std::string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize,
+		int nOutput,
 		int partition = 0) :
 		HitSink(
 			ofn,
@@ -1615,7 +1688,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		partition_(partition),
 		offBase_(offBase),
 		colorSeq_(colorSeq),
@@ -1649,6 +1723,7 @@ public:
 		std::vector<std::string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize,
+		int nOutput,
 		int partition = 0) :
 		HitSink(
 			numOuts,
@@ -1660,7 +1735,8 @@ public:
 			sampleMax,
 			refnames,
 			nthreads,
-			perThreadBufSize),
+			perThreadBufSize,
+			nOutput),
 		partition_(partition),
 		offBase_(offBase),
 		colorSeq_(colorSeq),
@@ -1724,7 +1800,7 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(".tmp", 1, "", "", "", false, false, NULL, 1, 1) { }
+	StubHitSink() : HitSink(".tmp", 1, "", "", "", false, false, NULL, 1, 1, 1) { }
 	
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) { }
 };
