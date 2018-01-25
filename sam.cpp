@@ -139,9 +139,6 @@ void SAMHitSink::reportUnOrMax(
 		o << '\n';
 	}
 	ptCounts_[threadId]++;
-	if (reorder_) {
-	   batchIds_[threadId] = p.rdid() / perThreadBufSize_ + 1;
-	}
 }
 
 /**

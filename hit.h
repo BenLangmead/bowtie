@@ -169,7 +169,6 @@ public:
 		nthreads_((nthreads > 0) ? nthreads : 1),
 		ptBufs_(),
 		ptCounts_(nthreads_),
-		batchIds_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
 		ptNumAligned_(NULL),
 		reorder_(reorder)
@@ -183,8 +182,6 @@ public:
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
-		batchIds_.assign(nthreads_, 0);
-		lastBatchIdSeen = 0;
 		initDumps();
 	}
 
@@ -253,9 +250,6 @@ public:
 			}
 		}
 		ptCounts_[threadId]++;
-		if (reorder_) {
-			batchIds_[threadId] = rdid / perThreadBufSize_ + 1;
-		}
 		if(tally) {
 			tallyAlignments(threadId, end - start, paired);
 		}
@@ -563,30 +557,7 @@ protected:
 	void flush(size_t threadId, bool finalBatch) {
 		{
 			ThreadSafe _ts(&mutex_); // flush
-			if (reorder_) {
-				nchars += ptBufs_[threadId].length();
-				batch b(ptBufs_[threadId], batchIds_[threadId], false /* has batch been written */);
-				unwrittenBatches_.push_back(b);
-				// consider writing if we have enough data to fill the buffer
-				// or we're ready to output the final batch
-				if (finalBatch || nchars >= OutFileBuf::BUF_SZ) {
-					// sort by batch ID
-					std::sort(unwrittenBatches_.begin(), unwrittenBatches_.end());
-					for (std::vector<batch>::size_type i = 0; i < unwrittenBatches_.size(); i++) {
-						if (unwrittenBatches_[i].batchId - lastBatchIdSeen == 1) {
-							nchars -= out_.writeString(unwrittenBatches_[i].btString);
-							lastBatchIdSeen = unwrittenBatches_[i].batchId;
-							unwrittenBatches_[i].isWritten = true;
-						}
-					}
-					unwrittenBatches_.erase(std::remove_if(unwrittenBatches_.begin(),
-					                        unwrittenBatches_.end(), batch::remove_written_batches),
-					                        unwrittenBatches_.end());
-				}
-			}
-			else {
-				out_.writeString(ptBufs_[threadId]);
-			}
+			out_.writeString(ptBufs_[threadId]);
 		}
 		ptCounts_[threadId] = 0;
 		ptBufs_[threadId].clear();
@@ -627,42 +598,7 @@ protected:
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
-	bool reorder_;
-
-	struct batch {
-		BTString btString;
-		size_t batchId;
-		bool isWritten;
-
-		batch(BTString& s, size_t id, bool b)
-			: batchId(id), isWritten(b)
-		{
-			s.moveTo(btString);
-		}
-
-		bool operator<(const batch& other) const {
-			return batchId < other.batchId;
-		}
-
-		batch& operator=(batch& other) {
-			if (&other != this) {
-				batchId = other.batchId;
-				isWritten = other.isWritten;
-				other.btString.moveTo(btString);
-			}
-			return *this;
-		}
-
-		static bool remove_written_batches(const batch& b) {
-			return b.isWritten;
-		}
-	};
-
-
-	std::vector<batch> unwrittenBatches_;
-	std::vector<size_t> batchIds_;
-	size_t lastBatchIdSeen;
-	size_t nchars;
+    bool reorder_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
