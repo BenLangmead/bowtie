@@ -184,7 +184,10 @@ public:
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
 		batchIds_.assign(nthreads_, 0);
-		lastBatchIdSeen = 0;
+		unwrittenBatches_.resize(nthreads_);
+		flushed_.resize(nthreads_);
+		flushed_.assign(nthreads_, 1);
+		lastBatchFlushed_ = 0;
 		initDumps();
 	}
 
@@ -560,36 +563,51 @@ protected:
 	/**
 	 * Flush thread's output buffer and reset both buffer and count.
 	 */
-	void flush(size_t threadId, bool finalBatch) {
+	void flush(size_t threadId, bool force) {
 		{
 			ThreadSafe _ts(&mutex_); // flush
 			if (reorder_) {
-				nchars += ptBufs_[threadId].length();
-				batch b(ptBufs_[threadId], batchIds_[threadId], false /* has batch been written */);
-				unwrittenBatches_.push_back(b);
-				// consider writing if we have enough data to fill the buffer
-				// or we're ready to output the final batch
-				if (finalBatch || nchars >= OutFileBuf::BUF_SZ) {
-					// sort by batch ID
-					std::sort(unwrittenBatches_.begin(), unwrittenBatches_.end());
-					for (std::vector<batch>::size_type i = 0; i < unwrittenBatches_.size(); i++) {
-						if (unwrittenBatches_[i].batchId - lastBatchIdSeen == 1) {
-							nchars -= out_.writeString(unwrittenBatches_[i].btString);
-							lastBatchIdSeen = unwrittenBatches_[i].batchId;
-							unwrittenBatches_[i].isWritten = true;
-						}
+				if (batchIds_[threadId] == 0) {
+					return;
+				}
+
+				size_t index = batchIds_[threadId] - lastBatchFlushed_ - 1;
+
+				if (index >= unwrittenBatches_.size()) {
+					size_t old_size = unwrittenBatches_.size();
+					unwrittenBatches_.resize(index + 1);
+					flushed_.resize(index + 1);
+					for (size_t i = old_size; i < unwrittenBatches_.size(); i++) {
+						flushed_[i] = 1;
 					}
-					unwrittenBatches_.erase(std::remove_if(unwrittenBatches_.begin(),
-					                        unwrittenBatches_.end(), batch::remove_written_batches),
-					                        unwrittenBatches_.end());
+				}
+				unwrittenBatches_[index] = ptBufs_[threadId];
+				flushed_[index] = 0;
+
+				size_t nflush = 0;
+				for (size_t i = 0; i < flushed_.size() && !flushed_[i]; ++i, ++nflush)
+					;
+
+				if (nflush >= nthreads_ || force) {
+					for (size_t i = 0; i < nflush; ++i) {
+						out_.writeString(unwrittenBatches_[i]);
+						unwrittenBatches_[i].clear();
+						flushed_[i] = 1;
+					}
+					if (nflush > 0) {
+						unwrittenBatches_.erase(unwrittenBatches_.begin(),
+						                        unwrittenBatches_.begin() + nflush);
+						flushed_.erase(flushed_.begin(), flushed_.begin() + nflush);
+						lastBatchFlushed_ += nflush;
+					}
 				}
 			}
 			else {
 				out_.writeString(ptBufs_[threadId]);
 			}
 		}
-		ptCounts_[threadId] = 0;
-		ptBufs_[threadId].clear();
+        ptCounts_[threadId] = 0;
+        ptBufs_[threadId].clear();
 	}
 	
 	/**
@@ -597,7 +615,7 @@ protected:
 	 */
 	void flushAll() {
 		for(size_t i = 0; i < nthreads_; i++) {
-			flush(i, i == nthreads_ - 1);
+			flush(i, true);
 		}
 	}
 
@@ -607,6 +625,8 @@ protected:
 	 */
 	void maybeFlush(size_t threadId) {
 		if(ptCounts_[threadId] >= perThreadBufSize_) {
+            if (reorder_) {
+            }
 			flush(threadId, false /* final batch? */);
 		}
 	}
@@ -629,40 +649,10 @@ protected:
 	int perThreadBufSize_;
 	bool reorder_;
 
-	struct batch {
-		BTString btString;
-		size_t batchId;
-		bool isWritten;
-
-		batch(BTString& s, size_t id, bool b)
-			: batchId(id), isWritten(b)
-		{
-			s.moveTo(btString);
-		}
-
-		bool operator<(const batch& other) const {
-			return batchId < other.batchId;
-		}
-
-		batch& operator=(batch& other) {
-			if (&other != this) {
-				batchId = other.batchId;
-				isWritten = other.isWritten;
-				other.btString.moveTo(btString);
-			}
-			return *this;
-		}
-
-		static bool remove_written_batches(const batch& b) {
-			return b.isWritten;
-		}
-	};
-
-
-	std::vector<batch> unwrittenBatches_;
 	std::vector<size_t> batchIds_;
-	size_t lastBatchIdSeen;
-	size_t nchars;
+	std::vector<BTString> unwrittenBatches_;
+	std::vector<short> flushed_;
+	size_t lastBatchFlushed_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
