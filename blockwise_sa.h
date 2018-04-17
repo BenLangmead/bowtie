@@ -200,7 +200,7 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 #endif
 			{ _randomSrc.init(__seed); reset(); }
 
-		~KarkkainenBlockwiseSA() {
+		~KarkkainenBlockwiseSA() throw() {
 			if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
 			if (_done != NULL) {
 				delete[] _done;
