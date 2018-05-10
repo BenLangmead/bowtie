@@ -1076,9 +1076,13 @@ static const char *argv0 = NULL;
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
 static PatternSourcePerThreadFactory*
-createPatsrcFactory(PatternComposer& _patsrc, int tid, uint32_t max_buf) {
+createPatsrcFactory(
+	PatternComposer& _patsrc,
+	int tid,
+	const PatternParams& pp)
+{
 	PatternSourcePerThreadFactory *patsrcFact;
-	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, max_buf, skipReads, seed);
+	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, pp);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -1223,6 +1227,7 @@ static HitSink*               exactSearch_sink;
 static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
+static const PatternParams*   exactSearch_pp;
 #ifdef WITH_TBB
 //void exactSearchWorker::operator()() const {
 static void exactSearchWorker(void *vp) {
@@ -1240,9 +1245,10 @@ static void exactSearchWorker(void *vp) {
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	const BitPairReference* refs =  exactSearch_refs;
+	const PatternParams& pp      = *exactSearch_pp;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	PatternSourcePerThread *patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1335,9 +1341,10 @@ static void exactSearchWorkerStateful(void *vp) {
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	BitPairReference* refs       =  exactSearch_refs;
+	const PatternParams& pp      = *exactSearch_pp;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -1434,7 +1441,8 @@ static void exactSearchWorkerStateful(void *vp) {
  * hits.  Assumes that index is already loaded into memory.
  */
 static void exactSearch(PatternComposer& _patsrc,
-                        HitSink& _sink,
+                        const PatternParams& pp,
+						HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
                         vector<String<Dna5> >& os)
 {
@@ -1459,6 +1467,7 @@ static void exactSearch(PatternComposer& _patsrc,
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
+	exactSearch_pp = &pp;
 	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
 	vector<std::thread*> threads;
@@ -1603,6 +1612,7 @@ static vector<String<Dna5> >*         mismatchSearch_os;
 static SyncBitset*                    mismatchSearch_doneMask;
 static SyncBitset*                    mismatchSearch_hitMask;
 static BitPairReference*              mismatchSearch_refs;
+static const PatternParams*           mismatchSearch_pp;
 
 /**
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
@@ -1625,9 +1635,10 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	Ebwt<String<Dna> >&    ebwtBw  = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os      = *mismatchSearch_os;
 	BitPairReference*      refs    =  mismatchSearch_refs;
+	const PatternParams&   pp      = *mismatchSearch_pp;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -1723,9 +1734,10 @@ static void mismatchSearchWorkerFull(void *vp){
 	Ebwt<String<Dna> >&    ebwtBw    = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os        = *mismatchSearch_os;
 	const BitPairReference* refs     =  mismatchSearch_refs;
+	const PatternParams& pp          = *mismatchSearch_pp;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1807,6 +1819,7 @@ static void mismatchSearchWorkerFull(void *vp){
  * hits.  Assumes that index is already loaded into memory.
  */
 static void mismatchSearchFull(PatternComposer& _patsrc,
+                               const PatternParams& pp,
                                HitSink& _sink,
                                Ebwt<String<Dna> >& ebwtFw,
                                Ebwt<String<Dna> >& ebwtBw,
@@ -1841,6 +1854,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		if(!refs->loaded()) throw 1;
 	}
 	mismatchSearch_refs = refs;
+	mismatchSearch_pp = &pp;
 
 	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
@@ -2051,7 +2065,7 @@ static SyncBitset*                    twoOrThreeMismatchSearch_doneMask;
 static SyncBitset*                    twoOrThreeMismatchSearch_hitMask;
 static bool                           twoOrThreeMismatchSearch_two;
 static BitPairReference*              twoOrThreeMismatchSearch_refs;
-
+static const PatternParams*           twoOrThreeMismatchSearch_pp;
 
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
@@ -2074,10 +2088,11 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Ebwt<String<Dna> >&    ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os      = *twoOrThreeMismatchSearch_os;
 	BitPairReference*      refs    =  twoOrThreeMismatchSearch_refs;
+	const PatternParams&   pp      = *twoOrThreeMismatchSearch_pp;
 	static bool            two     =  twoOrThreeMismatchSearch_two;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -2173,8 +2188,10 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	PatternComposer&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
+	const PatternParams&           pp       = *twoOrThreeMismatchSearch_pp;
 	bool                           two      = twoOrThreeMismatchSearch_two;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -2308,6 +2325,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
 		PatternComposer& _patsrc,   /// pattern source
+		const PatternParams& pp,
 		HitSink& _sink,                 /// hit sink
 		Ebwt<TStr>& ebwtFw,             /// index of original text
 		Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2344,6 +2362,7 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_doneMask = NULL;
 	twoOrThreeMismatchSearch_hitMask  = NULL;
 	twoOrThreeMismatchSearch_two      = two;
+	twoOrThreeMismatchSearch_pp       = &pp;
 
 	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
@@ -2485,6 +2504,7 @@ static PartialAlignmentManager* seededQualSearch_pamFw;
 static PartialAlignmentManager* seededQualSearch_pamRc;
 static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
+static const PatternParams*     seededQualSearch_pp;
 
 #ifdef WITH_TBB
 //void seededQualSearchWorkerFull::operator()() const {
@@ -2502,7 +2522,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;
 	int                      qualCutoff = seededQualSearch_qualCutoff;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	const PatternParams&     pp         = *seededQualSearch_pp;
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -2746,9 +2767,10 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;
 	int                      qualCutoff = seededQualSearch_qualCutoff;
 	BitPairReference*        refs       = seededQualSearch_refs;
+	const PatternParams&     pp         = *seededQualSearch_pp;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, pp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -2866,6 +2888,7 @@ static void seededQualCutoffSearchFull(
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
         PatternComposer& _patsrc,   /// pattern source
+        const PatternParams& pp,
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2894,6 +2917,7 @@ static void seededQualCutoffSearchFull(
 		if(!refs->loaded()) throw 1;
 	}
 	seededQualSearch_refs = refs;
+	seededQualSearch_pp = &pp;
 
 	int tids[max(nthreads, thread_ceiling)];
 #ifdef WITH_TBB
@@ -3042,39 +3066,27 @@ static void seededQualCutoffSearchFull(
  * from or as the sequences themselves (i.e. if -c was used).
  */
 static PatternSource*
-patsrcFromStrings(int format,
+patsrcFromStrings(const PatternParams& pp,
                   const vector<string>& reads,
                   const vector<string>* quals)
 {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (reads, quals, color,
-			                               trim3, trim5,
-			                               solexaQuals, phred64Quals,
-			                               integerQuals);
+			return new FastaPatternSource (reads, pp);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               reads, fastaContLen,
+			                               reads, pp, fastaContLen,
 			                               fastaContFreq);
 		case RAW:
-			return new RawPatternSource   (reads, color,
-			                               trim3, trim5);
+			return new RawPatternSource   (reads, pp);
 		case FASTQ:
-			return new FastqPatternSource (reads, color,
-			                               trim3, trim5,
-			                               solexaQuals, phred64Quals,
-			                               integerQuals);
+			return new FastqPatternSource (reads, pp);
 		case INTERLEAVED:
-			return new FastqPatternSource (reads, color,
-			                               trim3, trim5,
-			                               solexaQuals, phred64Quals,
-			                               integerQuals, true /* is interleaved */);
+			return new FastqPatternSource (reads, pp, true /* is interleaved */);
 		case TAB_MATE:
-			return new TabbedPatternSource(reads, false, color,
-			                               trim3, trim5);
+			return new TabbedPatternSource(reads, pp, false);
 		case CMDLINE:
-			return new VectorPatternSource(reads, color,
-			                               trim3, trim5);
+			return new VectorPatternSource(reads, pp);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;
@@ -3123,6 +3135,33 @@ static void driver(const char * type,
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
 	vector<PatternSource*> patsrcs_ab;
+	
+	const int io_buffer_size = 0; // dummy
+	const int blockBytes = 0; // dummy
+	const int readsPerBlock = 0; // dummy
+	const bool use_input_threads = true; // dummy
+
+	PatternParams pp(
+		format,        // file format
+		color,         // colorspace?
+		fileParallel,  // true -> wrap files with separate PairedPatternSources
+		seed,          // pseudo-random seed
+		readsPerBatch, // # reads in a light parsing batch
+		io_buffer_size, // size reads to use when reading input
+		solexaQuals,   // true -> qualities are on solexa64 scale
+		phred64Quals,  // true -> qualities are on phred64 scale
+		integerQuals,  // true -> qualities are space-separated numbers
+		trim5,         // amt to hard clip from 5' end
+		trim3,         // amt to hard clip from 3' end
+		fastaContLen,  // length of sampled reads for FastaContinuous...
+		fastaContFreq, // frequency of sampled reads for FastaContinuous...
+		skipReads,     // skip the first 'skip' patterns
+		nthreads,      // number of threads for locking
+		blockBytes,    // # bytes in one input block, 0 if we're not using blocked input
+		readsPerBlock, // # reads per input block, 0 if we're not using blockeds input
+		use_input_threads, // whether to have separate input thread
+		outType != OUTPUT_SAM // whether to fix mate names
+	);
 
 	// If there were any first-mates specified, we will operate in
 	// stateful mode
@@ -3143,7 +3182,7 @@ static void driver(const char * type,
 			tmp.push_back(mates12[i]);
 			assert_eq(1, tmp.size());
 		}
-		patsrcs_ab.push_back(patsrcFromStrings(format, *qs, NULL));
+		patsrcs_ab.push_back(patsrcFromStrings(pp, *qs, NULL));
 		if(!fileParallel) {
 			break;
 		}
@@ -3164,7 +3203,7 @@ static void driver(const char * type,
 			assert_eq(1, tmpSeq.size());
 		}
 		if(quals->empty()) quals = NULL;
-		patsrcs_a.push_back(patsrcFromStrings(format, *qs, quals));
+		patsrcs_a.push_back(patsrcFromStrings(pp, *qs, quals));
 		if(!fileParallel) {
 			break;
 		}
@@ -3185,7 +3224,7 @@ static void driver(const char * type,
 			assert_eq(1, tmpSeq.size());
 		}
 		if(quals->empty()) quals = NULL;
-		patsrcs_b.push_back(patsrcFromStrings(format, *qs, quals));
+		patsrcs_b.push_back(patsrcFromStrings(pp, *qs, quals));
 		if(!fileParallel) {
 			break;
 		}
@@ -3212,7 +3251,7 @@ static void driver(const char * type,
 			assert_eq(1, tmpSeq.size());
 		}
 		if(quals->empty()) quals = NULL;
-		patsrc = patsrcFromStrings(format, *qs, quals);
+		patsrc = patsrcFromStrings(pp, *qs, quals);
 		assert(patsrc != NULL);
 		patsrcs_a.push_back(patsrc);
 		patsrcs_b.push_back(NULL);
@@ -3345,7 +3384,7 @@ static void driver(const char * type,
 				sampleMax,
 				refnames,
 				nthreads,
-				outBatchSz,
+				(int)outBatchSz,
 				reorder);
 			if(!samNoHead) {
 				vector<string> refnames;
@@ -3374,6 +3413,7 @@ static void driver(const char * type,
 									   qualThresh,
 									   seedMms,
 									   *patsrc,
+									   pp,
 									   *sink,
 									   ebwt,    // forward index
 									   *ebwtBw, // mirror index (not optional)
@@ -3382,9 +3422,9 @@ static void driver(const char * type,
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
 				assert(ebwtBw != NULL);
-				mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
+				mismatchSearchFull(*patsrc, pp, *sink, ebwt, *ebwtBw, os);
 			} else if(mismatches == 2 || mismatches == 3) {
-				twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
+				twoOrThreeMismatchSearchFull(*patsrc, pp, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
 				throw 1;
@@ -3393,7 +3433,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(*patsrc, *sink, ebwt, os);
+			exactSearch(*patsrc, pp, *sink, ebwt, os);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {

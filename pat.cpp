@@ -64,7 +64,7 @@ void PatternSourcePerThread::finalize(Read& ra) {
 	ra.mate = 0;
 	ra.constructRevComps();
 	ra.constructReverses();
-	ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+	ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, pp_.seed);
 }
 
 /**
@@ -77,13 +77,13 @@ void PatternSourcePerThread::finalizePair(Read& ra, Read& rb) {
 	ra.constructRevComps();
 	ra.constructReverses();
 	ra.fixMateName(1);
-	ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+	ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, pp_.seed);
 	
 	rb.mate = 2;
 	rb.constructRevComps();
 	rb.constructReverses();
 	rb.fixMateName(2);
-	rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
+	rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, pp_.seed);
 }
 
 /**
@@ -107,7 +107,7 @@ pair<bool, bool> PatternSourcePerThread::nextReadPair() {
 		assert_gt(buf_.cur_buf_, 0);
 	}
 	bool this_is_last = buf_.cur_buf_ == last_batch_size_-1;
-	if(buf_.rdid() < skip_) {
+	if(buf_.rdid() < pp_.skip) {
 		return make_pair(false, this_is_last ? last_batch_ : false);
 	}
 	// Parse read/pair
@@ -231,6 +231,10 @@ pair<bool, int> CFilePatternSource::nextBatchImpl(
 	PerThreadReadBuf& pt,
 	bool batch_a)
 {
+	// When not using a separate input thread, the worker threads call this,
+	// having obtained the lock in one of the callers.  When using a separate
+	// input thread, the input thread calls this without holding a lock.
+	// Either way, we don't grab any locks here.
 	bool done = false;
 	size_t nread = 0;
 	pt.setReadId(readCnt_);
@@ -253,7 +257,30 @@ pair<bool, int> CFilePatternSource::nextBatchImpl(
 	}
 	assert_geq(nread, 0);
 	readCnt_ += nread;
-	return make_pair(done, nread);
+	pt.setNumReads(nread);
+	return make_pair(done, nread); // having nread here is kind of redundant
+	                               // if we also store it in PerThreadReadBuf
+}
+
+void CFilePatternSource::inputThreadRun() {
+	assert_gt(infiles_.size(), 0);
+	errs_.resize(infiles_.size(), false);
+	open(); // open first file in the list
+	assert(is_open_);
+	assert(fp_ != NULL || zfp_ != NULL);
+	filecur_++;
+	const bool batch_a = true; // TODO: support pairs of files
+	while(true) {
+		PerThreadReadBuf rb(pp_.max_buf);
+		pair<bool, int> ret = nextBatchImpl(rb, batch_a);
+		if(ret.second > 0) { // at least 1 read
+			bq_.enqueue(std::move(rb)); // block if necessary
+		}
+		if(ret.first) { // done
+			break;
+		}
+	}
+	num_done_producers_.fetch_add(1, std::memory_order_release);
 }
 
 pair<bool, int> CFilePatternSource::nextBatch(
@@ -261,20 +288,56 @@ pair<bool, int> CFilePatternSource::nextBatch(
 	bool batch_a,
 	bool lock)
 {
-	if(lock) {
-		// synchronization at this level because both reading and manipulation of
-		// current file pointer have to be protected
-		ThreadSafe ts(&mutex);
-		return nextBatchImpl(pt, batch_a);
+	if(pp_.use_input_threads) {
+		// Note: no locking here
+		bool success = false;
+		bool done = false;
+		do {
+			if(bq_.wait_dequeue_timed(pt, 10000)) { // microseconds
+				success = true;
+				break;
+			}
+		} while(num_done_producers_.load(std::memory_order_acquire) == 0);
+		done = num_done_producers_.load(std::memory_order_acquire) > 0;
+		if(success && pt.num_reads_ > 0) {
+			return make_pair(done, pt.num_reads_);
+		} else {
+			return make_pair(true, 0);
+		}
 	} else {
-		return nextBatchImpl(pt, batch_a);
+		if(lock) {
+			// synchronization at this level because both reading and
+			// manipulation of current file pointer have to be protected
+			ThreadSafe ts(&mutex);
+			return nextBatchImpl(pt, batch_a);
+		} else {
+			return nextBatchImpl(pt, batch_a);
+		}
 	}
+}
+
+static bool is_gzipped_file(const std::string& filename) {
+	struct stat s;
+	if (stat(filename.c_str(), &s) != 0) {
+		perror("stat");
+	}
+	else {
+		if (S_ISFIFO(s.st_mode))
+			return true;
+	}
+	size_t pos = filename.find_last_of(".");
+	std::string ext = (pos == std::string::npos) ? "" : filename.substr(pos + 1);
+	if (ext == "" || ext == "gz" || ext == "Z") {
+		return true;
+	}
+	return false;
 }
 
 /**
  * Open the next file in the list of input files.
  */
 void CFilePatternSource::open() {
+	assert(infiles_.size() > 0);
 	if(is_open_) {
 		is_open_ = false;
 		if (compressed_) {
@@ -284,10 +347,6 @@ void CFilePatternSource::open() {
 		else if (fp_ != stdin) {
 			fclose(fp_);
 			fp_ = NULL;
-		}
-		if(qfp_ != NULL && qfp_ != stdin) {
-			fclose(qfp_);
-			qfp_ = NULL;
 		}
 	}
 	while(filecur_ < infiles_.size()) {
@@ -329,22 +388,6 @@ void CFilePatternSource::open() {
 		else {
 			setvbuf(fp_, buf_, _IOFBF, 64*1024);
 		}
-		if(!qinfiles_.empty()) {
-			if(qinfiles_[filecur_] == "-") {
-				qfp_ = stdin;
-			} else if((qfp_ = fopen(qinfiles_[filecur_].c_str(), "rb")) == NULL) {
-				if(!errs_[filecur_]) {
-					cerr << "Warning: Could not open quality file \""
-					     << qinfiles_[filecur_] << "\" for reading; skipping..."
-						 << endl;
-					errs_[filecur_] = true;
-				}
-				filecur_++;
-				continue;
-			}
-			assert(qfp_ != NULL);
-			setvbuf(qfp_, qbuf_, _IOFBF, 64*1024);
-		}
 		return;
 	}
 	throw 1;
@@ -357,11 +400,8 @@ void CFilePatternSource::open() {
  */
 VectorPatternSource::VectorPatternSource(
 	const vector<string>& seqs,
-	bool color,
-	int trim3,
-	int trim5) :
-	TrimmingPatternSource(trim3, trim5),
-	color_(color),
+	const PatternParams& pp) :
+	PatternSource(pp),
 	cur_(0),
 	paired_(false),
 	tokbuf_(),
@@ -409,7 +449,7 @@ pair<bool, int> VectorPatternSource::nextBatchImpl(
 	bool batch_a)
 {
 	pt.setReadId(cur_);
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
 	for(; readi < pt.max_buf_ && cur_ < bufs_.size(); readi++, cur_++) {
 		const size_t len = bufs_[cur_].length();
@@ -478,7 +518,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		assert_eq(0, seqan::length(r.patFw));
 		c = ra.readOrigBuf[cur++];
 		int nchar = 0, seqoff = 0;
-		if(color_ && asc2dnacat[c] > 0) {
+		if(pp_.color && asc2dnacat[c] > 0) {
 			// First char is a DNA char (primer)
 			if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
 				// 2nd char isn't a color, so don't assume 'c' is primer
@@ -489,7 +529,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			}
 			c = r.readOrigBuf[cur++];
 		}
-		if(color_) {
+		if(pp_.color) {
 			while(c != '\t' && cur < buflen) {
 				if(c >= '0' && c < '4') {
 					c = "ACGTN"[(int)c - '0'];
@@ -499,7 +539,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 				}
 				if(isalpha(c)) {
 					assert_in(toupper(c), "ACGTN");
-					if(nchar++ >= this->trim5_) {
+					if(nchar++ >= pp_.trim5) {
 						assert_neq(0, asc2dnacat[c]);
 						r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 					}
@@ -511,7 +551,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			while(c != '\t' && cur < buflen) {
 				if(isalpha(c)) {
 					assert_in(toupper(c), "ACGTN");
-					if(nchar++ >= this->trim5_) {
+					if(nchar++ >= pp_.trim5) {
 						assert_neq(0, asc2dnacat[c]);
 						r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 					}
@@ -528,7 +568,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		// record amt trimmed from 5' end due to --trim5
 		r.trimmed5 = (int)(nchar - seqoff);
 		// record amt trimmed from 3' end due to --trim3
-		int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+		int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 		_setLength(r.patFw, seqoff - trim3);
 		r.trimmed3 = trim3;
 		
@@ -543,7 +583,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 				return false;
 			}
 			char cadd = charToPhred33(c, false, false);
-			if(++nqual > this->trim5_) {
+			if(++nqual > pp_.trim5) {
 				r.qualBuf[qualoff++] = cadd;
 			}
 			if(cur >= buflen) break;
@@ -577,7 +617,7 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	size_t readi)
 {
 	int c;
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
 		c = getc_wrapper();
 		if(c == EOF) {
@@ -676,7 +716,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 			}
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					assert_neq(0, asc2dnacat[c]);
 					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 				}
@@ -691,7 +731,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 			}
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					r.patBufFw[seqoff++] = charToDna5[c];
 				}
 			}
@@ -704,7 +744,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	// record amt trimmed from 5' end due to --trim5
 	r.trimmed5 = (int)(nchar - seqoff);
 	// record amt trimmed from 3' end due to --trim3
-	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+	int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 	_setLength(r.patFw, seqoff - trim3);
 	r.trimmed3 = trim3;
 	
@@ -744,7 +784,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 	size_t readi)
 {
 	int c = -1;
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	int nameoff = 0;
 	while(readi < pt.max_buf_) {
 		c = getc_wrapper();
@@ -866,7 +906,7 @@ bool FastaContinuousPatternSource::parse(
 	while(cur < buflen) {
 		if(isalpha(c)) {
 			assert_in(toupper(c), "ACGTN");
-			if(nchar++ >= this->trim5_) {
+			if(nchar++ >= pp_.trim5) {
 				assert_neq(0, asc2dnacat[c]);
 				ra.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 			}
@@ -878,7 +918,7 @@ bool FastaContinuousPatternSource::parse(
 	// record amt trimmed from 5' end due to --trim5
 	ra.trimmed5 = (int)(nchar - seqoff);
 	// record amt trimmed from 3' end due to --trim3
-	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+	int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 	_setLength(ra.patFw, seqoff - trim3);
 	ra.trimmed3 = trim3;
 	
@@ -908,7 +948,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	size_t readi)
 {
 	int c = 0;
-	vector<Read>* readBuf = batch_a ? &pt.bufa_ : &pt.bufb_;
+	Read *readBuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
 		c = getc_wrapper();
 		while(c == '\r' || c == '\n') {
@@ -919,14 +959,14 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 			throw 1;
 		}
 		first_ = false;
-		(*readBuf)[readi].readOrigBuf[0] = c;
-		(*readBuf)[readi].readOrigBufLen = 1;
+		readBuf[readi].readOrigBuf[0] = c;
+		readBuf[readi].readOrigBufLen = 1;
 	}
 	bool done = false, aborted = false;
 	// Read until we run out of input or until we've filled the buffer
 	while (readi < pt.max_buf_ && !done) {
-		char* buf = (*readBuf)[readi].readOrigBuf;
-		assert(readi == 0 || (*readBuf)[readi].readOrigBufLen == 0);
+		char* buf = readBuf[readi].readOrigBuf;
+		assert(readi == 0 || readBuf[readi].readOrigBufLen == 0);
 		int newlines = 4;
 		while(newlines) {
 			c = getc_wrapper();
@@ -944,13 +984,13 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 				}
 				break;
 			}
-			buf[(*readBuf)[readi].readOrigBufLen++] = c;
+			buf[readBuf[readi].readOrigBufLen++] = c;
 		}
 		if (c > 0) {
 			if (interleaved_) {
 				// alternate between read buffers
 				batch_a = !batch_a;
-				readBuf = batch_a ? &pt.bufa_ : &pt.bufb_;
+				readBuf = batch_a ? pt.bufa_ : pt.bufb_;
 				// increment read counter after each pair gets read
 				readi = batch_a ? readi + 1 : readi;
 			}
@@ -999,7 +1039,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	// Parse sequence
 	int nchar = 0, seqoff = 0;
 	assert_eq(0, seqan::length(r.patFw));
-	if(color_ && asc2dnacat[c] > 0) {
+	if(pp_.color && asc2dnacat[c] > 0) {
 		// First char is a DNA char (primer)
 		if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
 			// 2nd char isn't a color, so don't assume 'c' is primer
@@ -1010,7 +1050,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 		}
 		c = r.readOrigBuf[cur++];
 	}
-	if(color_) {
+	if(pp_.color) {
 		while(c != '+' && cur < buflen) {
 			if(c >= '0' && c < '4') {
 				c = "ACGTN"[(int)c - '0'];
@@ -1020,7 +1060,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			}
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					assert_neq(0, asc2dnacat[c]);
 					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 				}
@@ -1035,7 +1075,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			}
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					r.patBufFw[seqoff++] = charToDna5[c];
 				}
 			}
@@ -1047,7 +1087,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	// record amt trimmed from 5' end due to --trim5
 	r.trimmed5 = (int)(nchar - seqoff);
 	// record amt trimmed from 3' end due to --trim3
-	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+	int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 	_setLength(r.patFw, seqoff - trim3);
 	r.patBufFw[seqan::length(r.patFw)] = '\0';
 	r.trimmed3 = trim3;
@@ -1063,25 +1103,25 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	
 	assert_eq(0, seqan::length(r.qual));
 	int nqual = 0, qualoff = 0;
-	if (intQuals_) {
+	if (pp_.intQuals) {
 		int cur_int = 0;
 		while(c != '\t' && c != '\n' && c != '\r') {
 			cur_int *= 10;
 			cur_int += (int)(c - '0');
 			c = r.readOrigBuf[cur++];
 			if(c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-				char cadd = intToPhred33(cur_int, solQuals_);
+				char cadd = intToPhred33(cur_int, pp_.solexa64);
 				cur_int = 0;
 				if (c == ' ')
 					c = r.readOrigBuf[cur++];
 				assert_geq(cadd, 33);
-				if(++nqual > this->trim5_) {
+				if(++nqual > pp_.trim5) {
 					r.qualBuf[qualoff++] = cadd;
 				}
 			}
 		}
 	} else {
-		c = charToPhred33(c, solQuals_, phred64Quals_);
+		c = charToPhred33(c, pp_.solexa64, pp_.phred64);
 		if(nqual++ >= r.trimmed5) {
 			r.qualBuf[qualoff++] = c;
 		}
@@ -1094,7 +1134,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			if(c == '\r' || c == '\n') {
 				break;
 			}
-			c = charToPhred33(c, solQuals_, phred64Quals_);
+			c = charToPhred33(c, pp_.solexa64, pp_.phred64);
 			if(nqual++ >= r.trimmed5) {
 				r.qualBuf[qualoff++] = c;
 			}
@@ -1146,7 +1186,7 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_wrapper();
 	}
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;
@@ -1209,7 +1249,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		assert_eq(0, seqan::length(r.patFw));
 		c = ra.readOrigBuf[cur++];
 		int nchar = 0, seqoff = 0;
-		if(color_ && asc2dnacat[c] > 0) {
+		if(pp_.color && asc2dnacat[c] > 0) {
 			// First char is a DNA char (primer)
 			if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
 				// 2nd char isn't a color, so don't assume 'c' is primer
@@ -1220,7 +1260,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			}
 			c = r.readOrigBuf[cur++];
 		}
-		if(color_) {
+		if(pp_.color) {
 			while(c != '\t' && cur < buflen) {
 				if(c >= '0' && c < '4') {
 					c = "ACGTN"[(int)c - '0'];
@@ -1230,7 +1270,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 				}
 				if(isalpha(c)) {
 					assert_in(toupper(c), "ACGTN");
-					if(nchar++ >= this->trim5_) {
+					if(nchar++ >= pp_.trim5) {
 						assert_neq(0, asc2dnacat[c]);
 						r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 					}
@@ -1242,7 +1282,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			while(c != '\t' && cur < buflen) {
 				if(isalpha(c)) {
 					assert_in(toupper(c), "ACGTN");
-					if(nchar++ >= this->trim5_) {
+					if(nchar++ >= pp_.trim5) {
 						assert_neq(0, asc2dnacat[c]);
 						r.patBufFw[seqoff++] = charToDna5[c];
 					}
@@ -1258,7 +1298,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		// record amt trimmed from 5' end due to --trim5
 		r.trimmed5 = (int)(nchar - seqoff);
 		// record amt trimmed from 3' end due to --trim3
-		int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+		int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 		_setLength(r.patFw, seqoff - trim3);
 		r.patBufFw[seqan::length(r.patFw)] = '\0';
 		r.trimmed3 = trim3;
@@ -1267,17 +1307,17 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		assert_eq(0, seqan::length(r.qual));
 		c = ra.readOrigBuf[cur++];
 		int nqual = 0, qualoff = 0;
-		if (intQuals_) {
+		if (pp_.intQuals) {
 			int cur_int = 0;
 			while(c != '\t' && c != '\n' && c != '\r' && cur < buflen) {
 				cur_int *= 10;
 				cur_int += (int)(c - '0');
 				c = ra.readOrigBuf[cur++];
 				if(c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-					char cadd = intToPhred33(cur_int, solQuals_);
+					char cadd = intToPhred33(cur_int, pp_.solexa64);
 					cur_int = 0;
 					assert_geq(cadd, 33);
-					if(++nqual > this->trim5_) {
+					if(++nqual > pp_.trim5) {
 						r.qualBuf[qualoff++] = cadd;
 					}
 				}
@@ -1288,8 +1328,8 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 					wrongQualityFormat(r.name);
 					return false;
 				}
-				char cadd = charToPhred33(c, solQuals_, phred64Quals_);
-				if(++nqual > this->trim5_) {
+				char cadd = charToPhred33(c, pp_.solexa64, pp_.phred64);
+				if(++nqual > pp_.trim5) {
 					r.qualBuf[qualoff++] = cadd;
 				}
 				if(cur >= buflen) break;
@@ -1325,7 +1365,7 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_wrapper();
 	}
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;
@@ -1354,7 +1394,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	int nchar = 0, seqoff = 0;
 	int c = r.readOrigBuf[cur++];
 
-	if(color_ && asc2dnacat[c] > 0) {
+	if(pp_.color && asc2dnacat[c] > 0) {
 		// First char is a DNA char (primer)
 		if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
 			// 2nd char isn't a color, so don't assume 'c' is primer
@@ -1365,7 +1405,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		}
 		c = r.readOrigBuf[cur++];
 	}
-	if(color_) {
+	if(pp_.color) {
 		while(c != '\0') {
 			assert(c != '\r' && c != '\n');
 			if(c >= '0' && c < '4') {
@@ -1376,7 +1416,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 			}
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					assert_neq(0, asc2dnacat[c]);
 					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
 				}
@@ -1391,7 +1431,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 			assert(c != '\r' && c != '\n');
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
-				if(nchar++ >= this->trim5_) {
+				if(nchar++ >= pp_.trim5) {
 					assert_neq(0, asc2dnacat[c]);
 					r.patBufFw[seqoff++] = charToDna5[c];
 				}
@@ -1402,7 +1442,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	// record amt trimmed from 5' end due to --trim5
 	r.trimmed5 = (int)(nchar - seqoff);
 	// record amt trimmed from 3' end due to --trim3
-	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
+	int trim3 = (seqoff < pp_.trim3) ? seqoff : pp_.trim3;
 	_setLength(r.patFw, seqoff - trim3);
 	r.patBufFw[seqan::length(r.patFw)] = '\0';
 	r.trimmed3 = trim3;
