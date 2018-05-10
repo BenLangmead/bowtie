@@ -615,6 +615,7 @@ public:
 		fp_(NULL),
 		is_open_(false),
 		first_(true),
+		bq_(),
 		num_done_producers_(0),
 		thread_(NULL)
 	{
