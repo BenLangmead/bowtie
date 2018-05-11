@@ -274,7 +274,7 @@ void CFilePatternSource::inputThreadRun() {
 		PerThreadReadBuf rb(pp_.max_buf);
 		pair<bool, int> ret = nextBatchImpl(rb, batch_a);
 		if(ret.second > 0) { // at least 1 read
-			bq_.enqueue(rb); // block if necessary
+			bq_.enqueue(std::move(rb)); // block if necessary
 		}
 		if(ret.first) { // done
 			break;
@@ -297,8 +297,8 @@ pair<bool, int> CFilePatternSource::nextBatch(
 				success = true;
 				break;
 			}
-		} while(num_done_producers_.load(std::memory_order_acquire) == 0);
-		done = num_done_producers_.load(std::memory_order_acquire) > 0;
+		} while(num_done_producers_.load(std::memory_order_acquire) == 0 || bq_.size_approx() != 0);
+		done = num_done_producers_.load(std::memory_order_acquire) > 0 && bq_.size_approx() == 0;
 		if(success && pt.num_reads_ > 0) {
 			return make_pair(done, pt.num_reads_);
 		} else {

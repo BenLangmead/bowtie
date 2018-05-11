@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <fstream>
 #include <thread>
+#include <future>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -616,11 +617,10 @@ public:
 		is_open_(false),
 		first_(true),
 		bq_(),
-		num_done_producers_(0),
-		thread_(NULL)
+		num_done_producers_(0)
 	{
 		if(pp_.use_input_threads) {
-			thread_ = new std::thread(&CFilePatternSource::inputThreadRun, this);
+			task_ = std::async(&CFilePatternSource::inputThreadRun, this);
 		} else {
 			assert_gt(infiles.size(), 0);
 			errs_.resize(infiles_.size(), false);
@@ -632,8 +632,7 @@ public:
 	
 	virtual ~CFilePatternSource() {
 		if(pp_.use_input_threads) {
-			thread_->join();
-			delete thread_;
+			task_.get();
 		}
 		if(is_open_) {
 			if (compressed_) {
@@ -723,7 +722,7 @@ protected:
 	std::atomic<int> num_done_producers_;
 	
 	// input thread (if relevant)
-	std::thread *thread_;
+	std::future<void> task_;
 
 private:
 	

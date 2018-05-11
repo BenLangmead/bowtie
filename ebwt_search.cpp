@@ -1994,7 +1994,9 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose); \
 	} \
 	assert(ebwtFw.isInMemory()); \
-	_patsrc.reset(); /* rewind pattern source to first pattern */ \
+	if (!pp.use_input_threads) { \
+		_patsrc.reset(); /* rewind pattern source to first pattern */ \
+	} \
 }
 
 #define SWITCH_TO_BW_INDEX() { \
