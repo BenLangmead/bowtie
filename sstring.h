@@ -1649,6 +1649,31 @@ public:
 		*this = o;
 	}
 
+    /**
+     * Move constructor
+     */
+    SStringExpandable(SStringExpandable<T, S>&& o) :
+        cs_(o.cs_),
+        printcs_(o.printcs_),
+        len_(o.len_),
+        sz_(o.sz_)
+    {
+        o.cs_ = o.printcs_ = NULL;
+    }
+
+    /**
+     * Move-assign
+     */
+    SStringExpandable& operator=(SStringExpandable<T, S>&& o)
+    {
+        cs_ = o.cs_;
+        printcs_ = o.printcs_;
+        len_ = o.len_;
+        sz_ = o.sz_;
+        o.cs_ = o.printcs_ = NULL;
+        return *this;
+    }
+
 	/**
 	 * Create an SStringExpandable from a std::basic_string of the
 	 * appropriate type.
