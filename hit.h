@@ -7,7 +7,10 @@
 #include <fstream>
 #include <string>
 #include <stdexcept>
+#include <future>
 #include <seqan/sequence.h>
+#include <algorithm>
+
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "threading.h"
@@ -18,7 +21,7 @@
 #include "filebuf.h"
 #include "edit.h"
 #include "sstring.h"
-#include <algorithm>
+#include "blockingconcurrentqueue.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -183,12 +186,19 @@ public:
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
 		initDumps();
+
+		if (nthreads_ > 1) {
+			consumer_ = std::async(&HitSink::flush, this);
+		}
 	}
 
 	/**
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
+		if (nthreads_ > 1) {
+		}
+
 		if(ptNumAligned_ != NULL) {
 			delete[] ptNumAligned_;
 			ptNumAligned_ = NULL;
@@ -554,21 +564,27 @@ protected:
 	/**
 	 * Flush thread's output buffer and reset both buffer and count.
 	 */
-	void flush(size_t threadId, bool finalBatch) {
-		{
-			ThreadSafe _ts(&mutex_); // flush
-			out_.writeString(ptBufs_[threadId]);
-		}
-		ptCounts_[threadId] = 0;
-		ptBufs_[threadId].clear();
+	void flush() {
+		BTString s;
+		do {
+			if (bq_.wait_dequeue_timed(s, 10000)) {
+				out_.writeString(s);
+			}
+		} while(all_producers_done_.load(std::memory_order_acquire) == 0 || bq_.size_approx() != 0);
 	}
 	
 	/**
 	 * Flush all output buffers.
 	 */
 	void flushAll() {
-		for(size_t i = 0; i < nthreads_; i++) {
-			flush(i, i == nthreads_ - 1);
+		if (nthreads_ > 1) {
+			for (int i = 0; i < nthreads_; i++) {
+				bq_.enqueue(std::move(ptBufs_[i]));
+			}
+			all_producers_done_.fetch_add(1, std::memory_order_release);
+			consumer_.get();
+		} else {
+			out_.writeString(ptBufs_[0]);
 		}
 	}
 
@@ -577,8 +593,10 @@ protected:
 	 * reset both buffer and count.
 	 */
 	void maybeFlush(size_t threadId) {
-		if(ptCounts_[threadId] >= perThreadBufSize_) {
-			flush(threadId, false /* final batch? */);
+		if(nthreads_ > 1 && ptCounts_[threadId] >= perThreadBufSize_) {
+			bq_.enqueue(ptBufs_[threadId]);
+			ptCounts_[threadId] = 0;
+			ptBufs_[threadId].clear();
 		}
 	}
 	
@@ -599,6 +617,11 @@ protected:
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
     bool reorder_;
+
+    // producer/consumer
+	BlockingConcurrentQueue<BTString> bq_;
+	std::atomic<int> all_producers_done_;
+	std::future<void> consumer_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
