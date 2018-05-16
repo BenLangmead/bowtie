@@ -599,6 +599,11 @@ private:
 	char nametmp_[20];                // temp buffer for constructing name
 };
 
+    
+struct MyTraits : public moodycamel::ConcurrentQueueDefaultTraits {
+	static const size_t MAX_SUBQUEUE_SIZE = NTHREADS * BLOCK_SIZE;
+};
+
 /**
  * Parent class for PatternSources that read from a file.
  * Uses unlocked C I/O, on the assumption that all reading
@@ -718,7 +723,7 @@ protected:
 	bool compressed_;   // whether input file is compressed
 	
 	// queue between input thread & worker threads (if relevant)
-	BlockingConcurrentQueue<PerThreadReadBuf> bq_;
+	BlockingConcurrentQueue<PerThreadReadBuf, MyTraits> bq_;
 	std::atomic<int> num_done_producers_;
 	
 	// input thread (if relevant)

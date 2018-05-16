@@ -65,6 +65,17 @@ ifneq (,$(findstring Linux,$(shell uname)))
     override EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
+ifdef NTHREADS
+	EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
+else
+	ifdef MACOS
+		NTHREADS = $(shell sysctl -n hw.ncpu)
+	else
+		NTHREADS = $(shell nproc --all)
+	endif
+	EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
+endif
+
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
     MM_DEF = -DBOWTIE_MM
