@@ -620,7 +620,7 @@ public:
 		num_done_producers_(0)
 	{
 		if(pp_.use_input_threads) {
-			task_ = std::async(&CFilePatternSource::inputThreadRun, this);
+			task_ = std::async(std::launch::async, &CFilePatternSource::inputThreadRun, this);
 		} else {
 			assert_gt(infiles.size(), 0);
 			errs_.resize(infiles_.size(), false);

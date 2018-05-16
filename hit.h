@@ -188,7 +188,7 @@ public:
 		initDumps();
 
 		if (nthreads_ > 1) {
-			consumer_ = std::async(&HitSink::flush, this);
+			consumer_ = std::async(std::launch::async, &HitSink::flush, this);
 		}
 	}
 
