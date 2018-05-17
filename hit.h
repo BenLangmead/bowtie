@@ -170,7 +170,7 @@ public:
 		sampleMax_(sampleMax),
 		quiet_(false),
 		nthreads_((nthreads > 0) ? nthreads : 1),
-		use_output_queue_(false),
+		use_output_queue_(true),
 		ptBufs_(),
 		ptCounts_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
@@ -591,7 +591,7 @@ protected:
 	void flushAll() {
 		if (use_output_queue_) {
 			for (int i = 0; i < nthreads_; i++) {
-				bq_.try_enqueue(*(ptoks_[0]), std::move(ptBufs_[i]));
+				while (!bq_.try_enqueue(*(ptoks_[0]), std::move(ptBufs_[i])));
 			}
 			all_producers_done_.fetch_add(1, std::memory_order_release);
 			consumer_.get();
