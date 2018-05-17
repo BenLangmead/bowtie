@@ -392,6 +392,12 @@ public:
 		cur_buf_ = o.cur_buf_;
 		rdid_ = o.rdid_;
 		num_reads_ = o.num_reads_;
+		if (bufa_ != NULL) {
+			delete[] bufa_;
+		}
+		if (bufb_ != NULL) {
+			delete[] bufb_;
+		}
 		bufa_ = o.bufa_;
 		bufb_ = o.bufb_;
 		o.bufa_ = o.bufb_ = NULL;
@@ -1209,7 +1215,7 @@ public:
 		composer_(composer),
 		pp_(pp),
 		buf_(pp.max_buf),
-      	last_batch_(false),
+		last_batch_(false),
 		last_batch_size_(0) { }
 
 	/**
