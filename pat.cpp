@@ -293,13 +293,12 @@ pair<bool, int> CFilePatternSource::nextBatch(
 		bool success = false;
 		bool done = false;
 		do {
-			bq_.pop(pt);
-			if(!pt.exhausted()) { // microseconds
+			if(bq_.try_pop(pt)) { // microseconds
 				success = true;
 				break;
 			}
-		} while(num_done_producers_.load(std::memory_order_acquire) == 0 || bq_.size() > 0);
-		done = num_done_producers_.load(std::memory_order_acquire) > 0 && bq_.size() == 0;
+		} while(num_done_producers_.load(std::memory_order_acquire) == 0 || !bq_.empty());
+		done = num_done_producers_.load(std::memory_order_acquire) > 0 && bq_.empty();
 		if(success && pt.num_reads_ > 0) {
 			return make_pair(done, pt.num_reads_);
 		} else {
