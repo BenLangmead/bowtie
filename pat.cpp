@@ -271,10 +271,10 @@ void CFilePatternSource::inputThreadRun() {
 	filecur_++;
 	const bool batch_a = true; // TODO: support pairs of files
 	while(true) {
-		PerThreadReadBuf rb(pp_.max_buf);
+		PerThreadReadBuf rb;
 		pair<bool, int> ret = nextBatchImpl(rb, batch_a);
 		if(ret.second > 0) { // at least 1 read
-			bq_.enqueue(std::move(rb)); // block if necessary
+			bq_.push(std::move(rb)); // block if necessary
 		}
 		if(ret.first) { // done
 			break;
@@ -293,12 +293,13 @@ pair<bool, int> CFilePatternSource::nextBatch(
 		bool success = false;
 		bool done = false;
 		do {
-			if(bq_.wait_dequeue_timed(pt, 10000)) { // microseconds
+			bq_.pop(pt);
+			if(!pt.exhausted()) { // microseconds
 				success = true;
 				break;
 			}
-		} while(num_done_producers_.load(std::memory_order_acquire) == 0 || bq_.size_approx() != 0);
-		done = num_done_producers_.load(std::memory_order_acquire) > 0 && bq_.size_approx() == 0;
+		} while(num_done_producers_.load(std::memory_order_acquire) == 0 || bq_.size() > 0);
+		done = num_done_producers_.load(std::memory_order_acquire) > 0 && bq_.size() == 0;
 		if(success && pt.num_reads_ > 0) {
 			return make_pair(done, pt.num_reads_);
 		} else {

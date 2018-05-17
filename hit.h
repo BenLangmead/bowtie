@@ -170,10 +170,13 @@ public:
 		sampleMax_(sampleMax),
 		quiet_(false),
 		nthreads_((nthreads > 0) ? nthreads : 1),
+		use_output_queue_(false),
 		ptBufs_(),
 		ptCounts_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
 		ptNumAligned_(NULL),
+		bq_(100),
+		ptoks_(nthreads_),
 		reorder_(reorder)
 	{
 		size_t nelt = 5 * nthreads_;
@@ -187,8 +190,11 @@ public:
 		ptCounts_.resize(nthreads_, 0);
 		initDumps();
 
-		if (nthreads_ > 1) {
-			consumer_ = std::async(std::launch::async, &HitSink::flush, this);
+		if (use_output_queue_) {
+			for (int i = 0; i < nthreads_; i++) {
+				ptoks_[i] = new moodycamel::ProducerToken(bq_);
+			}
+			consumer_ = std::async(std::launch::async, &HitSink::flush_async, this);
 		}
 	}
 
@@ -196,9 +202,6 @@ public:
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
-		if (nthreads_ > 1) {
-		}
-
 		if(ptNumAligned_ != NULL) {
 			delete[] ptNumAligned_;
 			ptNumAligned_ = NULL;
@@ -564,7 +567,7 @@ protected:
 	/**
 	 * Flush thread's output buffer and reset both buffer and count.
 	 */
-	void flush() {
+	void flush_async() {
 		BTString s;
 		do {
 			if (bq_.wait_dequeue_timed(s, 10000)) {
@@ -572,19 +575,30 @@ protected:
 			}
 		} while(all_producers_done_.load(std::memory_order_acquire) == 0 || bq_.size_approx() != 0);
 	}
+
+	void flush(size_t threadId, bool finalBatch) {
+		{
+			ThreadSafe _ts(&mutex_); // flush
+			out_.writeString(ptBufs_[threadId]);
+		}
+		ptCounts_[threadId] = 0;
+		ptBufs_[threadId].clear();
+	}
 	
 	/**
 	 * Flush all output buffers.
 	 */
 	void flushAll() {
-		if (nthreads_ > 1) {
+		if (use_output_queue_) {
 			for (int i = 0; i < nthreads_; i++) {
-				bq_.enqueue(std::move(ptBufs_[i]));
+				bq_.try_enqueue(*(ptoks_[0]), std::move(ptBufs_[i]));
 			}
 			all_producers_done_.fetch_add(1, std::memory_order_release);
 			consumer_.get();
 		} else {
-			out_.writeString(ptBufs_[0]);
+			for (size_t i = 0; i < nthreads_; i++) {
+				flush(i, i == nthreads_ -1);
+			}
 		}
 	}
 
@@ -594,9 +608,13 @@ protected:
 	 */
 	void maybeFlush(size_t threadId) {
 		if(nthreads_ > 1 && ptCounts_[threadId] >= perThreadBufSize_) {
-			bq_.enqueue(ptBufs_[threadId]);
-			ptCounts_[threadId] = 0;
-			ptBufs_[threadId].clear();
+			if (use_output_queue_) {
+				bq_.try_enqueue(*(ptoks_[threadId]), ptBufs_[threadId]);
+				ptCounts_[threadId] = 0;
+				ptBufs_[threadId].clear();
+			} else {
+				flush(threadId, false /* final batch? */);
+			}
 		}
 	}
 	
@@ -619,7 +637,9 @@ protected:
     bool reorder_;
 
     // producer/consumer
-	BlockingConcurrentQueue<BTString> bq_;
+	bool use_output_queue_;
+	BlockingConcurrentQueue<BTString, MyTraits> bq_;
+	std::vector<moodycamel::ProducerToken*> ptoks_;
 	std::atomic<int> all_producers_done_;
 	std::future<void> consumer_;
 

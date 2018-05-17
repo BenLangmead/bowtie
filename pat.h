@@ -24,6 +24,7 @@
 #include "hit_set.h"
 #include "search_globals.h"
 #include "blockingconcurrentqueue.h"
+#include <tbb/concurrent_queue.h>
 
 #ifdef _WIN32
 #define getc_unlocked _fgetc_nolock
@@ -334,12 +335,12 @@ class PerThreadReadBuf {
 
 public:
 	
-	PerThreadReadBuf(size_t max_buf) :
-		max_buf_(max_buf),
+	PerThreadReadBuf() :
+		max_buf_(16),
 		rdid_()
 	{
-		bufa_ = new Read[max_buf];
-		bufb_ = new Read[max_buf];
+		bufa_ = new Read[max_buf_];
+		bufb_ = new Read[max_buf_];
 		reset();
 	}
 
@@ -599,9 +600,9 @@ private:
 	char nametmp_[20];                // temp buffer for constructing name
 };
 
-    
 struct MyTraits : public moodycamel::ConcurrentQueueDefaultTraits {
-	static const size_t MAX_SUBQUEUE_SIZE = NTHREADS * BLOCK_SIZE;
+    static const size_t BLOCK_SIZE = 2;
+	static const size_t MAX_SUBQUEUE_SIZE = NTHREADS;
 };
 
 /**
@@ -625,6 +626,7 @@ public:
 		num_done_producers_(0)
 	{
 		if(pp_.use_input_threads) {
+			bq_.set_capacity(NTHREADS);
 			task_ = std::async(std::launch::async, &CFilePatternSource::inputThreadRun, this);
 		} else {
 			assert_gt(infiles.size(), 0);
@@ -723,7 +725,7 @@ protected:
 	bool compressed_;   // whether input file is compressed
 	
 	// queue between input thread & worker threads (if relevant)
-	BlockingConcurrentQueue<PerThreadReadBuf, MyTraits> bq_;
+	tbb::concurrent_bounded_queue<PerThreadReadBuf> bq_;
 	std::atomic<int> num_done_producers_;
 	
 	// input thread (if relevant)
@@ -1208,7 +1210,7 @@ public:
 		const PatternParams& pp) :
 		composer_(composer),
 		pp_(pp),
-		buf_(pp.max_buf),
+		buf_(),
       	last_batch_(false),
 		last_batch_size_(0) { }
 
