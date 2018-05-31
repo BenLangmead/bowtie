@@ -1666,16 +1666,16 @@ public:
 	 */
 	SStringExpandable& operator=(SStringExpandable<T, S>&& o)
 	{
-		cs_ = o.cs_;
-		printcs_ = o.printcs_;
-		len_ = o.len_;
-		sz_ = o.sz_;
 		if (cs_ != NULL) {
 			delete[] cs_;
 		}
 		if (printcs_ != NULL) {
 			delete[] printcs_;
 		}
+		cs_ = o.cs_;
+		printcs_ = o.printcs_;
+		len_ = o.len_;
+		sz_ = o.sz_;
 		o.cs_ = o.printcs_ = NULL;
 		return *this;
 	}
