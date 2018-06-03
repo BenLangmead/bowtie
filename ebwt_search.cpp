@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <vector>
 #include <time.h>
+#include <memory>
 
 #ifndef _WIN32
 #include <dirent.h>
@@ -154,6 +155,7 @@ static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
 bool gReportColorPrimer;
 bool noUnal; // don't print unaligned reads
+std::atomic<bool> consumers_done_;
 MUTEX_T gLock;
 
 static void resetOptions() {
@@ -1034,6 +1036,7 @@ static const char *argv0 = NULL;
 	get_read_ret = p->nextReadPair(); \
 	if(p->rdid() >= qUpto) { \
 		get_read_ret = make_pair(false, true); \
+		consumers_done_.store(true, std::memory_order_release); \
 	} \
 	if(!get_read_ret.first) { \
 		if(get_read_ret.second) { \
@@ -3162,7 +3165,8 @@ static void driver(const char * type,
 		blockBytes,    // # bytes in one input block, 0 if we're not using blocked input
 		readsPerBlock, // # reads per input block, 0 if we're not using blockeds input
 		use_input_threads, // whether to have separate input thread
-		outType != OUTPUT_SAM // whether to fix mate names
+		outType != OUTPUT_SAM, // whether to fix mate names
+		&consumers_done_
 	);
 
 	// If there were any first-mates specified, we will operate in

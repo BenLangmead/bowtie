@@ -13,6 +13,7 @@
 #include <fstream>
 #include <thread>
 #include <future>
+#include <memory>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -93,7 +94,8 @@ struct PatternParams {
 		int block_bytes_,
 		int reads_per_block_,
 		bool use_input_threads_,
-		bool fixName_) :
+		bool fixName_,
+		std::atomic<bool>* consumers_done_) :
 		format(format_),
 		color(color_),
 		fileParallel(fileParallel_),
@@ -112,7 +114,8 @@ struct PatternParams {
 		block_bytes(block_bytes_),
 		reads_per_block(reads_per_block_),
 		use_input_threads(use_input_threads_),
-		fixName(fixName_) { }
+		fixName(fixName_),
+		consumers_done(consumers_done_) { }
 
 	int format;           // file format
 	bool color;           // colorspace?
@@ -133,6 +136,7 @@ struct PatternParams {
 	int block_bytes;      // # bytes in one input block, 0 if we're not using blocked input
 	int reads_per_block;  // # reads per input block, 0 if we're not using blockeds input
 	bool fixName;         //
+	std::atomic<bool>* consumers_done;
 };
 
 /**
@@ -631,7 +635,7 @@ public:
 		num_done_producers_(0)
 	{
 		if(pp_.use_input_threads) {
-			task_ = std::unique_ptr<std::thread>{new std::thread(&CFilePatternSource::inputThreadRun, this)};
+			task_ = std::async(std::launch::async, &CFilePatternSource::inputThreadRun, this);
 		} else {
 			assert_gt(infiles.size(), 0);
 			errs_.resize(infiles_.size(), false);
@@ -643,7 +647,7 @@ public:
 	
 	virtual ~CFilePatternSource() {
 		if(pp_.use_input_threads) {
-			task_->join();
+			task_.get();
 		}
 		if(is_open_) {
 			if (compressed_) {
@@ -733,7 +737,7 @@ protected:
 	std::atomic<int> num_done_producers_;
 	
 	// input thread (if relevant)
-	std::unique_ptr<std::thread> task_;
+	std::future<void> task_;
 
 private:
 	

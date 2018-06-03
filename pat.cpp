@@ -274,7 +274,12 @@ void CFilePatternSource::inputThreadRun() {
 		PerThreadReadBuf rb(pp_.max_buf);
 		pair<bool, int> ret = nextBatchImpl(rb, batch_a);
 		if(ret.second > 0) { // at least 1 read
-			while (!bq_.try_enqueue(std::move(rb))); // block if necessary
+			while (!bq_.try_enqueue(std::move(rb))) {
+				if (pp_.consumers_done->load(std::memory_order_acquire) == true) {
+					return;
+				}
+
+            } // block if necessary
 		}
 		if(ret.first) { // done
 			break;
