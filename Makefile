@@ -16,13 +16,15 @@ LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
-EXTRA_FLAGS = -std=c++11
+EXTRA_FLAGS =
 EXTRA_CFLAGS =
 EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
 WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
 				-Wno-unused-local-typedefs
+
+override EXTRA_FLAGS += -std=c++11
 
 RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
 
@@ -66,14 +68,14 @@ ifneq (,$(findstring Linux,$(shell uname)))
 endif
 
 ifdef NTHREADS
-	EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
+	override EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
 else
 	ifdef MACOS
 		NTHREADS = $(shell sysctl -n hw.ncpu)
 	else
 		NTHREADS = $(shell nproc --all)
 	endif
-	EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
+	override EXTRA_FLAGS += -DNTHREADS=$(NTHREADS)
 endif
 
 MM_DEF = 
