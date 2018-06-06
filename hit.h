@@ -609,7 +609,7 @@ protected:
 	void maybeFlush(size_t threadId) {
 		if(nthreads_ > 1 && ptCounts_[threadId] >= perThreadBufSize_) {
 			if (use_output_queue_) {
-				bq_.try_enqueue(*(ptoks_[threadId]), ptBufs_[threadId]);
+				while (!bq_.try_enqueue(*(ptoks_[threadId]), ptBufs_[threadId])) ;
 				ptCounts_[threadId] = 0;
 				ptBufs_[threadId].clear();
 			} else {
