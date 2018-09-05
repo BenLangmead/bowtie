@@ -862,7 +862,7 @@ public:
 	TIndexOffU*   ftab() const         { return _ftab; }
 	TIndexOffU*   eftab() const        { return _eftab; }
 	TIndexOffU*   offs() const         { return _offs; }
-	uint32_t*   isa() const          { return _isa; } /* check */
+	TIndexOffU*   isa() const          { return _isa; } /* check */
 	TIndexOffU*   plen() const         { return _plen; }
 	TIndexOffU*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
