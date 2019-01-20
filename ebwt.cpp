@@ -35,7 +35,6 @@ string gLastIOErrMsg;
  */
 string adjustEbwtBase(const string& cmdline,
                       const string& ebwtFileBase,
-                      bool& isBt2Index,
                       bool verbose = false)
 {
 	string str = ebwtFileBase;
@@ -43,7 +42,6 @@ string adjustEbwtBase(const string& cmdline,
 	if(verbose) cout << "Trying " << str << endl;
 	if (access((str + ".1." + gBt2_ext).c_str(), R_OK) == 0) {
 		gEbwt_ext = gBt2_ext;
-		isBt2Index = true;
 	}
 	in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 	if(!in.is_open()) {

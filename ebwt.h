@@ -4825,7 +4825,6 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
  */
 string adjustEbwtBase(const string& cmdline,
 					  const string& ebwtFileBase,
-					  bool& isbt2Index,
 					  bool verbose = false);
 
 #endif /*EBWT_H_*/

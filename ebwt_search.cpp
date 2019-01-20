@@ -3118,8 +3118,12 @@ static void driver(const char * type,
 		}
 	}
 	// Adjust
+	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 	bool isBt2Index = false;
-	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, isBt2Index, verbose);
+	if (gEbwt_ext == "bt2" || gEbwt_ext == "bt2l") {
+		isBt2Index = true;
+	}
+
 
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
