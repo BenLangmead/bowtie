@@ -495,7 +495,8 @@ public:
 	         isaRate,
 	         ftabChars,
 	         color,
-	         refparams.reverse == REF_READ_REVERSE)
+	         refparams.reverse == REF_READ_REVERSE,
+	         false /* is this a bt2 index? */)
 	{
 #ifdef POPCNT_CAPABILITY 
         ProcessorSupport ps; 
@@ -1056,12 +1057,12 @@ public:
 		assert_lt(_zEbwtByteOff, eh._sideBwtSz);
 		_zEbwtBpOff = sideCharOff & 3;
 		assert_lt(_zEbwtBpOff, 4);
-		// if((sideNum & 1) == 0) {
-		// 	// This is an even (backward) side
-		// 	_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
-		// 	_zEbwtBpOff = 3 - _zEbwtBpOff;
-		// 	assert_lt(_zEbwtBpOff, 4);
-		// }
+		if((sideNum & 1) == 0) {
+			// This is an even (backward) side
+			_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
+			_zEbwtBpOff = 3 - _zEbwtBpOff;
+			assert_lt(_zEbwtBpOff, 4);
+		}
 		_zEbwtByteOff += sideByteOff;
 		assert(repOk(eh)); // Ebwt should be fully initialized now
 	}
