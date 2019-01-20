@@ -3118,7 +3118,8 @@ static void driver(const char * type,
 		}
 	}
 	// Adjust
-	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
+	bool isBt2Index = false;
+	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, isBt2Index, verbose);
 
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
@@ -3258,7 +3259,8 @@ static void driver(const char * type,
 	                verbose, // whether to be talkative
 	                startVerbose, // talkative during initialization
 	                false /*passMemExc*/,
-	                sanityCheck);
+	                sanityCheck,
+	                isBt2Index);
 	Ebwt<TStr>* ebwtBw = NULL;
 	// We need the mirror index if mismatches are allowed
 	if(mismatches > 0 || maqLike) {
@@ -3279,7 +3281,8 @@ static void driver(const char * type,
 			verbose,  // whether to be talkative
 			startVerbose, // talkative during initialization
 			false /*passMemExc*/,
-			sanityCheck);
+			sanityCheck,
+	        isBt2Index);
 	}
 	if(!os.empty()) {
 		for(size_t i = 0; i < os.size(); i++) {

@@ -126,28 +126,30 @@ public:
 	           int32_t isaRate,
 	           int32_t ftabChars,
 	           bool color,
-	           bool entireReverse)
+	           bool entireReverse,
+	           bool isBt2Index)
 	{
-		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireReverse);
+		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireReverse, isBt2Index);
 	}
 
 	EbwtParams(const EbwtParams& eh) {
 		init(eh._len, eh._lineRate, eh._linesPerSide, eh._offRate,
-		     eh._isaRate, eh._ftabChars, eh._color, eh._entireReverse);
+		     eh._isaRate, eh._ftabChars, eh._color, eh._entireReverse, eh._isBt2Index);
 	}
 
 	void init(TIndexOffU len, int32_t lineRate, int32_t linesPerSide,
 	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
-	          bool color, bool entireReverse)
+	          bool color, bool entireReverse, bool isBt2Index)
 	{
 		_color = color;
+		_isBt2Index = isBt2Index;
 		_entireReverse = entireReverse;
 		_len = len;
 		_bwtLen = _len + 1;
 		_sz = (len+3)/4;
 		_bwtSz = (len/4 + 1);
 		_lineRate = lineRate;
-		_linesPerSide = linesPerSide;
+		_linesPerSide = _isBt2Index ? 1 : linesPerSide;
 		_origOffRate = offRate;
 		_offRate = offRate;
 		_offMask = OFF_MASK << _offRate;
@@ -170,6 +172,16 @@ public:
 		_numSides = _numSidePairs*2;
 		_numLines = _numSides * _linesPerSide;
 		_ebwtTotLen = _numSidePairs * (2*_sideSz);
+
+		if (_isBt2Index) {
+			_sideBwtSz = _sideSz - 4*OFF_SIZE;
+			_sideBwtLen = _sideBwtSz*4;
+			_numSides = (_bwtSz+(_sideBwtSz)-1)/(_sideBwtSz);
+			_numSidePairs = _numSides / 2;
+			_numLines = _numSides * _linesPerSide;
+			_ebwtTotLen = _numSides * _sideSz;
+		}
+
 		_ebwtTotSz = _ebwtTotLen;
 		assert(repOk());
 	}
@@ -205,6 +217,7 @@ public:
 	TIndexOffU ebwtTotSz() const     { return _ebwtTotSz; }
 	bool color() const             { return _color; }
 	bool entireReverse() const     { return _entireReverse; }
+	bool isBt2Index() const { return _isBt2Index; }
 
 	/**
 	 * Set a new suffix-array sampling rate, which involves updating
@@ -238,7 +251,7 @@ public:
 		assert_lt(_lineRate, 32);
 		assert_lt(_linesPerSide, 32);
 		assert_lt(_ftabChars, 32);
-		assert_eq(0, _ebwtTotSz % (2*_lineSz));
+		assert_eq(0, _ebwtTotSz % (_isBt2Index ? _lineSz : 2*_lineSz));
 		return true;
 	}
 
@@ -309,6 +322,7 @@ public:
 	TIndexOffU _ebwtTotSz;
 	bool     _color;
 	bool     _entireReverse;
+	bool     _isBt2Index;
 };
 
 /**
@@ -358,6 +372,7 @@ public:
 	    _verbose(verbose), \
 	    _passMemExc(passMemExc), \
 	    _sanity(sanityCheck), \
+	    _isBt2Index(isBt2Index), \
 	    _fw(__fw), \
 	    _in1(NULL), \
 	    _in2(NULL), \
@@ -405,7 +420,8 @@ public:
 	     bool verbose = false,
 	     bool startVerbose = false,
 	     bool passMemExc = false,
-	     bool sanityCheck = false) :
+	     bool sanityCheck = false,
+	     bool isBt2Index = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS
 	{
@@ -468,7 +484,8 @@ public:
 	     int32_t __overrideIsaRate = -1,
 	     bool verbose = false,
 	     bool passMemExc = false,
-	     bool sanityCheck = false) :
+	     bool sanityCheck = false,
+	     bool isBt2Index = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS,
 	     _eh(joinedLen(szs),
@@ -1039,12 +1056,12 @@ public:
 		assert_lt(_zEbwtByteOff, eh._sideBwtSz);
 		_zEbwtBpOff = sideCharOff & 3;
 		assert_lt(_zEbwtBpOff, 4);
-		if((sideNum & 1) == 0) {
-			// This is an even (backward) side
-			_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
-			_zEbwtBpOff = 3 - _zEbwtBpOff;
-			assert_lt(_zEbwtBpOff, 4);
-		}
+		// if((sideNum & 1) == 0) {
+		// 	// This is an even (backward) side
+		// 	_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
+		// 	_zEbwtBpOff = 3 - _zEbwtBpOff;
+		// 	assert_lt(_zEbwtBpOff, 4);
+		// }
 		_zEbwtByteOff += sideByteOff;
 		assert(repOk(eh)); // Ebwt should be fully initialized now
 	}
@@ -1142,6 +1159,8 @@ public:
 	inline void countFwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
 	inline TIndexOffU countBwSide(const SideLocus& l, int c) const;
 	inline void countBwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
+	inline TIndexOffU countBt2Side(const SideLocus& l, int c) const;
+	inline void countBt2SideEx(const SideLocus& l, TIndexOffU *pairs) const;
 	inline TIndexOffU mapLF(const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline void mapLFEx(const SideLocus& l, TIndexOffU *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, TIndexOffU *tops, TIndexOffU *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
@@ -1188,6 +1207,7 @@ public:
 	bool       _verbose;
 	bool       _passMemExc;
 	bool       _sanity;
+	bool       _isBt2Index;
 	bool       _fw;     // true iff this is a forward index
 	FILE      *_in1;    // input fd for primary index file
 	FILE      *_in2;    // input fd for secondary index file
@@ -1570,7 +1590,7 @@ struct SideLocus {
 	 * from one call to initFromRow to possibly avoid a second call.
 	 */
 	static void initFromTopBot(TIndexOffU top,
-								TIndexOffU bot,
+	                           TIndexOffU bot,
 	                           const EbwtParams& ep,
 	                           const uint8_t* ebwt,
 	                           SideLocus& ltop,
@@ -1585,7 +1605,7 @@ struct SideLocus {
 			lbot._charOff = (uint32_t)(ltop._charOff + spread);
 			lbot._sideNum = ltop._sideNum;
 			lbot._sideByteOff = ltop._sideByteOff;
-			lbot._fw = ltop._fw;
+			lbot._fw = ep._isBt2Index ? true : ltop._fw;
 			lbot._by = lbot._charOff >> 2;
 			assert_lt(lbot._by, (int)sideBwtSz);
 			if(!lbot._fw) lbot._by = sideBwtSz - lbot._by - 1;
@@ -1604,9 +1624,14 @@ struct SideLocus {
 		const uint32_t sideSz     = ep._sideSz;
 		// Side length is hard-coded for now; this allows the compiler
 		// to do clever things to accelerate / and %.
-		_sideNum                  = row / (56*OFF_SIZE);
-		_charOff                  = row % (56*OFF_SIZE);
-		_sideByteOff              = _sideNum * sideSz;
+		if (ep._isBt2Index) {
+			_sideNum = row / (48*OFF_SIZE);
+			_charOff = row % (48*OFF_SIZE);
+		} else {
+			_sideNum = row / (56*OFF_SIZE);
+			_charOff = row % (56*OFF_SIZE);
+		}
+		_sideByteOff = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 #ifndef NO_PREFETCH
@@ -1615,7 +1640,7 @@ struct SideLocus {
 		                   PREFETCH_LOCALITY);
 #endif
 		// prefetch this side too
-		_fw = (_sideNum & 1) != 0; // odd-numbered sides are forward
+		_fw = ep._isBt2Index ? true : ((_sideNum & 1) != 0); // odd-numbered sides are forward
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte
@@ -2259,10 +2284,10 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, TIndexOffU* arrs) cons
 	arrs[2] += (gt[0] + this->_fchr[2]);
 	arrs[3] += (gt[1] + this->_fchr[3]);
 #ifndef NDEBUG
-	assert_leq(arrs[0], this->_fchr[1]); // can't have jumpded into next char's section
-	assert_leq(arrs[1], this->_fchr[2]); // can't have jumpded into next char's section
-	assert_leq(arrs[2], this->_fchr[3]); // can't have jumpded into next char's section
-	assert_leq(arrs[3], this->_fchr[4]); // can't have jumpded into next char's section
+	assert_leq(arrs[0], this->_fchr[1]); // can't have jumped into next char's section
+	assert_leq(arrs[1], this->_fchr[2]); // can't have jumped into next char's section
+	assert_leq(arrs[2], this->_fchr[3]); // can't have jumped into next char's section
+	assert_leq(arrs[3], this->_fchr[4]); // can't have jumped into next char's section
 #endif
 }
 
@@ -2365,6 +2390,110 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, TIndexOffU* arrs) cons
 #endif
 }
 
+#define WITHIN_BWT_LEN(x) \
+	assert_leq(x[0], this->_eh._sideBwtLen); \
+	assert_leq(x[1], this->_eh._sideBwtLen); \
+	assert_leq(x[2], this->_eh._sideBwtLen); \
+	assert_leq(x[3], this->_eh._sideBwtLen)
+
+#define WITHIN_FCHR(x) \
+	assert_leq(x[0], this->fchr()[1]); \
+	assert_leq(x[1], this->fchr()[2]); \
+	assert_leq(x[2], this->fchr()[3]); \
+	assert_leq(x[3], this->fchr()[4])
+
+template<typename TStr>
+inline TIndexOffU Ebwt<TStr>::countBt2Side(const SideLocus& l, int c) const {
+	assert_range(0, 3, c);
+	assert_range(0, (int)this->_eh._sideBwtSz-1, (int)l._by);
+	assert_range(0, 3, (int)l._bp);
+	const uint8_t *side = l.side(this->ebwt());
+	TIndexOffU cCnt = countUpTo(l, c);
+	assert_leq(cCnt, this->_eh._sideBwtLen);
+	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
+		// Adjust for the fact that we represented $ with an 'A', but
+		// shouldn't count it as an 'A' here
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff))
+		{
+			cCnt--; // Adjust for '$' looking like an 'A'
+		}
+	}
+	TIndexOffU ret;
+	// Now factor in the occ[] count at the side break
+	const uint8_t *acgt8 = side + _eh._sideBwtSz;
+	const TIndexOffU *acgt = reinterpret_cast<const TIndexOffU*>(acgt8);
+	assert_leq(acgt[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
+	assert_leq(acgt[1], this->_eh._len);
+	assert_leq(acgt[2], this->_eh._len);
+	assert_leq(acgt[3], this->_eh._len);
+	ret = acgt[c] + cCnt + this->fchr()[c];
+#ifndef NDEBUG
+	assert_leq(ret, this->fchr()[c+1]); // can't have jumpded into next char's section
+	if(c == 0) {
+		assert_leq(cCnt, this->_eh._sideBwtLen);
+	} else {
+		assert_leq(ret, this->_eh._bwtLen);
+	}
+#endif
+	return ret;
+}
+
+/**
+ * Count all occurrences of character c from the beginning of the
+ * forward side to <by,bp> and add in the occ[] count up to the side
+ * break just prior to the side.
+ *
+ * A forward side is shaped like:
+ *
+ * [A] [C] XXXXXXXXXXXXXXXX
+ * -4- -4- --------56------ (numbers in bytes)
+ *         ^
+ *         Side ptr (result from SideLocus.side())
+ *
+ * And following it is a reverse side shaped like:
+ * 
+ * [G] [T] XXXXXXXXXXXXXXXX
+ * -4- -4- --------56------ (numbers in bytes)
+ *         ^
+ *         Side ptr (result from SideLocus.side())
+ *
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::countBt2SideEx(const SideLocus& l, TIndexOffU* arrs) const {
+	assert_range(0, (int)this->_eh._sideBwtSz-1, (int)l._by);
+	assert_range(0, 3, (int)l._bp);
+	countUpToEx(l, arrs);
+	if(l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
+		// Adjust for the fact that we represented $ with an 'A', but
+		// shouldn't count it as an 'A' here
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff))
+		{
+			arrs[0]--; // Adjust for '$' looking like an 'A'
+		}
+	}
+	WITHIN_FCHR(arrs);
+	WITHIN_BWT_LEN(arrs);
+	// Now factor in the occ[] count at the side break
+	const uint8_t *side = l.side(this->ebwt());
+	const uint8_t *acgt16 = side + this->_eh._sideSz - OFF_SIZE*4;
+	const TIndexOffU *acgt = reinterpret_cast<const TIndexOffU*>(acgt16);
+	assert_leq(acgt[0], this->fchr()[1] + this->_eh.sideBwtLen());
+	assert_leq(acgt[1], this->fchr()[2]-this->fchr()[1]);
+	assert_leq(acgt[2], this->fchr()[3]-this->fchr()[2]);
+	assert_leq(acgt[3], this->fchr()[4]-this->fchr()[3]);
+	assert_leq(acgt[0], this->_eh._len + this->_eh.sideBwtLen());
+	assert_leq(acgt[1], this->_eh._len);
+	assert_leq(acgt[2], this->_eh._len);
+	assert_leq(acgt[3], this->_eh._len);
+	arrs[0] += (acgt[0] + this->fchr()[0]);
+	arrs[1] += (acgt[1] + this->fchr()[1]);
+	arrs[2] += (acgt[2] + this->fchr()[2]);
+	arrs[3] += (acgt[3] + this->fchr()[3]);
+	WITHIN_FCHR(arrs);
+}
+
 /**
  * Given top and bot loci, calculate counts of all four DNA chars up to
  * those loci.  Used for more advanced backtracking-search.
@@ -2386,10 +2515,21 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 	assert_eq(0, tops[1]); assert_eq(0, bots[1]);
 	assert_eq(0, tops[2]); assert_eq(0, bots[2]);
 	assert_eq(0, tops[3]); assert_eq(0, bots[3]);
-	if(ltop._fw) countFwSideEx(ltop, tops); // Forward side
-	else         countBwSideEx(ltop, tops); // Backward side
-	if(lbot._fw) countFwSideEx(lbot, bots); // Forward side
-	else         countBwSideEx(lbot, bots); // Backward side
+	if(ltop._fw) {
+		 // Forward side
+		!_eh._isBt2Index ? countFwSideEx(ltop, tops)
+		                 : countBt2SideEx(ltop, tops);
+	} else {
+		countBwSideEx(ltop, tops); // Backward side
+	}
+
+	if(lbot._fw) {
+		// Forward side
+		!_eh._isBt2Index ? countFwSideEx(lbot, bots)
+		                 : countBt2SideEx(lbot, bots);
+	} else {
+		countBwSideEx(lbot, bots); // Backward side
+	}
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
 		// Make sure results match up with individual calls to mapLF;
@@ -2422,8 +2562,13 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& l,
 	assert_eq(0, arrs[1]);
 	assert_eq(0, arrs[2]);
 	assert_eq(0, arrs[3]);
-	if(l._fw) countFwSideEx(l, arrs); // Forward side
-	else      countBwSideEx(l, arrs); // Backward side
+	if(l._fw) {
+		// Forward side
+		!_eh._isBt2Index ? countFwSideEx(l, arrs)
+		                 : countBt2SideEx(l, arrs);
+	} else {
+		countBwSideEx(l, arrs); // Backward side
+	}
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
 		// Make sure results match up with individual calls to mapLF;
@@ -2454,8 +2599,14 @@ inline TIndexOffU Ebwt<TStr>::mapLF(const SideLocus& l
 	int c = rowL(l);
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	if(l._fw) ret = countFwSide(l, c); // Forward side
-	else      ret = countBwSide(l, c); // Backward side
+	if(l._fw) {
+		// Forward side
+		ret = !_eh._isBt2Index ? countFwSide(l, c)
+		                       : countBt2Side(l, c);
+	}
+	else {
+		ret = countBwSide(l, c); // Backward side
+	}
 	assert_lt(ret, this->_eh._bwtLen);
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
@@ -2485,8 +2636,14 @@ inline TIndexOffU Ebwt<TStr>::mapLF(const SideLocus& l, int c
 	TIndexOffU ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	if(l._fw) ret = countFwSide(l, c); // Forward side
-	else      ret = countBwSide(l, c); // Backward side
+	if(l._fw) {
+		// Forward side
+		ret = !_eh._isBt2Index ? countFwSide(l, c)
+		                       : countBt2Side(l, c);
+	}
+	else {
+		ret = countBwSide(l, c); // Backward side
+	}
 	assert_lt(ret, this->_eh._bwtLen);
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
@@ -2517,8 +2674,13 @@ inline TIndexOffU Ebwt<TStr>::mapLF1(TIndexOffU row, const SideLocus& l, int c
 	TIndexOffU ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	if(l._fw) ret = countFwSide(l, c); // Forward side
-	else      ret = countBwSide(l, c); // Backward side
+	if(l._fw) {
+		// Forward side
+		ret = !_eh._isBt2Index ? countFwSide(l, c)
+		                       : countBt2Side(l, c);
+	} else {
+		ret = countBwSide(l, c); // Backward side
+	}
 	assert_lt(ret, this->_eh._bwtLen);
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
@@ -2549,8 +2711,13 @@ inline int Ebwt<TStr>::mapLF1(TIndexOffU& row, const SideLocus& l
 	int c = rowL(l);
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	if(l._fw) row = countFwSide(l, c); // Forward side
-	else      row = countBwSide(l, c); // Backward side
+	if(l._fw) {
+		// Forward side
+		row = !_eh._isBt2Index ? countFwSide(l, c)
+		                       : countBt2Side(l, c);
+	} else {
+		row = countBwSide(l, c); // Backward side
+	}
 	assert_lt(row, this->_eh._bwtLen);
 #ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
@@ -2829,8 +2996,13 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		TIndexOffU newi;
 		assert_lt(c, 4);
 		assert_geq(c, 0);
-		if(l->_fw) newi = countFwSide(*l, c); // Forward side
-		else       newi = countBwSide(*l, c); // Backward side
+		if(l->_fw) {
+			// Forward side
+			newi = !_eh._isBt2Index ? countFwSide(*l, c)
+			                        : countBt2Side(*l, c);
+		} else {
+			newi = countBwSide(*l, c); // Backward side
+		}
 		assert_lt(newi, this->_eh._bwtLen);
 		assert_neq(newi, i);
 		i = newi;                                  // update row
@@ -2883,8 +3055,13 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 			TIndexOffU newi;
 			assert_lt(c, 4);
 			assert_geq(c, 0);
-			if(l->_fw) newi = countFwSide(*l, c); // Forward side
-			else       newi = countBwSide(*l, c); // Backward side
+			if(l->_fw) {
+				// Forward side
+				newi = !_eh._isBt2Index ? countFwSide(*l, c)
+				                        : countBt2Side(*l, c);
+			} else {
+				newi = countBwSide(*l, c); // Backward side
+			}
 			assert_lt(newi, this->_eh._bwtLen);
 			assert_neq(newi, i);
 			i = newi;                                  // update row
@@ -2922,8 +3099,14 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		appendValue(rbuf, (Dna5)c);
 		TIndexOffU newi;
 		assert_lt(c, 4); assert_geq(c, 0);
-		if(l->_fw) newi = countFwSide(*l, c); // Forward side
-		else       newi = countBwSide(*l, c); // Backward side
+		if(l->_fw) {
+			// Forward side
+			newi = !_eh._isBt2Index ? countFwSide(*l, c)
+			                        : countBt2Side(*l, c);
+		}
+		else {
+			newi = countBwSide(*l, c); // Backward side
+		}
 		assert_lt(newi, this->_eh._bwtLen);
 		assert_neq(newi, i);
 		i = newi;                                  // update row
@@ -3208,11 +3391,11 @@ void Ebwt<TStr>::readIntoMemory(
 	EbwtParams *eh;
 	bool deleteEh = false;
 	if(params != NULL) {
-		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev);
+		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev, _isBt2Index);
 		if(_verbose || startVerbose) params->print(cerr);
 		eh = params;
 	} else {
-		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev);
+		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev, _isBt2Index);
 		deleteEh = true;
 	}
 
@@ -3678,6 +3861,7 @@ void Ebwt<TStr>::readIntoMemory(
 /**
  * Read reference names from an input stream 'in' for an Ebwt primary
  * file and store them in 'refnames'.
+ * TODO: revisit this function
  */
 static inline void
 readEbwtRefnames(FILE* fin, vector<string>& refnames) {
@@ -3710,7 +3894,7 @@ readEbwtRefnames(FILE* fin, vector<string>& refnames) {
 	}
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse);
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse, false);
 
 	TIndexOffU nPat = readI<TIndexOffU>(fin, switchEndian); // nPat
 	fseeko(fin, nPat*OFF_SIZE, SEEK_CUR);
@@ -4640,6 +4824,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
  */
 string adjustEbwtBase(const string& cmdline,
 					  const string& ebwtFileBase,
+					  bool& isbt2Index,
 					  bool verbose = false);
 
 #endif /*EBWT_H_*/
