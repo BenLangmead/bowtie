@@ -64,7 +64,10 @@ string adjustEbwtBase(const string& cmdline,
 			if(getenv("BOWTIE_INDEXES") != NULL) {
 				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
 				if(verbose) cout << "Trying " << str << endl;
-				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+				if (access((str + ".1." + gBt2_ext).c_str(), R_OK) == 0) {
+					gEbwt_ext = gBt2_ext;
+				}
+				in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 				if(!in.is_open()) {
 					if(verbose) cout << "  didn't work" << endl;
 					in.close();
