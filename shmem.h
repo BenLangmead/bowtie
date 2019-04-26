@@ -67,7 +67,7 @@ bool allocSharedMem(std::string fname,
 				cerr << "EEXIST" << endl;
 			} else if(errno == EINVAL) {
 				cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << (shmemLen) << ")" << endl
-					 << "Deleteing old shared memory block and trying again." << endl;
+					 << "Deleting old shared memory block and trying again." << endl;
 				shmid = shmget(key, 0, 0);
 				if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
 					cerr << "shmctl returned " << ret
@@ -105,7 +105,7 @@ bool allocSharedMem(std::string fname,
 		if(ds.shm_segsz != shmemLen) {
 			cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
 				 << ") doesn't match expected size (" << shmemLen << ")" << endl
-				 << "Deleteing old shared memory block and trying again." << endl;
+				 << "Deleting old shared memory block and trying again." << endl;
 			if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
 				cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
 				throw 1;
