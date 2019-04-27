@@ -1,3 +1,13 @@
+<h2>1000-Genomes major-allele SNP references -- 4/26/2019</h2>
+<ul>
+    <li>For each base where the typical reference has the non-majority allele (according to the <a href="http://www.internationalgenome.org">1000 Genomes Project</a>, we substituted in the majority allele instead
+    <li>Links for indexes added to sidebar, as are links for the edited FASTA files
+    <li>We made versions both for GRCh38 primary assembly and hg19 assembly
+    <li>See <a href="https://github.com/BenLangmead/bowtie-majref">how we created them</a>
+    <li>Only SNPs (single-base substitutions) are considered for now; indels are future work
+    <li>Because only SNPs are considered, coordinates (e.g. gene annotations) are the same as for typical GRCh38 and hg19 assemblies.  Most downstream tools are unaffected as long as major-allele-edited FASTAs are used wherever genome sequences are required.
+</ul>
+
 <h2>1.2.2 - 12/11/2017</h2>
 <p>Update (12/12/2017): We have had to re-release this version of bowtie to address an issue when compiling with pthreads (<tt>make NO_TBB=1</tt>).</p>
 <ul>
