@@ -111,7 +111,7 @@
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
-      <tr><td colspan="2" style="font-size: x-small">&nbsp;&nbsp;<a href="https://github.com/BenLangmead/bowtie-majref">How we built this</a>
+      <tr><td colspan="2" style="font-size: x-small">&nbsp;&nbsp;<a href="https://github.com/BenLangmead/bowtie-majref">How we built this</a>, <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/grch38_1kgmaj.fa.gz">FASTA</a>
       </td></tr>
 
       <!-- hg19 -->
@@ -133,6 +133,15 @@
       </tr></table>
       </td></tr>
       -->
+
+      <!-- hg19 major-allele -->
+      <tr><td>
+        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_1kgmaj_bt.zip"><i>H. sapiens</i>, UCSC hg19 <br/> with 1KGenomes major SNPs</a>
+        </td><td align="right">
+          <b>2.7 GB</b>
+      </td></tr>
+      <tr><td colspan="2" style="font-size: x-small">&nbsp;&nbsp;<a href="https://github.com/BenLangmead/bowtie-majref">How we built this</a>, <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_1kgmaj.fa.gz">FASTA</a>
+      </td></tr>
 
       <!-- hg18 -->
       <!--
