@@ -120,38 +120,45 @@
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19.ebwt.1.zip">part 1</a> - 1.7 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19.ebwt.2.zip">part 2</a> - 1.0 GB</td>
       </tr>
+      -->
       <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg19_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- hg18 -->
-      <!--
       <tr><td>
         <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.zip"><i>H. sapiens</i>, UCSC hg18</a>
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr><td colspan=2><table width="100%">
+      <!--
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.1.zip">part 1</a> - 1.7 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.2.zip">part 2</a> - 1.0 GB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- H. sapiens, NCBI 37.1 -->
       <tr><td>
@@ -159,18 +166,22 @@
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm.ebwt.1.zip">part 1</a> - 1.7 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm.ebwt.2.zip">part 2</a> - 1.0 GB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_37_asm_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- H. sapiens, NCBI 36.3 -->
       <tr><td>
@@ -178,18 +189,22 @@
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.1.zip">part 1</a> - 1.7 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.2.zip">part 2</a> - 1.0 GB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- mm8 -->
       <tr><td>
@@ -197,18 +212,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- mm9 -->
       <tr><td>
@@ -216,18 +235,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm9_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- M. musculus, NCBI 37.1 -->
       <tr><td>
@@ -235,18 +258,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/m_musculus_ncbi37_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- rn4 -->
       <tr><td>
@@ -254,18 +281,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/rn4_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- B. taurus -->
       <tr><td>
@@ -273,18 +304,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/b_taurus_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- canFam2 -->
       <tr><td>
@@ -292,18 +327,22 @@
         </td><td align="right">
           <b>2.4 GB</b>
       </td></tr>
+      <tr><td colspan=2><table width="100%">
       <!--
-      <tr><td colspan=2><table width="100%"><tr>
+      <tr>
         <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2.ebwt.1.zip">part 1</a> - 1.5 GB,
                       <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2.ebwt.2.zip">part 2</a> - 900 MB</td>
-      </tr><tr>
+      </tr>
+      -->
+      <tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2_c.ebwt.zip">full</a>
+          <!-- , or
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2_c.ebwt.1.zip">part 1</a>,
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/canFam2_c.ebwt.2.zip">part 2</a></td>
+          -->
       </tr></table>
       </td></tr>
-      -->
 
       <!-- G. gallus -->
       <tr><td>
@@ -311,13 +350,11 @@
         </td><td align="right">
           <b>1.1 GB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/galGal3_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
       <!-- D. melanogaster -->
       <tr><td>
@@ -325,13 +362,11 @@
         </td><td align="right">
           <b>150 MB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/d_melanogaster_fb5_22_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
       <!-- A. thaliana -->
       <tr><td>
@@ -339,13 +374,11 @@
         </td><td align="right">
           <b>120 MB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/a_thaliana_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
       <!-- C. elegans -->
       <tr><td>
@@ -353,13 +386,11 @@
         </td><td align="right">
           <b>75 MB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/c_elegans_ws200_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
       <!-- S. cerevisiae -->
       <tr><td>
@@ -367,13 +398,11 @@
         </td><td align="right">
           <b>15 MB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/s_cerevisiae_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
       <!-- E. coli -->
       <tr><td>
@@ -381,13 +410,11 @@
         </td><td align="right">
           <b>5 MB</b>
       </td></tr>
-      <!--
       <tr><td colspan=2><table width="100%"><tr>
         <td>&nbsp;colorspace:
           <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/e_coli_c.ebwt.zip">full</a>
       </tr></table>
       </td></tr>
-      -->
 
     </table>
     <p style="font-size: x-small; line-height: 130%">
