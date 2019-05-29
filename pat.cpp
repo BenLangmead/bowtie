@@ -1329,14 +1329,18 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;
-		while(c >= 0 && c != '\n' && c != '\r') {
-			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
-			c = getc_wrapper();
-		}
 		while(c >= 0 && (c == '\n' || c == '\r')) {
 			c = getc_wrapper();
 		}
+		while(c >= 0 && (c != '\n' && c != '\r')) {
+			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
+			c = getc_wrapper();
+		}
 	}
+	while (readi > 0 && readbuf[readi-1].readOrigBufLen == 0) {
+		readi--;
+	}
+
 	return make_pair(c < 0, readi);
 }
 
