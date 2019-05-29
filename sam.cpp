@@ -334,7 +334,7 @@ void SAMHitSink::reportMaxed(
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == r) {
-						reportHits(NULL, &hs, i, i+2, threadId, 0, (int)(hs.size()/2)+1, false, p.rdid());
+						reportHits(NULL, &hs, i, i+2, threadId, 0, (int)(hs.size()/2)+1, true, p.rdid());
 						break;
 					}
 					num++;
@@ -349,7 +349,7 @@ void SAMHitSink::reportMaxed(
 			}
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
-			reportHits(&hs[r], NULL, 0, 1, threadId, 0, (int)hs.size()+1, false, p.rdid());
+			reportHits(&hs[r], NULL, 0, 1, threadId, 0, (int)hs.size()+1, true, p.rdid());
 		}
 	} else {
 		reportUnOrMax(p, &hs, threadId, false);
