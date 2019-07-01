@@ -13,6 +13,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdexcept>
+#include <fcntl.h>
+#include <zlib.h>
 #include "assert_helpers.h"
 
 /**
@@ -49,6 +51,12 @@ public:
 		assert(_in != NULL);
 	}
 
+	FileBuf(gzFile in) {
+		init();
+		_zIn = in;
+		assert(_zIn != NULL);
+	}
+
 	FileBuf(std::ifstream *inf) {
 		init();
 		_inf = inf;
@@ -65,7 +73,7 @@ public:
 	 * Return true iff there is a stream ready to read.
 	 */
 	bool isOpen() {
-		return _in != NULL || _inf != NULL || _ins != NULL;
+		return _in != NULL || _zIn != NULL || _inf != NULL || _ins != NULL;
 	}
 
 	/**
@@ -76,7 +84,9 @@ public:
 			fclose(_in);
 		} else if(_inf != NULL) {
 			_inf->close();
-		} else {
+		} else if(_zIn != NULL) {
+			gzclose(_zIn);
+		}  else {
 			// can't close _ins
 		}
 	}
@@ -85,7 +95,7 @@ public:
 	 * Get the next character of input and advance.
 	 */
 	int get() {
-		assert(_in != NULL || _inf != NULL || _ins != NULL);
+		assert(_in != NULL || _zIn != NULL || _inf != NULL || _ins != NULL);
 		int c = peek();
 		if(c != -1) {
 			_cur++;
@@ -106,6 +116,19 @@ public:
 	 */
 	void newFile(FILE *in) {
 		_in = in;
+		_inf = NULL;
+		_ins = NULL;
+		_cur = BUF_SZ;
+		_buf_sz = BUF_SZ;
+		_done = false;
+	}
+
+	/**
+	 * Initialize the buffer with a new gz file.
+	 */
+	void newFile(gzFile in) {
+		_in = NULL;
+		_zIn = in;
 		_inf = NULL;
 		_ins = NULL;
 		_cur = BUF_SZ;
@@ -148,6 +171,8 @@ public:
 		} else if(_ins != NULL) {
 			_ins->clear();
 			_ins->seekg(0, std::ios::beg);
+		} else if (_zIn != NULL) {
+			gzrewind(_zIn);
 		} else {
 			rewind(_in);
 		}
@@ -162,7 +187,7 @@ public:
 	 * Occasionally we'll need to read in a new buffer's worth of data.
 	 */
 	int peek() {
-		assert(_in != NULL || _inf != NULL || _ins != NULL);
+		assert(_in != NULL || _zIn != NULL || _inf != NULL || _ins != NULL);
 		assert_leq(_cur, _buf_sz);
 		if(_cur == _buf_sz) {
 			if(_done) {
@@ -175,6 +200,8 @@ public:
 				if(_inf != NULL) {
 					_inf->read((char*)_buf, BUF_SZ);
 					_buf_sz = _inf->gcount();
+				} else if (_zIn != NULL) {
+					_buf_sz = gzread(_zIn, (void *)_buf, BUF_SZ);
 				} else if(_ins != NULL) {
 					_ins->read((char*)_buf, BUF_SZ);
 					_buf_sz = _ins->gcount();
@@ -333,10 +360,44 @@ public:
 		return _lastn_cur;
 	}
 
+	static bool isGzippedFile(const char *filename) {
+		if (filename == NULL) {
+			return false;
+		}
+
+		int fd = open(filename, O_RDONLY);
+		if (fd == -1) {
+			std::cerr << "Unable to open " << filename << std::endl;
+			throw 1;
+		}
+
+		uint8_t byte1, byte2;
+
+		ssize_t r1 = read(fd, &byte1, sizeof(uint8_t));
+		ssize_t r2 = read(fd, &byte2, sizeof(uint8_t));
+
+		if (::close(fd) == -1) {
+			std::cerr << "Unable to close " << filename << std::endl;
+			throw 1;
+		}
+
+		if (r1 == 0 || r2 == 0) {
+                        std::cerr << "Unable to read file magic number" << std::endl;
+                        return false;
+                }
+
+		if (byte1 == 0x1f && byte2 == 0x8b) {
+			return true;
+		}
+
+		return false;
+	}
+
 private:
 
 	void init() {
 		_in = NULL;
+		_zIn = NULL;
 		_inf = NULL;
 		_ins = NULL;
 		_cur = _buf_sz = BUF_SZ;
@@ -347,6 +408,7 @@ private:
 
 	static const size_t BUF_SZ = 256 * 1024;
 	FILE     *_in;
+	gzFile   _zIn;
 	std::ifstream *_inf;
 	std::istream  *_ins;
 	size_t    _cur;

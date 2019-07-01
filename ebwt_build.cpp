@@ -333,12 +333,22 @@ static void driver(const string& infile,
 	} else {
 		// Adapt sequence files to ifstreams
 		for(size_t i = 0; i < infiles.size(); i++) {
-			FILE *f = fopen(infiles[i].c_str(), "rb");
-			if (f == NULL) {
-				cerr << "Error: could not open "<< infiles[i] << endl;
-				throw 1;
+			FileBuf *fb = NULL;
+			if (FileBuf::isGzippedFile(infiles[i].c_str())) {
+				gzFile zFp = gzopen(infiles[i].c_str(), "rb");
+				if (zFp == NULL) {
+					std::cerr << "Error: could not open " << infiles[i].c_str() << std::endl;
+					throw 1;
+				}
+				fb = new FileBuf(zFp);
+			} else {
+				FILE *f = fopen(infiles[i].c_str(), "rb");
+				if (f == NULL) {
+					cerr << "Error: could not open "<< infiles[i] << endl;
+					throw 1;
+				}
+				fb = new FileBuf(f);
 			}
-			FileBuf *fb = new FileBuf(f);
 			assert(fb != NULL);
 			assert(!fb->eof());
 			assert(fb->get() == '>');
