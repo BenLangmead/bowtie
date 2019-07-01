@@ -10,16 +10,17 @@
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
+#include <unistd.h>
 
 using namespace std;
 
 #ifdef BOWTIE_64BIT_INDEX
-
 std::string gEbwt_ext("ebwtl");
+std::string gBt2_ext("bt2l");
 
 #else
-
 std::string gEbwt_ext("ebwt");
+std::string gBt2_ext("bt2");
 
 #endif  // BOWTIE_64BIT_INDEX
 
@@ -33,12 +34,15 @@ string gLastIOErrMsg;
  * "$BOWTIE_INDEXES/".
  */
 string adjustEbwtBase(const string& cmdline,
-					  const string& ebwtFileBase,
-					  bool verbose = false)
+                      const string& ebwtFileBase,
+                      bool verbose = false)
 {
 	string str = ebwtFileBase;
 	ifstream in;
 	if(verbose) cout << "Trying " << str << endl;
+	if (access((str + ".1." + gBt2_ext).c_str(), R_OK) == 0) {
+		gEbwt_ext = gBt2_ext;
+	}
 	in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 	if(!in.is_open()) {
 		if(verbose) cout << "  didn't work" << endl;
@@ -60,7 +64,10 @@ string adjustEbwtBase(const string& cmdline,
 			if(getenv("BOWTIE_INDEXES") != NULL) {
 				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
 				if(verbose) cout << "Trying " << str << endl;
-				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+				if (access((str + ".1." + gBt2_ext).c_str(), R_OK) == 0) {
+					gEbwt_ext = gBt2_ext;
+				}
+				in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 				if(!in.is_open()) {
 					if(verbose) cout << "  didn't work" << endl;
 					in.close();

@@ -765,6 +765,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					// can re-use this prefix for all the reads
 					// that are substrings of this FASTA sequence
 					name_prefix_buf_[nameoff++] = c;
+					subReadCnt_ = 0;
 				}
 				c = getc_wrapper();
 			}
@@ -794,13 +795,14 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 				// the sampling gaps are by looking at the read
 				// name
 				if(!beginning_) {
-					readCnt_++;
+					subReadCnt_++;
 				}
 				continue;
 			}
 			// install name
+			nameoff = strlen(name_prefix_buf_);
 			memcpy(readbuf[readi].readOrigBuf, name_prefix_buf_, nameoff);
-			itoa10<TReadId>(readCnt_ - subReadCnt_, name_int_buf_);
+			itoa10<TReadId>(subReadCnt_, name_int_buf_);
 			size_t bufoff = nameoff;
 			memcpy(readbuf[readi].readOrigBuf + bufoff, name_int_buf_, strlen(name_int_buf_));
 			bufoff += strlen(name_int_buf_);
@@ -817,8 +819,8 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 			}
 			readbuf[readi].readOrigBufLen = bufoff;
 			eat_ = freq_-1;
-			readCnt_++;
 			beginning_ = false;
+			subReadCnt_++;
 			readi++;
 		}
 	}

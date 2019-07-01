@@ -472,7 +472,8 @@ static void driver(const string& infile,
 	                -1,           // override isaRate
 	                verbose,      // be talkative
 	                autoMem,      // pass exceptions up to the toplevel so that we can adjust memory settings automatically
-	                sanityCheck); // verify results and internal consistency
+	                sanityCheck,  // verify results and internal consistency
+	                false);       // are we building a bt2 index?
 	// Note that the Ebwt is *not* resident in memory at this time.  To
 	// load it into memory, call ebwt.loadIntoMemory()
 	if(verbose) {
