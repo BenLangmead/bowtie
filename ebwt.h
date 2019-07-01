@@ -3895,7 +3895,11 @@ readEbwtRefnames(FILE* fin, vector<string>& refnames) {
 	}
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse, false);
+	bool isBt2Index = false;
+	if (gEbwt_ext == "bt2" || gEbwt_ext == "bt2") {
+		isBt2Index = true;
+	}
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse, isBt2Index);
 
 	TIndexOffU nPat = readI<TIndexOffU>(fin, switchEndian); // nPat
 	fseeko(fin, nPat*OFF_SIZE, SEEK_CUR);
