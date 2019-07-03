@@ -69,6 +69,7 @@ def main():
     bin_spec            = os.path.join(ex_path, bin_s)
 
     if args.verbose:
+        bowtie_args.append('--verbose')
         logging.getLogger().setLevel(logging.INFO)
 
     if args.large_index:

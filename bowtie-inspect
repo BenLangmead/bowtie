@@ -34,8 +34,8 @@ def main():
     inspect_bin_name      = "bowtie-inspect"
     inspect_bin_s         = "bowtie-inspect-s"
     inspect_bin_l         = "bowtie-inspect-l"
-    idx_ext_l             = '.1.ebwtl'; 
-    idx_ext_s             = '.1.ebwt'; 
+    idx_ext_l             = '.1.ebwtl'
+    idx_ext_s             = '.1.ebwt'
     curr_script           = os.path.realpath(inspect.getsourcefile(main))
     ex_path               = os.path.dirname(curr_script)
     inspect_bin_spec      = os.path.join(ex_path,inspect_bin_s)
@@ -43,12 +43,13 @@ def main():
     options,arguments     = bld.build_args()
 
     if '--verbose' in options:
+        arguments.append('--verbose')
         logging.getLogger().setLevel(logging.INFO)
-        
+
     if '--debug' in options:
         inspect_bin_spec += '-debug'
         inspect_bin_l += '-debug'
-        
+
     if '--large-index' in options:
         inspect_bin_spec = os.path.join(ex_path,inspect_bin_l)
     elif len(arguments) >= 1:
@@ -58,18 +59,13 @@ def main():
         if large_idx_exists and not small_idx_exists:
             logging.info("No small index but a large one is present. Inspecting the large index.")
             inspect_bin_spec = os.path.join(ex_path,inspect_bin_l)
-    
+
     arguments[0] = inspect_bin_name
     arguments.insert(1, 'basic-0')
     arguments.insert(1, '--wrapper')
     logging.info('Command: %s %s' %  (inspect_bin_spec,' '.join(arguments[1:])))
-    os.execv(inspect_bin_spec, arguments)        
-        
-        
+    os.execv(inspect_bin_spec, arguments)
+
+
 if __name__ == "__main__":
     main()
-
-
-
-
-
