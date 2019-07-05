@@ -1,13 +1,24 @@
-<h2>1.2.2 - 12/11/2017</h2>
+<h2>1000-Genomes major-allele SNP references -- 4/26/2019</h2>
 <ul>
-    <li>Fixed major issue causing corrupt SAM output when using many threads (-p/--threads) on certain systems</li>
-    <li>Fixed major issue with incorrect alignment offsets being reported in --large-index mode</li>
-    <li>Fixed major issue with reads files being skipped when multiple inputs were specified together with -p/--threads</li>
+    <li>For each base where the typical reference has the non-majority allele (according to the <a href="http://www.internationalgenome.org">1000 Genomes Project</a>, we substituted in the majority allele instead
+    <li>Links for indexes added to sidebar, as are links for the edited FASTA files
+    <li>We made versions both for GRCh38 primary assembly and hg19 assembly
+    <li>See <a href="https://github.com/BenLangmead/bowtie-majref">how we created them</a>
+    <li>Only SNPs (single-base substitutions) are considered for now; indels are future work
+    <li>Because only SNPs are considered, coordinates (e.g. gene annotations) are the same as for typical GRCh38 and hg19 assemblies.  Most downstream tools are unaffected as long as major-allele-edited FASTAs are used wherever genome sequences are required.
+</ul>
+
+<h2>1.2.2 - 12/11/2017</h2>
+<p>Update (12/12/2017): We have had to re-release this version of bowtie to address an issue when compiling with pthreads (<tt>make NO_TBB=1</tt>).</p>
+<ul>
+    <li>Fixed major issue causing corrupt SAM output when using many threads (<tt><a href="manual.shtml#bowtie-options-p">-p/--threads</a></tt>) on certain systems</li>
+    <li>Fixed major issue with incorrect alignment offsets being reported in <tt><a href="manual.shtml#bowtie-options-large-index">--large-index</a></tt> mode</li>
+    <li>Fixed major issue with reads files being skipped when multiple inputs were specified together with <tt><a href="manual.shtml#bowtie-options-p">-p/--threads</a></tt></li>
     <li>The official LICENSE of Bowtie was changed to Artistic License 2.0. This fixes an issue with the previous LICENSE, which mistakenly combined elements of different open-source licenses.</li>
-    <li>Fixed issue where bowtie would still run for a long time even when -u was set to a small number.</li>
+    <li>Fixed issue where bowtie would still run for a long time even when <tt><a href="manual.shtml#bowtie-options-u">-u</a></tt> was set to a small number.</li>
     <li>Fixed spurious "Reads file contained a pattern with more than 1024 quality values" error for some colorspace inputs.</li>
-    <li>Fixed issue with --strata sometimes failing to suppress alignments at lower strata.</li>
-    <li>Fixed issue with ends of paired-end reads sometimes appearing in non-adjacent lines of the SAM output with -p/--threads >1</li>
+    <li>Fixed issue with <tt><a href="manual.shtml#bowtie-options-strata">--strata</a></tt> sometimes failing to suppress alignments at lower strata.</li>
+    <li>Fixed issue with ends of paired-end reads sometimes appearing in non-adjacent lines of the SAM output with <tt><a href="manual.shtml#bowtie-options-p">-p/--threads</a></tt> >1</li>
     <li>Fixed issue whereby the read name of end #2 was not always truncated at the first whitespace character</li>
     <li>Code simplifications</li>
 </ul>

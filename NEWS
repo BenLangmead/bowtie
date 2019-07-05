@@ -27,6 +27,8 @@ Version Release History
 =======================
 
 Version 1.2.2 - Dec 11, 2017
+Update (12/12/2017): We have had to re-release this version of bowtie to address an issue when compiling with pthreads (make NO_TBB=1).
+
     * Fixed major issue causing corrupt SAM output when using many threads (-p/--threads) on certain systems
     * Fixed major issue with incorrect alignment offsets being reported in --large-index mode
     * Fixed major issue with reads files being skipped when multiple inputs were specified together with -p/--threads

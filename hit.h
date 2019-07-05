@@ -169,7 +169,6 @@ public:
 		nthreads_((nthreads > 0) ? nthreads : 1),
 		ptBufs_(),
 		ptCounts_(nthreads_),
-		batchIds_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
 		ptNumAligned_(NULL),
 		reorder_(reorder)
@@ -183,11 +182,6 @@ public:
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
-		batchIds_.assign(nthreads_, 0);
-		unwrittenBatches_.resize(nthreads_);
-		flushed_.resize(nthreads_);
-		flushed_.assign(nthreads_, 1);
-		lastBatchFlushed_ = 0;
 		initDumps();
 	}
 
@@ -256,9 +250,6 @@ public:
 			}
 		}
 		ptCounts_[threadId]++;
-		if (reorder_) {
-			batchIds_[threadId] = rdid / perThreadBufSize_ + 1;
-		}
 		if(tally) {
 			tallyAlignments(threadId, end - start, paired);
 		}
@@ -271,10 +262,10 @@ public:
 	void finish(bool hadoopOut) {
 		// Flush all per-thread buffers
 		flushAll();
-		
+
 		// Close all output streams
 		closeOuts();
-		
+
 		// Print information about how many unpaired and/or paired
 		// reads were aligned.
 		if(!quiet_) {
@@ -288,7 +279,7 @@ public:
 				numUnaligned += ptNumUnaligned_[i];
 				numMaxed += ptNumMaxed_[i];
 			}
-			
+
 			uint64_t tot = numAligned + numUnaligned + numMaxed;
 			double alPct = 0.0, unalPct = 0.0, maxPct = 0.0;
 			if(tot > 0) {
@@ -566,50 +557,12 @@ protected:
 	void flush(size_t threadId, bool force) {
 		{
 			ThreadSafe _ts(&mutex_); // flush
-			if (reorder_) {
-				if (batchIds_[threadId] == 0) {
-					return;
-				}
-
-				size_t index = batchIds_[threadId] - lastBatchFlushed_ - 1;
-
-				if (index >= unwrittenBatches_.size()) {
-					size_t old_size = unwrittenBatches_.size();
-					unwrittenBatches_.resize(index + 1);
-					flushed_.resize(index + 1);
-					for (size_t i = old_size; i < unwrittenBatches_.size(); i++) {
-						flushed_[i] = 1;
-					}
-				}
-				unwrittenBatches_[index] = ptBufs_[threadId];
-				flushed_[index] = 0;
-
-				size_t nflush = 0;
-				for (size_t i = 0; i < flushed_.size() && !flushed_[i]; ++i, ++nflush)
-					;
-
-				if (nflush >= nthreads_ || force) {
-					for (size_t i = 0; i < nflush; ++i) {
-						out_.writeString(unwrittenBatches_[i]);
-						unwrittenBatches_[i].clear();
-						flushed_[i] = 1;
-					}
-					if (nflush > 0) {
-						unwrittenBatches_.erase(unwrittenBatches_.begin(),
-						                        unwrittenBatches_.begin() + nflush);
-						flushed_.erase(flushed_.begin(), flushed_.begin() + nflush);
-						lastBatchFlushed_ += nflush;
-					}
-				}
-			}
-			else {
-				out_.writeString(ptBufs_[threadId]);
-			}
+			out_.writeString(ptBufs_[threadId]);
 		}
-        ptCounts_[threadId] = 0;
-        ptBufs_[threadId].clear();
+		ptCounts_[threadId] = 0;
+		ptBufs_[threadId].clear();
 	}
-	
+
 	/**
 	 * Flush all output buffers.
 	 */
@@ -625,12 +578,10 @@ protected:
 	 */
 	void maybeFlush(size_t threadId) {
 		if(ptCounts_[threadId] >= perThreadBufSize_) {
-            if (reorder_) {
-            }
 			flush(threadId, false /* final batch? */);
 		}
 	}
-	
+
 	/**
 	 * Close (and flush) all OutFileBufs.
 	 */
@@ -641,18 +592,13 @@ protected:
 	OutFileBuf&         out_;        /// the alignment output stream(s)
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	MUTEX_T             mutex_;       /// pthreads mutexes for per-file critical sections
-	
-	// used for output read buffer	
+
+	// used for output read buffer
 	size_t nthreads_;
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
 	bool reorder_;
-
-	std::vector<size_t> batchIds_;
-	std::vector<BTString> unwrittenBatches_;
-	std::vector<short> flushed_;
-	size_t lastBatchFlushed_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -1090,7 +1036,7 @@ public:
 	virtual HitSinkPerThread* create() const {
 		return new NGoodHitSinkPerThread(sink_, n_, max_, defaultMapq_, threadId_);
 	}
-	
+
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
 		uint32_t max = max_ * (max_ == 0xffffffff ? 1 : m);
 		uint32_t n = n_ * (n_ == 0xffffffff ? 1 : m);
@@ -1233,7 +1179,7 @@ public:
 	virtual HitSinkPerThread* create() const {
 		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, 1, defaultMapq_, threadId_);
 	}
-	
+
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
 		uint32_t max = max_ * (max_ == 0xffffffff ? 1 : m);
 		uint32_t n = n_ * (n_ == 0xffffffff ? 1 : m);

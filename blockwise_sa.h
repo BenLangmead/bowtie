@@ -74,7 +74,11 @@ class BlockwiseSA {
 			_logger(__logger)
 	{ }
 
-		virtual ~BlockwiseSA() { }
+		virtual ~BlockwiseSA()
+#if __cplusplus > 199711L
+			noexcept(false)
+#endif
+		{ }
 
 		/**
 		 * Get the next suffix; compute the next bucket if necessary.
@@ -200,7 +204,11 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 #endif
 			{ _randomSrc.init(__seed); reset(); }
 
-		~KarkkainenBlockwiseSA() throw() {
+		~KarkkainenBlockwiseSA()
+#if __cplusplus > 199711L
+			noexcept(false)
+#endif
+		{
 			if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
 			if (_done != NULL) {
 				delete[] _done;
