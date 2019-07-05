@@ -207,7 +207,7 @@ Note that [Maq] internally rounds base qualities to the nearest 10 and
 rounds qualities greater than 30 to 30.  To maintain compatibility,
 Bowtie does the same.  Rounding can be suppressed with the
 [`--nomaqround`] option.
- 
+
 Bowtie is not fully sensitive in [`-n`] 2 and [`-n`] 3 modes by default.
 In these modes Bowtie imposes a "backtracking limit" to limit effort
 spent trying to find valid alignments for low-quality reads unlikely to
@@ -362,7 +362,7 @@ output no alignments.
 Specifying [`-m`] 5 instructs bowtie to refrain from reporting any
 alignments for reads having more than 5 reportable alignments.  Since
 the read has exactly 5 reportable alignments, the [`-m`] 5 limit allows
-`bowtie` to print them as usual. 
+`bowtie` to print them as usual.
 
 ### Example 9: `-a -m 3 --best --strata`
 
@@ -393,7 +393,7 @@ A valid paired-end alignment satisfies these criteria:
    defined by the [`-v`]/[`-n`]/[`-e`]/[`-l`] options.
 2. The relative orientation and position of the mates satisfy the
    constraints defined by the [`-I`]/[`-X`]/[`--fr`]/[`--rf`]/[`--ff`]
-   options. 
+   options.
 
 Policies governing which paired-end alignments are reported for a
 given read are specified using the [`-k`], [`-a`] and [`-m`] options as
@@ -767,6 +767,24 @@ The query input files (specified either as `<m1>` and `<m2>`, or as
 or similar).  All quality values are assumed to be 40 on the [Phred
 quality] scale.
 
+</td></tr><tr><td id="bowtie-options-F">
+
+[`-F`]: #bowtie-options-F
+
+    -F
+
+</td><td>
+
+Reads are substrings (k-mers) extracted from a FASTA file `s`.
+Specifically, for every reference sequence in FASTA file `s`, Bowtie
+2 aligns the k-mers at offsets 1, 1+i, 1+2i, ... until reaching the
+end of the reference. Each k-mer is aligned as a separate read.
+Quality values are set to all Is (40 on Phred scale). Each k-mer
+(read) is given a name like `sequence`_`offset`, where `sequence`
+is the name of the FASTA sequence it was drawn from and `offset`
+is its 0-based offset of origin with respect to the sequence. Only
+single k-mers, i.e. unpaired reads, can be aligned in this way.
+
 </td></tr><tr><td id="bowtie-options-r">
 
 [`-r`]: #bowtie-options-r
@@ -938,7 +956,7 @@ versions prior to 1.3.  Default: off.
 </td><td>
 
 Same as [`--phred64-quals`].  This is usually the right option for use
-with (unconverted) reads emitted by GA Pipeline version 1.3 or later. 
+with (unconverted) reads emitted by GA Pipeline version 1.3 or later.
 Default: off.
 
 </td></tr><tr><td id="bowtie-options-integer-quals">
@@ -1333,7 +1351,7 @@ disallowed via the [`-k`] option) and they fall into more than one
 alignment "stratum", report only those alignments that fall into the
 best stratum.  By default, Bowtie reports all reportable alignments
 regardless of whether they fall into multiple strata.  When
-[`--strata`] is specified, [`--best`] must also be specified. 
+[`--strata`] is specified, [`--best`] must also be specified.
 
 </td></tr>
 </table>
@@ -1781,7 +1799,7 @@ Default `bowtie` output
     character of the alignment occurs
 
 5.  Read sequence (reverse-complemented if orientation is `-`).
-    
+
     If the read was in colorspace, then the sequence shown in this
     column is the sequence of *decoded nucleotides*, not the original
     colors.  See the [Colorspace alignment] section for details about
@@ -1790,7 +1808,7 @@ Default `bowtie` output
 6.  ASCII-encoded read qualities (reversed if orientation is `-`).  The
     encoded quality values are on the Phred scale and the encoding is
     ASCII-offset by 33 (ASCII char `!`).
-    
+
     If the read was in colorspace, then the qualities shown in this
     column are the *decoded qualities*, not the original qualities.
     See the [Colorspace alignment] section for details about decoding.
@@ -1800,7 +1818,7 @@ Default `bowtie` output
     this read, this column contains the value of the ceiling,
     indicating that at least that many valid alignments were found in
     addition to the one reported.
-    
+
     Otherwise, this column contains the number of other instances where
     the same sequence aligned against the same reference characters as
     were aligned against in the reported alignment.  This is *not* the
@@ -1814,7 +1832,7 @@ Default `bowtie` output
     mismatches in the alignment, this field is empty.  A single
     descriptor has the format offset:reference-base>read-base.  The
     offset is expressed as a 0-based offset from the high-quality (5')
-    end of the read. 
+    end of the read.
 
 SAM `bowtie` output
 -------------------
@@ -1934,7 +1952,7 @@ right, the fields are:
 11. ASCII-encoded read qualities (reverse-complemented if the read
     aligned to the reverse strand).  The encoded quality values are on
     the [Phred quality] scale and the encoding is ASCII-offset by 33
-    (ASCII char `!`), similarly to a [FASTQ] file. 
+    (ASCII char `!`), similarly to a [FASTQ] file.
 
 12. Optional fields.  Fields are tab-separated.  For descriptions of
     all possible optional fields, see the SAM format specification.
@@ -2011,10 +2029,10 @@ The `bowtie-build` indexer
 `bowtie-build` outputs a set of 6 files with suffixes `.1.ebwt`,
 `.2.ebwt`, `.3.ebwt`, `.4.ebwt`, `.rev.1.ebwt`, and `.rev.2.ebwt`.  (If
 the total length of all the input sequences is greater than about 4
-billion, then the index files will end in `ebwtl` instead of `ebwt`.) 
+billion, then the index files will end in `ebwtl` instead of `ebwt`.)
 These files together constitute the index: they are all that is needed
 to align reads to that reference.  The original sequence files are no
-longer used by Bowtie once the index is built.  
+longer used by Bowtie once the index is built.
 
 Use of Karkkainen's [blockwise algorithm] allows `bowtie-build` to
 trade off between running time and memory usage. `bowtie-build` has
@@ -2221,7 +2239,7 @@ governs how many rows get marked: the indexer will mark every 2^`<int>`
 rows.  Marking more rows makes reference-position lookups faster, but
 requires more memory to hold the annotations at runtime.  The default
 is 5 (every 32nd row is marked; for human genome, annotations occupy
-about 340 megabytes).  
+about 340 megabytes).
 
 </td></tr><tr><td>
 
@@ -2425,4 +2443,3 @@ Print version information and quit.
 Print usage information and quit.
 
 </td></tr></table>
-

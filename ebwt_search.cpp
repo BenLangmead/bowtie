@@ -480,6 +480,9 @@ static void printUsage(ostream& out) {
 	    << "Input:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
+	    << "  -F k:<int>,i:<int> query input files are continuous FASTA where reads" << endl
+	    << "                     are substrings (k-mers) extracted from a FASTA file <s>" << endl
+	    << "                     and aligned at offsets 1, 1+i, 1+2i ... end of reference" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
 	    << "  -C                 reads and index are in colorspace" << endl

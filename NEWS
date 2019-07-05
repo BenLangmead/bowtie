@@ -5,14 +5,15 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `LICENSE') and freely
-available to the public for download.  The current version is 1.2.1.1.
+available to the public for download.  The current version is 1.2.3.
 
 Reporting Issues
 ================
 
 Please report any issues using the Sourceforge bug tracker:
 
-  https://sourceforge.net/tracker/?group_id=236897&atid=1101606
+  * https://github.com/BenLangmead/bowtie/issues
+  * https://sourceforge.net/tracker/?group_id=236897&atid=1101606
 
 Announcements
 =============
@@ -25,6 +26,17 @@ subscribe to our mailing list:
 
 Version Release History
 =======================
+
+Version 1.2.3 - Jul 5, 2019
+    * Added support for reading and inspecting Bowtie 2 indexes.
+      Bowtie 2 indexes can now be used with either Bowtie or Bowtie 2.
+    * Added support for building an index from a gzipped-compressed
+      FASTA.
+    * Fixed issue preventing bowtie from reporting repeated alignments
+      when -M is specified.
+    * Fixed issue with -F mode omitting final base of each read.
+    * Fixed clipping of first letter of first read in batches after first.
+    * Fixed an issue preventing bowtie wrapper script from finding indexes.
 
 Version 1.2.2 - Dec 11, 2017
 Update (12/12/2017): We have had to re-release this version of bowtie to address an issue when compiling with pthreads (make NO_TBB=1).

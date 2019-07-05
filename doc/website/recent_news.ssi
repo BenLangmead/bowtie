@@ -1,3 +1,14 @@
+<h2>1.2.3 - 07/05/2019</h2>
+<ul>
+    <li>Added support for reading and inspecting Bowtie 2 indexes. Bowtie 2 indexes can now be used with either Bowtie or Bowtie 2.</li>
+    <li>Added support for building an index from a gzipped-compressed FASTA.</li>
+    <li>Fixed issue preventing bowtie from reporting repeated alignments when <tt><a href="manual.shtml#bowtie-options-M">-M</a></tt> is specified.</li>
+    <li>Fixed issue with <tt><a href="manual.shtml#bowtie-options-F">-F</a></tt> mode omitting final base of each read.</li>
+    <li>Fixed clipping of first letter of first read in batches after first.</li>
+    <li>Fixed an issue preventing bowtie wrapper script from finding indexes.</li>
+</ul>
+
+
 <h2>1000-Genomes major-allele SNP references -- 4/26/2019</h2>
 <ul>
     <li>For each base where the typical reference has the non-majority allele (according to the <a href="http://www.internationalgenome.org">1000 Genomes Project</a>, we substituted in the majority allele instead
