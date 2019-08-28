@@ -280,7 +280,7 @@ public:
 				numMaxed += ptNumMaxed_[i];
 			}
 
-			uint64_t tot = numAligned + numUnaligned + numMaxed;
+			uint64_t tot = numAligned + numUnaligned;
 			double alPct = 0.0, unalPct = 0.0, maxPct = 0.0;
 			if(tot > 0) {
 				alPct   = 100.0 * (double)numAligned / (double)tot;

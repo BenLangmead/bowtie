@@ -308,8 +308,8 @@ void SAMHitSink::reportMaxed(
 	size_t threadId,
 	PatternSourcePerThread& p)
 {
+	HitSink::reportMaxed(hs, threadId, p);
 	if(sampleMax_) {
-		HitSink::reportMaxed(hs, threadId, p);
 		RandomSource rand;
 		rand.init(p.bufa().seed);
 		assert_gt(hs.size(), 0);
@@ -351,7 +351,5 @@ void SAMHitSink::reportMaxed(
 			uint32_t r = rand.nextU32() % num;
 			reportHits(&hs[r], NULL, 0, 1, threadId, 0, (int)hs.size()+1, true, p.rdid());
 		}
-	} else {
-		reportUnOrMax(p, &hs, threadId, false);
 	}
 }
