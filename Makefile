@@ -8,10 +8,10 @@ bindir = $(prefix)/bin
 SEQAN_DIR = ./SeqAn-1.1
 # treat SeqAn as a sysdir to suppress warnings
 SEQAN_INC = -isystem $(SEQAN_DIR)
-INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) $(SEQAN_INC) -I third_party
-CPP = g++
-CXX = $(CPP)
-CC = gcc
+INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) $(SEQAN_INC)
+CPP ?= g++
+CXX ?= $(CPP)
+CC ?= gcc
 LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
@@ -162,6 +162,12 @@ VERSION = $(shell cat VERSION)
 BITS=32
 ifeq (x86_64,$(shell uname -m))
 	BITS=64
+else ifeq (aarch64,$(shell uname -m))
+	BITS=64
+else ifeq (s390x,$(shell uname -m))
+	BITS=64
+else ifeq (ppc64le,$(shell uname -m))
+	BITS=64
 endif
 # msys will always be 32 bit so look at the cpu arch instead.
 ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
@@ -180,8 +186,8 @@ ifeq (32,$(BITS))
     $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 -m64
-RELEASE_FLAGS = -O3 -m64
+DEBUG_FLAGS = -O0 -g3
+RELEASE_FLAGS = -O3
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
