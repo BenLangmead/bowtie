@@ -227,7 +227,7 @@ extern uint8_t nuccol2nuc[5][5];
 extern uint8_t asc2dnamask[];
 
 /// Convert a 4-bit mask into an IUPAC code
-extern char mask2iupac[16];
+extern signed char mask2iupac[16];
 
 /**
  * Return true iff c is an unambiguous Dna character.
