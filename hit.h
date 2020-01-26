@@ -441,8 +441,10 @@ public:
 					}
 				}
 				dumpUnal_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpUnal_->put('\n');
 				if(dumpUnalQv_ != NULL) {
 					dumpUnalQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpUnal_->put('\n');
 				}
 			}
 		} else {
@@ -463,10 +465,14 @@ public:
 					}
 				}
 				dumpUnal_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpUnal_1_->put('\n');
 				dumpUnal_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				dumpUnal_2_->put('\n');
 				if(dumpUnalQv_1_ != NULL) {
 					dumpUnalQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpUnalQv_1_->put('\n');
 					dumpUnalQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
+					dumpUnalQv_2_->put('\n');
 				}
 			}
 		}
@@ -495,8 +501,10 @@ public:
 					}
 				}
 				dumpMax_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpMax_->put('\n');
 				if(dumpMaxQv_ != NULL) {
 					dumpMaxQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpMaxQv_->put('\n');
 				}
 			}
 		} else {
@@ -517,10 +525,14 @@ public:
 					}
 				}
 				dumpMax_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpMax_1_->put('\n');
 				dumpMax_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				dumpMax_2_->put('\n');
 				if(dumpMaxQv_1_ != NULL) {
 					dumpMaxQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpMaxQv_1_->put('\n');
 					dumpMaxQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
+					dumpMaxQv_2_->put('\n');
 				}
 			}
 		}
