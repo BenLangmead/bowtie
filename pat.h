@@ -120,13 +120,13 @@ struct Read {
 	~Read() {
 		clearAll(); reset();
 		// Prevent seqan from trying to free buffers
-		_setBegin(patFw, NULL);
-		_setBegin(patRc, NULL);
-		_setBegin(qual, NULL);
-		_setBegin(patFwRev, NULL);
-		_setBegin(patRcRev, NULL);
-		_setBegin(qualRev, NULL);
-		_setBegin(name, NULL);
+		_setBegin(patFw, (Dna5*)NULL);
+		_setBegin(patRc, (Dna5*)NULL);
+		_setBegin(qual, (char*)NULL);
+		_setBegin(patFwRev, (Dna5*)NULL);
+		_setBegin(patRcRev, (Dna5*)NULL);
+		_setBegin(qualRev, (char*)NULL);
+		_setBegin(name, (char*)NULL);
 	}
 
 #define RESET_BUF(str, buf, typ) _setBegin(str, (typ*)buf); _setLength(str, 0); _setCapacity(str, BUF_SIZE);
