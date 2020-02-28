@@ -979,7 +979,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	{
 		Timer timer(cout, "  Invoking Larsson-Sadakane on ranks time: ", this->verbose());
 		VMSG_NL("  Invoking Larsson-Sadakane on ranks");
-		_Context_LSS<TIndexOff> c;
+		ContextLss_<TIndexOff> c;
 		c.suffixsort(
 			(TIndexOff*)begin(_isaPrime, Standard()),
 			(TIndexOff*)begin(sPrime, Standard()),
