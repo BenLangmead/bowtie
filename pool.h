@@ -19,13 +19,13 @@
  * is set at construction time.  Heap memory is only allocated at
  * construction and deallocated at destruction.
  */
-class ChunkPool {
+class bowtieChunkPool {
 public:
 	/**
 	 * Initialize a new pool with an initial size of about 'bytes'
 	 * bytes.  Exit with an error message if we can't allocate it.
 	 */
-	ChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
+	bowtieChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
 		verbose(verbose_), patid(0), pool_(NULL), cur_(0),
 		chunkSz_(chunkSz), totSz_(totSz), lim_(totSz/chunkSz),
 		bits_(lim_), exhaustCrash_(false),
@@ -38,7 +38,7 @@ public:
 			}
 		} catch(std::bad_alloc& e) {
 			ThreadSafe _ts(&gLock);
-			std::cerr << "Error: Could not allocate ChunkPool of "
+			std::cerr << "Error: Could not allocate bowtieChunkPool of "
 			          << totSz << " bytes" << std::endl;
 			exhausted();
 			throw 1; // Exit if we haven't already
@@ -48,7 +48,7 @@ public:
 	/**
 	 * Delete all the pools.
 	 */
-	~ChunkPool() {
+	~bowtieChunkPool() {
 		if(pool_ != NULL) delete[] pool_;
 	}
 
@@ -189,7 +189,7 @@ public:
 	 * Initialize a new pool with an initial size of about 'bytes'
 	 * bytes.  Exit with an error message if we can't allocate it.
 	 */
-	AllocOnlyPool(ChunkPool* pool, const char *name) :
+	AllocOnlyPool(bowtieChunkPool* pool, const char *name) :
 		pool_(pool), name_(name), curPool_(0), cur_(0)
 	{
 		assert(pool != NULL);
@@ -388,7 +388,7 @@ protected:
 		lastCurInPool_.pop_back();
 	}
 
-	ChunkPool*      pool_;
+	bowtieChunkPool*      pool_;
 	const char     *name_;
 	std::vector<T*> pools_; /// the memory pools
 	uint32_t        curPool_; /// pool we're current allocating from

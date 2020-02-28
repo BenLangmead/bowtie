@@ -125,7 +125,7 @@ static bool norc; // don't align rc orientation of read
 static bool strandFix;  // attempt to fix strand bias
 static bool stats; // print performance stats
 static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
-static int chunkSz;    // size of single chunk disbursed by ChunkPool
+static int chunkSz;    // size of single chunk disbursed by bowtieChunkPool
 static bool chunkVerbose; // have chunk allocator output status messages?
 static bool useV1;
 static bool reportSe;
@@ -232,7 +232,7 @@ static void resetOptions() {
 	strandFix				= true;  // attempt to fix strand bias
 	stats					= false; // print performance stats
 	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
-	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
+	chunkSz					= 256;   // size of single chunk disbursed by bowtieChunkPool (in KB)
 	chunkVerbose			= false; // have chunk allocator output status messages?
 	useV1					= true;
 	reportSe				= false;
@@ -1343,7 +1343,7 @@ static void exactSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
-	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	bowtieChunkPool *pool = new bowtieChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
@@ -1632,7 +1632,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
-	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	bowtieChunkPool *pool = new bowtieChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
@@ -2083,7 +2083,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
-	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	bowtieChunkPool *pool = new bowtieChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	Unpaired23mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -2753,7 +2753,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
-	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	bowtieChunkPool *pool = new bowtieChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	AlignerMetrics *metrics = NULL;
 	if(stats) {

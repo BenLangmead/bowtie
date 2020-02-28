@@ -391,7 +391,7 @@ public:
 		bool verbose,
 		bool quiet,
 		int maxBts,
-		ChunkPool *pool,
+		bowtieChunkPool *pool,
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode),
@@ -597,7 +597,7 @@ protected:
 	bool quiet_; // don't print informational/warning info
 
 	const int maxBts_;
-	ChunkPool *pool_;
+	bowtieChunkPool *pool_;
 	int *btCnt_;
 	AlignerMetrics *metrics_;
 };
@@ -638,7 +638,7 @@ public:
 		bool verbose,
 		bool quiet,
 		int maxBts,
-		ChunkPool *pool,
+		bowtieChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
 		refs_(refs),
@@ -1405,7 +1405,7 @@ protected:
 	bool quiet_;
 
 	int maxBts_;
-	ChunkPool *pool_;
+	bowtieChunkPool *pool_;
 	int *btCnt_;
 
 	// Range-finding state for first mate
@@ -1529,7 +1529,7 @@ public:
 		bool verbose,
 		bool quiet,
 		int maxBts,
-		ChunkPool *pool,
+		bowtieChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
 		refs_(refs),
@@ -2076,7 +2076,7 @@ protected:
 	TDriver* driver_;
 
 	// Pool for distributing chunks of best-first path descriptor memory
-	ChunkPool *pool_;
+	bowtieChunkPool *pool_;
 
 	bool verbose_;
 	bool quiet_;

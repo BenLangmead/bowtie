@@ -32,7 +32,7 @@ public:
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			ChunkPool *pool,
+			bowtieChunkPool *pool,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
@@ -160,7 +160,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	ChunkPool *pool_;
+	bowtieChunkPool *pool_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool maqPenalty_;
@@ -199,7 +199,7 @@ public:
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			ChunkPool *pool,
+			bowtieChunkPool *pool,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool reportSe,
@@ -475,7 +475,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	ChunkPool *pool_;
+	bowtieChunkPool *pool_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool reportSe_;

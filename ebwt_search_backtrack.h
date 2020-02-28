@@ -2703,7 +2703,7 @@ public:
 			bool verbose,
 			bool quiet,
 			bool mate1,
-			ChunkPool* pool,
+			bowtieChunkPool* pool,
 			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose,
@@ -2877,7 +2877,7 @@ public:
 			bool verbose,
 			bool quiet,
 			bool mate1,
-			ChunkPool* pool,
+			bowtieChunkPool* pool,
 			int *btCnt = NULL) :
 			params_(params),
 			rs_(rs),
@@ -2936,7 +2936,7 @@ protected:
 	bool verbose_;
 	bool quiet_;
 	bool mate1_;
-	ChunkPool* pool_;
+	bowtieChunkPool* pool_;
 	int *btCnt_;
 };
 

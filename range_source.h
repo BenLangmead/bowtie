@@ -1307,7 +1307,7 @@ class PathManager {
 
 public:
 
-	PathManager(ChunkPool* cpool_, int *btCnt, bool verbose, bool quiet) :
+	PathManager(bowtieChunkPool* cpool_, int *btCnt, bool verbose, bool quiet) :
 		branchQ_(verbose, quiet),
 		cpool(cpool_),
 		bpool(cpool, "branch"),
@@ -1556,7 +1556,7 @@ protected:
 
 public:
 
-	ChunkPool *cpool; // pool for generic chunks of memory
+	bowtieChunkPool *cpool; // pool for generic chunks of memory
 	AllocOnlyPool<Branch> bpool; // pool for allocating Branches
 	AllocOnlyPool<RangeState> rpool; // pool for allocating RangeStates
 	AllocOnlyPool<Edit> epool; // pool for allocating Edits
@@ -1730,7 +1730,7 @@ public:
 		bool quiet,
 		bool mate1,
 		uint32_t minCostAdjustment,
-		ChunkPool* pool,
+		bowtieChunkPool* pool,
 		int *btCnt) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
