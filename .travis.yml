@@ -52,8 +52,9 @@ matrix:
       env:
         - POPCNT_CAPABILITY=0
         - NO_TBB=1
-      # Skip make simple-test as it fails.
-      script: make -j $NPROC allall
+      before_install:
+        # The tests only work with `--threads 1`.
+        - sed -i 's/--threads $nthreads/--threads 1/' scripts/test/simple_tests.pl
     # PPC64LE
     - os: linux
       arch: ppc64le
