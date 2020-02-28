@@ -482,19 +482,6 @@ static String<T> getDeltaMap(T v, const String<T>& dc) {
 }
 
 /**
- * Return population count (count of all bits set to 1) of i.
- */
-template<typename T>
-static unsigned int popCount(T i) {
-	unsigned int cnt = 0;
-	for(size_t j = 0; j < sizeof(T)*8; j++) {
-		if(i & 1) cnt++;
-		i >>= 1;
-	}
-	return cnt;
-}
-
-/**
  * Calculate log-base-2 of i
  */
 template<typename T>
