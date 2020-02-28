@@ -457,7 +457,7 @@ static String<T> getDeltaMap(T v, const String<T>& dc) {
 	// Declare anchor-map-related items
 	String<T> amap;
 	size_t amapEnts = 1;
-	fill(amap, v, 0xffffffff, Exact());
+	resize(amap, v, 0xffffffff, Exact());
 	amap[0] = 0;
 	// Print out difference cover (and optionally calculate
 	// anchor map)
@@ -537,7 +537,7 @@ public:
 		assert_gt(_d, 0);
 		assert_eq(1, popCount(_v)); // must be power of 2
 		// Build map from d's to idx's
-		fill(_dInv, _v, 0xffffffff, Exact());
+		resize(_dInv, _v, 0xffffffff, Exact());
 		uint32_t lim = (uint32_t)length(_ds);
 		for(uint32_t i = 0; i < lim; i++) {
 			_dInv[_ds[i]] = i;
@@ -661,7 +661,7 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
 	VMSG_NL("  Doing sanity check");
 	TIndexOffU added = 0;
 	String<TIndexOffU> sorted;
-	fill(sorted, length(_isaPrime), OFF_MASK, Exact());
+	resize(sorted, length(_isaPrime), OFF_MASK, Exact());
 	for(size_t di = 0; di < this->d(); di++) {
 		uint32_t d = _ds[di];
 		size_t i = 0;
@@ -725,7 +725,7 @@ void DifferenceCoverSample<TStr>::buildSPrime(
 	assert_eq(length(_doffs), d+1);
 	// Size sPrime appropriately
 	reserve(sPrime, sPrimeSz + padding, Exact()); // reserve extra slot for LS
-	fill(sPrime, sPrimeSz + padding, OFF_MASK, Exact());
+	resize(sPrime, sPrimeSz + padding, OFF_MASK, Exact());
 	// Slot suffixes from text into sPrime according to the mu
 	// mapping; where the mapping would leave a blank, insert a 0
 	TIndexOffU added = 0;
@@ -949,7 +949,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 		// arrays back into sPrime.
 		VMSG_NL("  Allocating rank array");
 		reserve(_isaPrime, length(sPrime), Exact());
-		fill(_isaPrime, length(sPrime), OFF_MASK, Exact());
+		resize(_isaPrime, length(sPrime), OFF_MASK, Exact());
 		assert_gt(length(_isaPrime), 0);
 		{
 			Timer timer(cout, "  Ranking v-sort output time: ", this->verbose());

@@ -673,8 +673,8 @@ class BinarySorting_worker {
 					try {
 						// Allocate and initialize containers for holding bucket
 						// sizes and representatives.
-						fill(tparams[tid].bucketSzs, numBuckets, 0, Exact());
-						fill(tparams[tid].bucketReps, numBuckets, OFF_MASK, Exact());
+						resize(tparams[tid].bucketSzs, numBuckets, 0, Exact());
+						resize(tparams[tid].bucketReps, numBuckets, OFF_MASK, Exact());
 					} catch(bad_alloc &e) {
 						if(this->_passMemExc) {
 							throw e; // rethrow immediately
@@ -1063,7 +1063,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 				hi = _sampleSuffs[cur_block];
 				//zHi.resizeExact(_dcV);
 				//zHi.fillZero();
-				fill(zHi, _dcV, 0, Exact());
+				resize(zHi, _dcV, 0, Exact());
 				assert_eq(getValue(zHi, 0), 0);
 				calcZ(t, hi, zHi, this->verbose(), this->sanityCheck());
 			}
@@ -1074,7 +1074,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 				lo = _sampleSuffs[cur_block-1];
 				//zLo.resizeExact(_dcV);
 				//zLo.fillZero();
-				fill(zLo, _dcV, 0, Exact());
+				resize(zLo, _dcV, 0, Exact());
 				assert_gt(_dcV, 3);
 				assert_eq(getValue(zLo, 0), 0);
 				calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
