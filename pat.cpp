@@ -78,7 +78,7 @@ void PatternSourcePerThread::finalizePair(Read& ra, Read& rb) {
 	ra.constructReverses();
 	ra.fixMateName(1);
 	ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-	
+
 	rb.mate = 2;
 	rb.constructRevComps();
 	rb.constructReverses();
@@ -446,7 +446,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 	int c = '\t';
 	size_t cur = 0;
 	const size_t buflen = ra.readOrigBufLen;
-	
+
 	// Loop over the two ends
 	for(int endi = 0; endi < 2 && c == '\t'; endi++) {
 		Read& r = ((endi == 0) ? ra : rb);
@@ -531,7 +531,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
 		_setLength(r.patFw, seqoff - trim3);
 		r.trimmed3 = trim3;
-		
+
 		// Parse qualities
 		assert_eq(0, seqan::length(r.qual));
 		c = ra.readOrigBuf[cur++];
@@ -626,7 +626,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	int c = -1;
 	size_t cur = 1;
 	const size_t buflen = r.readOrigBufLen;
-	
+
 	// Parse read name
 	assert_eq(0, seqan::length(r.name));
 	int nameoff = 0;
@@ -648,7 +648,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, nameoff);
 	}
-	
+
 	// Parse sequence
 	int nchar = 0, seqoff = 0;
 	assert_eq(0, seqan::length(r.patFw));
@@ -707,7 +707,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
 	_setLength(r.patFw, seqoff - trim3);
 	r.trimmed3 = trim3;
-	
+
 	for(size_t i = 0; i < seqoff - trim3; i++) {
 		r.qualBuf[i] = 'I';
 	}
@@ -844,7 +844,7 @@ bool FastaContinuousPatternSource::parse(
 	int c = '\t';
 	size_t cur = 0;
 	const size_t buflen = ra.readOrigBufLen;
-	
+
 	// Parse read name
 	assert_eq(0, seqan::length(ra.name));
 	int nameoff = 0;
@@ -882,7 +882,7 @@ bool FastaContinuousPatternSource::parse(
 	int trim3 = (seqoff < this->trim3_) ? seqoff : this->trim3_;
 	_setLength(ra.patFw, seqoff - trim3);
 	ra.trimmed3 = trim3;
-	
+
 	// Make fake qualities
 	assert_eq(0, seqan::length(ra.qual));
 	int qualoff = 0;
@@ -996,7 +996,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	r.nameBuf[nameoff] = '\0';
 	_setBegin(r.name, r.nameBuf);
 	_setLength(r.name, nameoff);
-	
+
 	// Parse sequence
 	int nchar = 0, seqoff = 0;
 	assert_eq(0, seqan::length(r.patFw));
@@ -1061,7 +1061,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	while(cur < buflen && (c == '\n' || c == '\r')) {
 		c = r.readOrigBuf[cur++];
 	}
-	
+
 	assert_eq(0, seqan::length(r.qual));
 	int nqual = 0, qualoff = 0;
 	if (intQuals_) {
@@ -1155,6 +1155,16 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
 			c = getc_wrapper();
 		}
+		if (c == '\n') {
+			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
+#ifdef _WIN32
+			c = getc_wrapper();
+			if (c == '\r')
+				readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
+			else if(c >= 0)
+				ungetc_wrapper(c);
+#endif
+		}
 		while(c >= 0 && (c == '\n' || c == '\r') && readi < pt.max_buf_ - 1) {
 			c = getc_wrapper();
 		}
@@ -1176,7 +1186,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 	size_t cur = 0;
 	const size_t buflen = ra.readOrigBufLen;
 	bool paired = false;
-	
+
 	// Loop over the two ends
 	for(int endi = 0; endi < 2 && c == '\t'; endi++) {
 		Read& r = ((endi == 0) ? ra : rb);
@@ -1203,7 +1213,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			// tab5, copy name from first end
 			rb.name = ra.name; // not a deep copy
 		}
-		
+
 		paired = endi > 0;
 
 		// Parse sequence
@@ -1263,7 +1273,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		_setLength(r.patFw, seqoff - trim3);
 		r.patBufFw[seqan::length(r.patFw)] = '\0';
 		r.trimmed3 = trim3;
-		
+
 		// Parse qualities
 		assert_eq(0, seqan::length(r.qual));
 		c = ra.readOrigBuf[cur++];
@@ -1330,13 +1340,24 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
 		readbuf[readi].readOrigBufLen = 0;
-		while(c >= 0 && (c == '\n' || c == '\r')) {
-			c = getc_wrapper();
-		}
 		while(c >= 0 && (c != '\n' && c != '\r')) {
 			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
 			c = getc_wrapper();
 		}
+		if (c == '\n') {
+			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
+#ifdef _WIN32
+			c = getc_wrapper();
+			if (c == '\r')
+				readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
+			else if(c >= 0)
+				ungetc_wrapper(c);
+#endif
+		}
+		while(c >= 0 && (c == '\n' || c == '\r')) {
+			c = getc_wrapper();
+		}
+
 	}
 	while (readi > 0 && readbuf[readi-1].readOrigBufLen == 0) {
 		readi--;
@@ -1372,7 +1393,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	}
 	if(color_) {
 		while(c != '\0') {
-			assert(c != '\r' && c != '\n');
+			// assert(c != '\r' && c != '\n');
 			if(c >= '0' && c < '4') {
 				c = "ACGTN"[(int)c - '0'];
 			}
@@ -1393,7 +1414,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		cur--;
 		while(cur < buflen) {
 			c = r.readOrigBuf[cur++];
-			assert(c != '\r' && c != '\n');
+			// assert(c != '\r' && c != '\n');
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
 				if(nchar++ >= this->trim5_) {
@@ -1411,12 +1432,12 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	_setLength(r.patFw, seqoff - trim3);
 	r.patBufFw[seqan::length(r.patFw)] = '\0';
 	r.trimmed3 = trim3;
-	
+
 	// Give the name field a dummy value
 	itoa10<TReadId>(rdid, r.nameBuf);
 	_setBegin(r.name, r.nameBuf);
 	_setLength(r.name, strlen(r.nameBuf));
-	
+
 	// Give the base qualities dummy values
 	assert_eq(0, seqan::length(r.qual));
 	const size_t len = seqan::length(r.patFw);
@@ -1425,7 +1446,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	}
 	_setBegin(r.qual, r.qualBuf);
 	_setLength(r.qual, seqan::length(r.patFw));
-	
+
 	r.parsed = true;
 	if(!rb.parsed && rb.readOrigBufLen > 0) {
 		return parse(rb, r, rdid);
