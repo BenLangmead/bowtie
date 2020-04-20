@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdexcept>
 #include <fcntl.h>
+#include <unistd.h>
 #include <zlib.h>
 #include "assert_helpers.h"
 
