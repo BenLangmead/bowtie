@@ -20,7 +20,7 @@ EXTRA_FLAGS =
 EXTRA_CFLAGS =
 EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
-CXXFLAGS += $(EXTRA_CXXFLAGS)
+CXXFLAGS += $(EXTRA_CXXFLAGS) --std=c++11
 WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
 				-Wno-unused-local-typedefs
 
@@ -63,7 +63,7 @@ LINUX =
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
     override EXTRA_FLAGS += -Wl,--hash-style=both
-endif
+ endif
 
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
@@ -93,13 +93,8 @@ ifeq (1,$(NO_SPINLOCK))
 	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
-ifneq (1,$(NO_TBB))
-	LIBS += $(PTHREAD_LIB) -ltbb
-	LIBS += -ltbbmalloc$(if $(RELEASE_BUILD),,_proxy)
-	override EXTRA_FLAGS += -DWITH_TBB
-else
-	LIBS += $(PTHREAD_LIB)
-endif
+
+LIBS += $(PTHREAD_LIB)
 
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
@@ -124,10 +119,6 @@ ifeq (1,$(WITH_THREAD_PROFILING))
 	override EXTRA_FLAGS += -DPER_THREAD_TIMING=1
 endif
 
-ifeq (1,$(WITH_AFFINITY))
-	override EXTRA_FLAGS += -DWITH_AFFINITY=1
-endif
-
 ifeq (1,$(WITH_QUEUELOCK))
 	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
 endif
@@ -144,9 +135,7 @@ ifeq (1,$(WITH_COHORTLOCK))
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
 
-ifeq (1,$(NO_TBB))
-	OTHER_CPPS += tinythread.cpp
-endif
+# OTHER_CPPS += tinythread.cpp
 
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp sam.cpp \
@@ -159,7 +148,7 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
-BITS=32
+BITS=64
 ifeq (x86_64,$(shell uname -m))
 	BITS=64
 endif

@@ -7,44 +7,62 @@
 #include <cstring>
 #include <cassert>
 
-#ifdef WITH_TBB
-# include <tbb/mutex.h>
-# include <tbb/spin_mutex.h>
-# include <tbb/queuing_mutex.h>
-# include <tbb/atomic.h>
-# ifdef WITH_AFFINITY
-#  include <sched.h>
-#  include <tbb/task_group.h>
-#  include <tbb/task_scheduler_observer.h>
-#  include <tbb/task_scheduler_init.h>
-# endif
+#if (__cplusplus >= 201103L)
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
 #else
-# include "tinythread.h"
-# include "fast_mutex.h"
+#include "tinythread.h"
+#include "fast_mutex.h"
 #endif
 
-#ifdef NO_SPINLOCK
-# ifdef WITH_TBB
-#   ifdef WITH_QUEUELOCK
-#  	define MUTEX_T tbb::queuing_mutex
-#   else
-#       define MUTEX_T tbb::mutex
-#   endif
-# else
-#   define MUTEX_T tthread::mutex
-# endif
-#else
-# ifdef WITH_TBB
-#   define MUTEX_T tbb::spin_mutex
-# else
-#   define MUTEX_T tthread::fast_mutex
-# endif
-#endif /* NO_SPINLOCK */
+// #ifdef NO_SPINLOCK
+// # ifdef WITH_TBB
+// #   ifdef WITH_QUEUELOCK
+// #  	define MUTEX_T queuing_lock__
+// struct queuing_lock__ {
+// 	queuing_lock__() : l_(), m_() { }
 
-#ifdef WITH_TBB
+// 	void lock() { l_.acquire(m_); }
+// 	void unlock() { l_.release(); }
+// 	bool try_lock() { return l_.try_acquire(m_); }
+// 	tbb::queuing_mutex::scoped_lock l_;
+// 	tbb::queuing_mutex m_;
+// };
+// #   else
+// #       define MUTEX_T std::mutex
+// #   endif
+// # else
+// #   define MUTEX_T tthread::mutex
+// # endif
+// #else
+// # ifdef WITH_TBB
+// #   define MUTEX_T tbb::spin_mutex
+// # else
+// #   define MUTEX_T tthread::fast_mutex
+// # endif
+// #endif /* NO_SPINLOCK */
+
+#if (__cplusplus >= 201103L)
+#define MUTEX_T std::mutex
+#else
+#define MUTEX_T tthread::mutex
+#endif
+
+#if (__cplusplus >= 201103L)
+#define COND_VAR_T std::condition_variable_any
+#define COND_MUTEX_T std::mutex
+#define COND_LOCK_T std::unique_lock
+#else
+#define COND_VAR_T tthread::condition_variable
+#define COND_MUTEX_T tthread::mutex
+#define COND_LOCK_T tthread::lock_guard
+#endif
+
+#if (__cplusplus >= 201103L)
 struct thread_tracking_pair {
 	int tid;
-	tbb::atomic<int>* done;
+	std::atomic<int>* done;
 };
 #endif
 
@@ -56,32 +74,18 @@ class ThreadSafe {
 public:
 
 	ThreadSafe(MUTEX_T* ptr_mutex) :
-#if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-		mutex_(*ptr_mutex)
-#else
 		ptr_mutex_(ptr_mutex)
-#endif
-	{
-#if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-#else
-		assert(ptr_mutex_ != NULL);
-		ptr_mutex_->lock();
-#endif
-	}
+		{
+			assert(ptr_mutex_ != NULL);
+			ptr_mutex_->lock();
+		}
 
 	~ThreadSafe() {
-#if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-#else
 		ptr_mutex_->unlock();
-#endif
 	}
 
 private:
-#if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-	MUTEX_T::scoped_lock mutex_;
-#else
 	MUTEX_T *ptr_mutex_;
-#endif
 };
 
 #if defined(_TTHREAD_WIN32_)

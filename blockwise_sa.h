@@ -1,11 +1,9 @@
 #ifndef BLOCKWISE_SA_H_
 #define BLOCKWISE_SA_H_
 
-#ifdef WITH_TBB
-#include <tbb/tbb.h>
-#include <tbb/task_group.h>
+#if (__cplusplus >= 201103)
+#include <thread>
 #endif
-
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -25,6 +23,7 @@
 #include "timer.h"
 #include "auto_array.h"
 #include "word_io.h"
+#include "threading.h"
 
 using namespace std;
 using namespace seqan;
@@ -184,29 +183,26 @@ class InorderBlockwiseSA : public BlockwiseSA<TStr> {
  */
 template<typename TStr>
 class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
-	public:
-		typedef DifferenceCoverSample<TStr> TDC;
+public:
+	typedef DifferenceCoverSample<TStr> TDC;
 
-		KarkkainenBlockwiseSA(const TStr& __text,
-				TIndexOffU __bucketSz,
-				int __nthreads,
-				uint32_t __dcV,
-				uint32_t __seed = 0,
-				bool __sanityCheck = false,
-				bool __passMemExc = false,
-				bool __verbose = false,
-				string base_fname = "",
-				ostream& __logger = cout) :
-			InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
-			_sampleSuffs(), _nthreads(__nthreads), _itrBucketIdx(0), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _base_fname(base_fname), _bigEndian(currentlyBigEndian()), _done(NULL)
-#ifdef WITH_TBB
-			,thread_group_started(false)
-#endif
-			{ _randomSrc.init(__seed); reset(); }
+	KarkkainenBlockwiseSA(const TStr& __text,
+			      TIndexOffU __bucketSz,
+			      int __nthreads,
+			      uint32_t __dcV,
+			      uint32_t __seed = 0,
+			      bool __sanityCheck = false,
+			      bool __passMemExc = false,
+			      bool __verbose = false,
+			      string base_fname = "",
+			      ostream& __logger = cout) :
+		InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
+		_sampleSuffs(), _nthreads(__nthreads), _itrBucketIdx(0), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _base_fname(base_fname), _bigEndian(currentlyBigEndian()), _done(NULL)
+		{ _randomSrc.init(__seed); reset(); }
 
-		~KarkkainenBlockwiseSA()
+	~KarkkainenBlockwiseSA()
 #if __cplusplus > 199711L
-			noexcept(false)
+	noexcept(false)
 #endif
 		{
 			if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
@@ -214,257 +210,232 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 				delete[] _done;
 				_done = NULL;
 			}
-#ifdef WITH_TBB
-			tbb_grp.wait();
-#else
 			if(_threads.size() > 0) {
 				for (size_t tid = 0; tid < _threads.size(); tid++) {
 					_threads[tid]->join();
 					delete _threads[tid];
 				}
 			}
-#endif 
 		}
 
-		/**
-		 * Allocate an amount of memory that simulates the peak memory
-		 * usage of the DifferenceCoverSample with the given text and v.
-		 * Throws bad_alloc if it's not going to fit in memory.  Returns
-		 * the approximate number of bytes the Cover takes at all times.
-		 */
-		static size_t simulateAllocs(const TStr& text, TIndexOffU bucketSz) {
-			size_t len = length(text);
-			// _sampleSuffs and _itrBucket are in memory at the peak
-			size_t bsz = bucketSz;
-			size_t sssz = len / max<TIndexOffU>(bucketSz-1, 1);
-			AutoArray<TIndexOffU> tmp(bsz + sssz + (1024 * 1024 /*out of caution*/));
-			return bsz;
-		}
+	/**
+	 * Allocate an amount of memory that simulates the peak memory
+	 * usage of the DifferenceCoverSample with the given text and v.
+	 * Throws bad_alloc if it's not going to fit in memory.  Returns
+	 * the approximate number of bytes the Cover takes at all times.
+	 */
+	static size_t simulateAllocs(const TStr& text, TIndexOffU bucketSz) {
+		size_t len = length(text);
+		// _sampleSuffs and _itrBucket are in memory at the peak
+		size_t bsz = bucketSz;
+		size_t sssz = len / max<TIndexOffU>(bucketSz-1, 1);
+		AutoArray<TIndexOffU> tmp(bsz + sssz + (1024 * 1024 /*out of caution*/));
+		return bsz;
+	}
 
-		//TBB requires a Functor to be passed to the thread group
-		//hence the nested class
-#ifdef WITH_TBB
-		class nextBlock_Worker {
-			void *vp;
+	//TBB requires a Functor to be passed to the thread group
+	//hence the nested class
 
-			public:
-			nextBlock_Worker(const nextBlock_Worker& W): vp(W.vp) {};
-			nextBlock_Worker(void *vp_):vp(vp_) {}; 
-			void operator()() const {
-#else
-				static void nextBlock_Worker(void *vp) {
-#endif 
-					pair<KarkkainenBlockwiseSA*, int> param = *(pair<KarkkainenBlockwiseSA*, int>*)vp;
-					KarkkainenBlockwiseSA* sa = param.first;
-					int tid = param.second;
-					while(true) {
-						size_t cur = 0;
-						{
-							ThreadSafe ts(&sa->_mutex);
-							cur = sa->_cur;
-							if(cur > length(sa->_sampleSuffs)) break;
-							sa->_cur++;
-						}
-						sa->nextBlock((int)cur, tid);
-						// Write suffixes into a file
-						std::ostringstream number; number << cur;
-						const string fname = sa->_base_fname + "." + number.str() + ".sa";
-						ofstream sa_file(fname.c_str(), ios::binary);
-						if(!sa_file.good()) {
-							cerr << "Could not open file for writing a reference graph: \"" << fname << "\"" << endl;
-							throw 1;
-						}
-						const String<TIndexOffU>& bucket = sa->_itrBuckets[tid];
-						writeU<TIndexOffU>(sa_file, (TIndexOffU)length(bucket), sa->_bigEndian);
-						for(size_t i = 0; i < length(bucket); i++) {
-							writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
-						}
-						sa_file.close();
-						clear(sa->_itrBuckets[tid]);
-						sa->_done[cur] = true;
-					}
-				}
-#ifdef WITH_TBB
-			};
-#endif
-
-
-			/**
-			 * Get the next suffix; compute the next bucket if necessary.
-			 */
-			virtual TIndexOffU nextSuffix() {
-				// Launch threads if not
-				if(this->_nthreads > 1) {
-#ifdef WITH_TBB
-					if(!thread_group_started)
-					{
-#else
-						if(_threads.size() == 0) {
-#endif
-							_done = new volatile bool[length(_sampleSuffs)+1];
-							for (int i = 0; i < length(_sampleSuffs) + 1; i++) {
-								_done[i] = false;
-							}
-							resize(_itrBuckets, this->_nthreads);
-							_tparams.resize(this->_nthreads);
-							for(int tid = 0; tid < this->_nthreads; tid++) {
-								_tparams[tid].first = this;
-								_tparams[tid].second = tid;
-#ifdef WITH_TBB
-								tbb_grp.run(nextBlock_Worker((void*)&_tparams[tid]));
-							}
-							thread_group_started = true;
-						}
-#else
-						_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams[tid]));
-					}
-					assert_eq(_threads.size(), (size_t)this->_nthreads);
-				}
-#endif
-			}
-			if(this->_itrPushedBackSuffix != OFF_MASK) {
-				TIndexOffU tmp = this->_itrPushedBackSuffix;
-				this->_itrPushedBackSuffix = OFF_MASK;
-				return tmp;
-			}
-			while(this->_itrBucketPos >= length(this->_itrBucket) ||
-					length(this->_itrBucket) == 0)
+	static void nextBlock_Worker(void *vp) {
+		pair<KarkkainenBlockwiseSA*, int> param = *(pair<KarkkainenBlockwiseSA*, int>*)vp;
+		KarkkainenBlockwiseSA* sa = param.first;
+		int tid = param.second;
+		while(true) {
+			size_t cur = 0;
 			{
-				if(!hasMoreBlocks()) {
-					throw out_of_range("No more suffixes");
+				ThreadSafe ts(&sa->_mutex);
+				cur = sa->_cur;
+				if(cur > length(sa->_sampleSuffs)) break;
+				sa->_cur++;
+			}
+			sa->nextBlock((int)cur, tid);
+			// Write suffixes into a file
+			std::ostringstream number; number << cur;
+			const string fname = sa->_base_fname + "." + number.str() + ".sa";
+			ofstream sa_file(fname.c_str(), ios::binary);
+			if(!sa_file.good()) {
+				cerr << "Could not open file for writing a reference graph: \"" << fname << "\"" << endl;
+				throw 1;
+			}
+			const String<TIndexOffU>& bucket = sa->_itrBuckets[tid];
+			writeU<TIndexOffU>(sa_file, (TIndexOffU)length(bucket), sa->_bigEndian);
+			for(size_t i = 0; i < length(bucket); i++) {
+				writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
+			}
+			sa_file.close();
+			clear(sa->_itrBuckets[tid]);
+			sa->_done[cur] = true;
+		}
+	}
+
+
+	/**
+	 * Get the next suffix; compute the next bucket if necessary.
+	 */
+	virtual TIndexOffU nextSuffix() {
+		// Launch threads if not
+		if(this->_nthreads > 1) {
+			if(_threads.size() == 0) {
+				_done = new volatile bool[length(_sampleSuffs)+1];
+				for (int i = 0; i < length(_sampleSuffs) + 1; i++) {
+					_done[i] = false;
 				}
-				if(this->_nthreads == 1) {
-					nextBlock((int)_cur);
-					_cur++;
-				} else {
-					while(!_done[this->_itrBucketIdx]) {
-						SLEEP(1);
-					}
-					// Read suffixes from a file
-					std::ostringstream number; number << this->_itrBucketIdx;
-					const string fname = _base_fname + "." + number.str() + ".sa";
-					ifstream sa_file(fname.c_str(), ios::binary);
-					if(!sa_file.good()) {
-						cerr << "Could not open file for reading a reference graph: \"" << fname << "\"" << endl;
-						throw 1;
-					}
-					size_t numSAs = readU<TIndexOffU>(sa_file, _bigEndian);
-					resize(this->_itrBucket, numSAs);
-					for(size_t i = 0; i < numSAs; i++) {
-						this->_itrBucket[i] = readU<TIndexOffU>(sa_file, _bigEndian);
-					}
-					sa_file.close();
-					std::remove(fname.c_str());
-				}
-				this->_itrBucketIdx++;
-				this->_itrBucketPos = 0;
-			}
-			return this->_itrBucket[this->_itrBucketPos++];
-		}
-
-		/// Defined in blockwise_sa.cpp
-		virtual void nextBlock(int cur_block, int tid = 0);
-
-		/// Defined in blockwise_sa.cpp
-		virtual void qsort(String<TIndexOffU>& bucket);
-
-		/// Return true iff more blocks are available
-		virtual bool hasMoreBlocks() const {
-			return this->_itrBucketIdx <= length(_sampleSuffs);
-		}
-
-		/// Return the difference-cover period
-		uint32_t dcV() const { return _dcV; }
-
-	protected:
-
-		/**
-		 * Initialize the state of the blockwise suffix sort.  If the
-		 * difference cover sample and the sample set have not yet been
-		 * built, build them.  Then reset the block cursor to point to
-		 * the first block.
-		 */
-		virtual void reset() {
-			if(!_built) {
-				build();
-			}
-			assert(_built);
-			_cur = 0;
-		}
-
-		/// Return true iff we're about to dole out the first bucket
-		virtual bool isReset() {
-			return _cur == 0;
-		}
-
-	private:
-
-		/**
-		 * Calculate the difference-cover sample and sample suffixes.
-		 */
-		void build() {
-			// Calculate difference-cover sample
-			assert(_dc == NULL);
-			if(_dcV != 0) {
-				_dc = new TDC(this->text(), _dcV, this->verbose(), this->sanityCheck());
-				_dc->build(this->_nthreads);
-			}
-			// Calculate sample suffixes
-			if(this->bucketSz() <= length(this->text())) {
-				VMSG_NL("Building samples");
-				buildSamples();
-			} else {
-				VMSG_NL("Skipping building samples since text length " <<
-						length(this->text()) << " is less than bucket size: " <<
-						this->bucketSz());
-			}
-			_built = true;
-		}
-
-		/**
-		 * Calculate the lcp between two suffixes using the difference
-		 * cover as a tie-breaker.  If the tie-breaker is employed, then
-		 * the calculated lcp may be an underestimate.
-		 *
-		 * Defined in blockwise_sa.cpp
-		 */
-		inline bool tieBreakingLcp(TIndexOffU aOff,
-				TIndexOffU bOff,
-				TIndexOffU& lcp,
-				bool& lcpIsSoft);
-
-		/**
-		 * Compare two suffixes using the difference-cover sample.
-		 */
-		inline bool suffixCmp(TIndexOffU cmp,
-				TIndexOffU i,
-				int64_t& j,
-				int64_t& k,
-				bool& kSoft,
-				const String<TIndexOffU>& z);
-
-		void buildSamples();
-
-		String<TIndexOffU> _sampleSuffs; /// sample suffixes
-		int                _nthreads; /// # of threads
-		TIndexOffU         _itrBucketIdx;
-		TIndexOffU         _cur;         /// offset to 1st elt of next block
-		const uint32_t   _dcV;         /// difference-cover periodicity
-		TDC*             _dc;          /// queryable difference-cover data
-		bool             _built;       /// whether samples/DC have been built
-		RandomSource     _randomSrc;   /// source of pseudo-randoms
-		MUTEX_T                 _mutex;       /// synchronization of output message
-		string                  _base_fname;  /// base file name for storing SA blocks
-		bool                    _bigEndian;   /// bigEndian?
-#ifdef WITH_TBB
-		tbb::task_group     tbb_grp;/// thread "list" via Intel TBB
-		bool    thread_group_started;
+				resize(_itrBuckets, this->_nthreads);
+				_tparams.resize(this->_nthreads);
+				for(int tid = 0; tid < this->_nthreads; tid++) {
+					_tparams[tid].first = this;
+					_tparams[tid].second = tid;
+#if (__cplusplus >= 201103L)
+					_threads.push_back(new std::thread(nextBlock_Worker, (void*)&_tparams[tid]));
 #else
-		std::vector<tthread::thread*> _threads;     /// thread list
+					_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams[tid]));
 #endif
-		std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
-		String<String<TIndexOffU> >     _itrBuckets;  /// buckets
-		volatile bool* _done;        /// is a block processed?
+				}
+				assert_eq(_threads.size(), (size_t)this->_nthreads);
+			}
+		}
+		if(this->_itrPushedBackSuffix != OFF_MASK) {
+			TIndexOffU tmp = this->_itrPushedBackSuffix;
+			this->_itrPushedBackSuffix = OFF_MASK;
+			return tmp;
+		}
+		while(this->_itrBucketPos >= length(this->_itrBucket) ||
+		      length(this->_itrBucket) == 0)
+		{
+			if(!hasMoreBlocks()) {
+				throw out_of_range("No more suffixes");
+			}
+			if(this->_nthreads == 1) {
+				nextBlock((int)_cur);
+				_cur++;
+			} else {
+				while(!_done[this->_itrBucketIdx]) {
+					SLEEP(1);
+				}
+				// Read suffixes from a file
+				std::ostringstream number; number << this->_itrBucketIdx;
+				const string fname = _base_fname + "." + number.str() + ".sa";
+				ifstream sa_file(fname.c_str(), ios::binary);
+				if(!sa_file.good()) {
+					cerr << "Could not open file for reading a reference graph: \"" << fname << "\"" << endl;
+					throw 1;
+				}
+				size_t numSAs = readU<TIndexOffU>(sa_file, _bigEndian);
+				resize(this->_itrBucket, numSAs);
+				for(size_t i = 0; i < numSAs; i++) {
+					this->_itrBucket[i] = readU<TIndexOffU>(sa_file, _bigEndian);
+				}
+				sa_file.close();
+				std::remove(fname.c_str());
+			}
+			this->_itrBucketIdx++;
+			this->_itrBucketPos = 0;
+		}
+		return this->_itrBucket[this->_itrBucketPos++];
+	}
+
+	/// Defined in blockwise_sa.cpp
+	virtual void nextBlock(int cur_block, int tid = 0);
+
+	/// Defined in blockwise_sa.cpp
+	virtual void qsort(String<TIndexOffU>& bucket);
+
+	/// Return true iff more blocks are available
+	virtual bool hasMoreBlocks() const {
+		return this->_itrBucketIdx <= length(_sampleSuffs);
+	}
+
+	/// Return the difference-cover period
+	uint32_t dcV() const { return _dcV; }
+
+protected:
+
+	/**
+	 * Initialize the state of the blockwise suffix sort.  If the
+	 * difference cover sample and the sample set have not yet been
+	 * built, build them.  Then reset the block cursor to point to
+	 * the first block.
+	 */
+	virtual void reset() {
+		if(!_built) {
+			build();
+		}
+		assert(_built);
+		_cur = 0;
+	}
+
+	/// Return true iff we're about to dole out the first bucket
+	virtual bool isReset() {
+		return _cur == 0;
+	}
+
+private:
+
+	/**
+	 * Calculate the difference-cover sample and sample suffixes.
+	 */
+	void build() {
+		// Calculate difference-cover sample
+		assert(_dc == NULL);
+		if(_dcV != 0) {
+			_dc = new TDC(this->text(), _dcV, this->verbose(), this->sanityCheck());
+			_dc->build(this->_nthreads);
+		}
+		// Calculate sample suffixes
+		if(this->bucketSz() <= length(this->text())) {
+			VMSG_NL("Building samples");
+			buildSamples();
+		} else {
+			VMSG_NL("Skipping building samples since text length " <<
+				length(this->text()) << " is less than bucket size: " <<
+				this->bucketSz());
+		}
+		_built = true;
+	}
+
+	/**
+	 * Calculate the lcp between two suffixes using the difference
+	 * cover as a tie-breaker.  If the tie-breaker is employed, then
+	 * the calculated lcp may be an underestimate.
+	 *
+	 * Defined in blockwise_sa.cpp
+	 */
+	inline bool tieBreakingLcp(TIndexOffU aOff,
+				   TIndexOffU bOff,
+				   TIndexOffU& lcp,
+				   bool& lcpIsSoft);
+
+	/**
+	 * Compare two suffixes using the difference-cover sample.
+	 */
+	inline bool suffixCmp(TIndexOffU cmp,
+			      TIndexOffU i,
+			      int64_t& j,
+			      int64_t& k,
+			      bool& kSoft,
+			      const String<TIndexOffU>& z);
+
+	void buildSamples();
+
+	String<TIndexOffU> _sampleSuffs; /// sample suffixes
+	int                _nthreads; /// # of threads
+	TIndexOffU         _itrBucketIdx;
+	TIndexOffU         _cur;         /// offset to 1st elt of next block
+	const uint32_t   _dcV;         /// difference-cover periodicity
+	TDC*             _dc;          /// queryable difference-cover data
+	bool             _built;       /// whether samples/DC have been built
+	RandomSource     _randomSrc;   /// source of pseudo-randoms
+	MUTEX_T                 _mutex;       /// synchronization of output message
+	string                  _base_fname;  /// base file name for storing SA blocks
+	bool                    _bigEndian;   /// bigEndian?
+#if (__cplusplus >= 201103)
+	std::vector<std::thread *> _threads; /// thread list
+#else
+	std::vector<tthread::thread*> _threads;     /// thread list
+#endif
+	std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
+	String<String<TIndexOffU> >     _itrBuckets;  /// buckets
+	volatile bool* _done;        /// is a block processed?
 };
 
 /**
@@ -533,22 +504,9 @@ struct BinarySortingParam {
 	size_t                   begin;
 	size_t                   end;
 };
-
-template<typename TStr>
-#ifdef WITH_TBB
-class BinarySorting_worker {
-	void *vp;
-
-	public:
-
-	BinarySorting_worker(const BinarySorting_worker& W): vp(W.vp) {};
-	BinarySorting_worker(void *vp_):vp(vp_) {};
-	void operator()() const
-	{
-#else
-		static void BinarySorting_worker(void *vp)
+template <typename TStr>
+static void BinarySorting_worker(void *vp)
 		{
-#endif
 			BinarySortingParam<TStr>* param = (BinarySortingParam<TStr>*)vp;
 			const TStr& t = *(param->t);
 			size_t len = length(t);
@@ -577,9 +535,7 @@ class BinarySorting_worker {
 			}
 		}
 
-#ifdef WITH_TBB
-	};
-#endif
+
 	/**
 	 * Select a set of bucket-delineating sample suffixes such that no
 	 * bucket is greater than the requested upper limit.  Some care is
@@ -660,8 +616,8 @@ class BinarySorting_worker {
 			// Iterate until all buckets are less than
 			while(--limit >= 0) {
 				TIndexOffU numBuckets = (TIndexOffU)length(_sampleSuffs)+1;
-#ifdef WITH_TBB
-				tbb::task_group tbb_grp;
+#if (__cplusplus >= 201103)
+				AutoArray<std::thread *> threads(this->_nthreads);
 #else
 				AutoArray<tthread::thread*> threads(this->_nthreads);
 #endif
@@ -692,15 +648,13 @@ class BinarySorting_worker {
 					if(this->_nthreads == 1) {
 						BinarySorting_worker<TStr>((void*)&tparams[tid]);
 					} else {
-#ifdef WITH_TBB
-						tbb_grp.run(BinarySorting_worker<TStr>(((void*)&tparams[tid])));
+#if (__cplusplus >= 201103L)
+						threads[tid] = new std::thread(BinarySorting_worker<TStr>, (void*)&tparams[tid]);
+#else
+						threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&tparams[tid]);
+#endif
 					}
 				}
-				tbb_grp.wait();
-#else
-				threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&tparams[tid]);
-			}
-		}
 
 	if(this->_nthreads > 1) {
 		for (int tid = 0; tid < this->_nthreads; tid++) {
@@ -708,7 +662,6 @@ class BinarySorting_worker {
 		}
 	}
 
-#endif
 
 	String<TIndexOffU>& bucketSzs = tparams[0].bucketSzs;
 	String<TIndexOffU>& bucketReps = tparams[0].bucketReps;

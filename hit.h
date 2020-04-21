@@ -8,6 +8,7 @@
 #include <string>
 #include <stdexcept>
 #include <seqan/sequence.h>
+#include <algorithm>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "threading.h"
@@ -18,7 +19,6 @@
 #include "filebuf.h"
 #include "edit.h"
 #include "sstring.h"
-#include <algorithm>
 
 /**
  * Classes for dealing with reporting alignments.
@@ -171,7 +171,8 @@ public:
 		ptCounts_(nthreads_),
 		perThreadBufSize_(perThreadBufSize),
 		ptNumAligned_(NULL),
-		reorder_(reorder)
+		reorder_(reorder),
+		next_batch_to_flush_(0)
 	{
 		size_t nelt = 5 * nthreads_;
 		ptNumAligned_ = new uint64_t[nelt];
@@ -183,6 +184,15 @@ public:
 		ptBufs_.resize(nthreads_);
 		ptCounts_.resize(nthreads_, 0);
 		initDumps();
+
+		if (reorder_) {
+			reorderInfo_.resize(nthreads_);
+			for (size_t i = 0; i < nthreads_; i++) {
+				reorderInfo_[i].batchId = 0;
+				reorderInfo_[i].waiting = false;
+				reorderInfo_[i].flushed = true;
+			}
+		}
 	}
 
 	/**
@@ -228,7 +238,8 @@ public:
 		size_t threadId,
 		int mapq,
 		int xms,
-		bool tally, size_t rdid)
+		bool tally,
+		PatternSourcePerThread& p)
 	{
 		assert_geq(end, start);
 		assert(nthreads_ > 1 || threadId == 0);
@@ -237,7 +248,6 @@ public:
 		}
 		const Hit& firstHit = (hptr == NULL) ? (*hsptr)[start] : *hptr;
 		bool paired = firstHit.mate > 0;
-		maybeFlush(threadId);
 		BTString& o = ptBufs_[threadId];
 		// Per-thread buffering is active
 		for(size_t i = start; i < end; i++) {
@@ -250,6 +260,12 @@ public:
 			}
 		}
 		ptCounts_[threadId]++;
+		size_t batchId = (size_t)(p.rdid()/perThreadBufSize_);
+		if (reorder_ && reorderInfo_[threadId].flushed) {
+			reorderInfo_[threadId].batchId = batchId;
+			reorderInfo_[threadId].flushed = false;
+		}
+		maybeFlush(threadId);
 		if(tally) {
 			tallyAlignments(threadId, end - start, paired);
 		}
@@ -549,11 +565,42 @@ public:
 
 protected:
 
+	void reorder(size_t threadId, bool force) {
+		COND_LOCK_T<COND_MUTEX_T> l(reorder_mutex_);
+		size_t last_batch_flushed = next_batch_to_flush_;
+		if (next_batch_to_flush_ == reorderInfo_[threadId].batchId || force) {
+			if (!force) {
+				out_.writeString(ptBufs_[threadId]);
+				next_batch_to_flush_ += 1;
+				reorderInfo_[threadId].flushed = true;
+			}
+			for (size_t i = 0; i < reorderInfo_.size();) {
+				if (reorderInfo_[i].batchId == next_batch_to_flush_ &&
+				    (reorderInfo_[i].waiting  || force)) {
+					out_.writeString(ptBufs_[i]);
+					reorderInfo_[i].flushed = true;
+					next_batch_to_flush_ += 1;
+					i = 0; // we may have skipped over a flushable batch
+				} else
+					i++;
+			}
+			if (next_batch_to_flush_ - last_batch_flushed > 1)
+				output_cond.notify_all();
+		} else {
+			reorderInfo_[threadId].waiting = true;
+			while (!reorderInfo_[threadId].flushed) {
+				output_cond.wait(reorder_mutex_);
+			}
+			reorderInfo_[threadId].waiting = false;
+		}
+	}
 	/**
 	 * Flush thread's output buffer and reset both buffer and count.
 	 */
 	void flush(size_t threadId, bool force) {
-		{
+		if (reorder_) {
+			reorder(threadId, force);
+		} else {
 			ThreadSafe _ts(&mutex_); // flush
 			out_.writeString(ptBufs_[threadId]);
 		}
@@ -587,6 +634,12 @@ protected:
 		out_.close();
 	}
 
+	struct PtBufInfo {
+		size_t batchId;
+		bool flushed;
+		bool waiting;
+	};
+
 	OutFileBuf&         out_;        /// the alignment output stream(s)
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	MUTEX_T             mutex_;       /// pthreads mutexes for per-file critical sections
@@ -596,7 +649,12 @@ protected:
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
+
+	size_t next_batch_to_flush_;
 	bool reorder_;
+	std::vector<PtBufInfo> reorderInfo_;
+	COND_MUTEX_T reorder_mutex_;
+	COND_VAR_T output_cond;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -795,7 +853,7 @@ public:
 			}
 			xms++;
 			_sink.reportHits(NULL, &_bufferedHits, 0, _bufferedHits.size(),
-			                 threadId_, mapq, xms, true, p.rdid());
+			                 threadId_, mapq, xms, true, p);
 			_sink.dumpAlign(p);
 			ret = (uint32_t)_bufferedHits.size();
 			_bufferedHits.clear();

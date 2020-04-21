@@ -65,6 +65,10 @@ void SAMHitSink::reportUnOrMax(
 	if(un) {
 		HitSink::reportUnaligned(threadId, p);
 		if (noUnal) {
+			if (reorder_) {
+				ptCounts_[threadId]++;
+				maybeFlush(threadId);
+			}
 			return;
 		}
 	} else {
@@ -77,7 +81,6 @@ void SAMHitSink::reportUnOrMax(
 	assert(!un || hs == NULL || hs->size() == 0);
 	size_t hssz = 0;
 	if(hs != NULL) hssz = hs->size();
-	maybeFlush(threadId);
 	BTString& o = ptBufs_[threadId];
 	for(int i = 0; i < (int)seqan::length(p.bufa().name) - (paired ? 2 : 0); i++) {
 		if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
@@ -139,6 +142,12 @@ void SAMHitSink::reportUnOrMax(
 		o << '\n';
 	}
 	ptCounts_[threadId]++;
+	size_t batchId = (size_t)(p.rdid()/perThreadBufSize_);
+	if (reorder_ && reorderInfo_[threadId].flushed) {
+		reorderInfo_[threadId].batchId = batchId;
+		reorderInfo_[threadId].flushed = false;
+	}
+	maybeFlush(threadId);
 }
 
 /**
@@ -334,7 +343,7 @@ void SAMHitSink::reportMaxed(
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == r) {
-						reportHits(NULL, &hs, i, i+2, threadId, 0, (int)(hs.size()/2)+1, true, p.rdid());
+						reportHits(NULL, &hs, i, i+2, threadId, 0, (int)(hs.size()/2)+1, true, p);
 						break;
 					}
 					num++;
@@ -349,7 +358,7 @@ void SAMHitSink::reportMaxed(
 			}
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
-			reportHits(&hs[r], NULL, 0, 1, threadId, 0, (int)hs.size()+1, true, p.rdid());
+			reportHits(&hs[r], NULL, 0, 1, threadId, 0, (int)hs.size()+1, true, p);
 		}
 	}
 }
