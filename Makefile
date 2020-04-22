@@ -21,7 +21,7 @@ EXTRA_CFLAGS =
 EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
-WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
+WARNING_FLAGS = -Wall -Wno-unused-private-field -Wno-reorder \
 				-Wno-unused-local-typedefs
 
 RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
@@ -160,7 +160,7 @@ SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
 BITS=32
-ifeq (x86_64,$(shell uname -m))
+ifeq (1,$(shell echo __LP64__ | $(CC) -P -E - | tr -d '\n'))
 	BITS=64
 endif
 # msys will always be 32 bit so look at the cpu arch instead.
@@ -168,12 +168,6 @@ ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
 	ifeq (1,$(MINGW))
 		BITS=64
 	endif
-endif
-
-ifeq (1,$(LINUX))
-    ifeq (x86_64, $(shell uname -p))
-        BITS=64
-    endif
 endif
 
 ifeq (32,$(BITS))
