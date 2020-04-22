@@ -840,22 +840,20 @@ public:
 		// Only free buffers if we're *not* using memory-mapped files
 		if(!_useMm) {
 			// Delete everything that was allocated in read(false, ...)
-			if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
-			if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
-			if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
-			if(_offs != NULL && !useShmem_) {
-				delete[] _offs; _offs = NULL;
-			} else if(_offs != NULL && useShmem_) {
+			if(_fchr    != NULL) delete[] _fchr;
+			if(_ftab    != NULL) delete[] _ftab;
+			if(_eftab   != NULL) delete[] _eftab;
+			if(_offs != NULL && !useShmem_)
+				delete[] _offs;
+			else if(_offs != NULL && useShmem_)
 				FREE_SHARED(_offs);
-			}
-			if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
-			if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
-			if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
-			if(_ebwt != NULL && !useShmem_) {
-				delete[] _ebwt; _ebwt = NULL;
-			} else if(_ebwt != NULL && useShmem_) {
+			if(_isa     != NULL) delete[] _isa;
+			if(_plen    != NULL) delete[] _plen;
+			if(_rstarts != NULL) delete[] _rstarts;
+			if(_ebwt != NULL && !useShmem_)
+				delete[] _ebwt;
+			else if(_ebwt != NULL && useShmem_)
 				FREE_SHARED(_ebwt);
-			}
 		}
 		if (_in1 != NULL) fclose(_in1);
 		if (_in2 != NULL) fclose(_in2);

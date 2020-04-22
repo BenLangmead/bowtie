@@ -531,128 +531,132 @@ public:
 		uint64_t mid   = 0;
 		// For all records pertaining to the target reference sequence...
 		for(uint64_t i = reci; i < recf; i++) {
-			uint64_t origBufOff = bufOff;
-			assert_geq(toff, off);
-		if (firstStretch && recf > reci + 16){
-			// binary search finds smallest i s.t. toff >= cumRefOff_[i]
-			while (left < right-1) {
-				mid = left + ((right - left) >> 1);
-				if (cumRefOff_[mid] <= toff)
-					left = mid;
-				else
-					right = mid;
-			}
-			off = cumRefOff_[left];
-			bufOff = cumUnambig_[left];
-			origBufOff = bufOff;
-			i = left;
-			assert(cumRefOff_[i+1] == 0 || cumRefOff_[i+1] > toff);
-			ASSERT_ONLY(binarySearched = true);
-		}
-		off += recs_[i].off; // skip Ns at beginning of stretch
-		assert_gt(count, 0);
-		if(toff < off) {
-			size_t cpycnt = min((size_t)(off - toff), count);
-			memset(&dest[cur], 4, cpycnt);
-			count -= cpycnt;
-			toff += cpycnt;
-			cur += cpycnt;
-			if(count == 0) break;
-		}
-		assert_geq(toff, off);
-		if(toff < off + recs_[i].len) {
-			bufOff += toff - off; // move bufOff pointer forward
-		} else {
-			bufOff += recs_[i].len;
-		}
-		off += recs_[i].len;
-		assert(off == cumRefOff_[i+1] || cumRefOff_[i+1] == 0);
-		assert(!binarySearched || toff < off);
-		if(toff < off) {
-			if(firstStretch) {
-				if(toff + 8 < off && count > 8) {
-					// We already added some Ns, so we have to do
-					// a fixup at the beginning of the buffer so
-					// that we can start clobbering at cur >> 2
-					if(cur & 3) {
-						offset -= (cur & 3);
-					}
-					uint64_t curU32 = cur >> 2;
-					// Do the initial few bases
-					if(bufOff & 3) {
-						const uint64_t bufElt = (bufOff) >> 2;
-						const int64_t low2 = bufOff & 3;
-						// Lots of cache misses on the following line
-						destU32[curU32] = byteToU32_[buf_[bufElt]];
-						for(int j = 0; j < low2; j++) {
-							((char *)(&destU32[curU32]))[j] = 4;
-						}
-						curU32++;
-						offset += low2;
-						const int64_t chars = 4 - low2;
-						count -= chars;
-						bufOff += chars;
-						toff += chars;
-					}
-					assert_eq(0, bufOff & 3);
-					uint64_t bufOffU32 = bufOff >> 2;
-					uint64_t countLim = count >> 2;
-					uint64_t offLim = ((off - (toff + 4)) >> 2);
-					uint64_t lim = min(countLim, offLim);
-					// Do the fast thing for as far as possible
-					for(uint64_t j = 0; j < lim; j++) {
-						// Lots of cache misses on the following line
-						destU32[curU32] = byteToU32_[buf_[bufOffU32++]];
 #ifndef NDEBUG
-						if(dest_2 != NULL) {
-							assert_eq(dest[(curU32 << 2) + 0], dest_2[(curU32 << 2) - offset + 0]);
-							assert_eq(dest[(curU32 << 2) + 1], dest_2[(curU32 << 2) - offset + 1]);
-							assert_eq(dest[(curU32 << 2) + 2], dest_2[(curU32 << 2) - offset + 2]);
-							assert_eq(dest[(curU32 << 2) + 3], dest_2[(curU32 << 2) - offset + 3]);
-						}
+			uint64_t origBufOff = bufOff;
 #endif
-						curU32++;
-					}
-					toff += (lim << 2);
-					assert_leq(toff, off);
-					assert_leq((lim << 2), count);
-					count -= (lim << 2);
-					bufOff = bufOffU32 << 2;
-					cur = curU32 << 2;
+			assert_geq(toff, off);
+			if (firstStretch && recf > reci + 16){
+				// binary search finds smallest i s.t. toff >= cumRefOff_[i]
+				while (left < right-1) {
+					mid = left + ((right - left) >> 1);
+					if (cumRefOff_[mid] <= toff)
+						left = mid;
+					else
+						right = mid;
 				}
-				// Do the slow thing for the rest
-				for(; toff < off && count > 0; toff++) {
-					assert_lt(bufOff, bufSz_);
-					const uint64_t bufElt = (bufOff) >> 2;
-					const uint64_t shift = (bufOff & 3) << 1;
-					dest[cur++] = (buf_[bufElt] >> shift) & 3;
-					bufOff++;
-					count--;
-				}
-				firstStretch = false;
+				off = cumRefOff_[left];
+				bufOff = cumUnambig_[left];
+#ifndef NDEBUG
+				origBufOff = bufOff;
+#endif
+				i = left;
+				assert(cumRefOff_[i+1] == 0 || cumRefOff_[i+1] > toff);
+				ASSERT_ONLY(binarySearched = true);
+			}
+			off += recs_[i].off; // skip Ns at beginning of stretch
+			assert_gt(count, 0);
+			if(toff < off) {
+				size_t cpycnt = min((size_t)(off - toff), count);
+				memset(&dest[cur], 4, cpycnt);
+				count -= cpycnt;
+				toff += cpycnt;
+				cur += cpycnt;
+				if(count == 0) break;
+			}
+			assert_geq(toff, off);
+			if(toff < off + recs_[i].len) {
+				bufOff += toff - off; // move bufOff pointer forward
 			} else {
-				// Do the slow thing
-				for(; toff < off && count > 0; toff++) {
-					assert_lt(bufOff, bufSz_);
-					const uint64_t bufElt = (bufOff) >> 2;
-					const uint64_t shift = (bufOff & 3) << 1;
-					dest[cur++] = (buf_[bufElt] >> shift) & 3;
-					bufOff++;
-					count--;
+				bufOff += recs_[i].len;
+			}
+			off += recs_[i].len;
+			assert(off == cumRefOff_[i+1] || cumRefOff_[i+1] == 0);
+			assert(!binarySearched || toff < off);
+			if(toff < off) {
+				if(firstStretch) {
+					if(toff + 8 < off && count > 8) {
+						// We already added some Ns, so we have to do
+						// a fixup at the beginning of the buffer so
+						// that we can start clobbering at cur >> 2
+						if(cur & 3) {
+							offset -= (cur & 3);
+						}
+						uint64_t curU32 = cur >> 2;
+						// Do the initial few bases
+						if(bufOff & 3) {
+							const uint64_t bufElt = (bufOff) >> 2;
+							const int64_t low2 = bufOff & 3;
+							// Lots of cache misses on the following line
+							destU32[curU32] = byteToU32_[buf_[bufElt]];
+							for(int j = 0; j < low2; j++) {
+								((char *)(&destU32[curU32]))[j] = 4;
+							}
+							curU32++;
+							offset += low2;
+							const int64_t chars = 4 - low2;
+							count -= chars;
+							bufOff += chars;
+							toff += chars;
+						}
+						assert_eq(0, bufOff & 3);
+						uint64_t bufOffU32 = bufOff >> 2;
+						uint64_t countLim = count >> 2;
+						uint64_t offLim = ((off - (toff + 4)) >> 2);
+						uint64_t lim = min(countLim, offLim);
+						// Do the fast thing for as far as possible
+						for(uint64_t j = 0; j < lim; j++) {
+							// Lots of cache misses on the following line
+							destU32[curU32] = byteToU32_[buf_[bufOffU32++]];
+#ifndef NDEBUG
+							if(dest_2 != NULL) {
+								assert_eq(dest[(curU32 << 2) + 0], dest_2[(curU32 << 2) - offset + 0]);
+								assert_eq(dest[(curU32 << 2) + 1], dest_2[(curU32 << 2) - offset + 1]);
+								assert_eq(dest[(curU32 << 2) + 2], dest_2[(curU32 << 2) - offset + 2]);
+								assert_eq(dest[(curU32 << 2) + 3], dest_2[(curU32 << 2) - offset + 3]);
+							}
+#endif
+							curU32++;
+						}
+						toff += (lim << 2);
+						assert_leq(toff, off);
+						assert_leq((lim << 2), count);
+						count -= (lim << 2);
+						bufOff = bufOffU32 << 2;
+						cur = curU32 << 2;
+					}
+					// Do the slow thing for the rest
+					for(; toff < off && count > 0; toff++) {
+						assert_lt(bufOff, bufSz_);
+						const uint64_t bufElt = (bufOff) >> 2;
+						const uint64_t shift = (bufOff & 3) << 1;
+						dest[cur++] = (buf_[bufElt] >> shift) & 3;
+						bufOff++;
+						count--;
+					}
+					firstStretch = false;
+				} else {
+					// Do the slow thing
+					for(; toff < off && count > 0; toff++) {
+						assert_lt(bufOff, bufSz_);
+						const uint64_t bufElt = (bufOff) >> 2;
+						const uint64_t shift = (bufOff & 3) << 1;
+						dest[cur++] = (buf_[bufElt] >> shift) & 3;
+						bufOff++;
+						count--;
+					}
 				}
 			}
+			if(count == 0) break;
+			assert_eq(recs_[i].len, bufOff - origBufOff);
+			assert_geq(toff, off);
+		} // end for loop over records
+		// In any chars are left after scanning all the records,
+		// they must be ambiguous
+		while(count > 0) {
+			count--;
+			dest[cur++] = 4;
 		}
-		if(count == 0) break;
-		assert_eq(recs_[i].len, bufOff - origBufOff);
-		assert_geq(toff, off);
-	} // end for loop over records
-	// In any chars are left after scanning all the records,
-	// they must be ambiguous
-	while(count > 0) {
-		count--;
-		dest[cur++] = 4;
-	}
-	assert_eq(0, count);
+		assert_eq(0, count);
 #ifndef NDEBUG
 		delete[] destU32_2;
 #endif

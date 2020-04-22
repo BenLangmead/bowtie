@@ -67,7 +67,7 @@ typedef uint64_t TReadId;
  * Note: Bowtie 2 uses this but Bowtie doesn't yet.
  */
 struct PatternParams {
-	
+
 	PatternParams() { }
 
 	PatternParams(
@@ -306,7 +306,7 @@ struct Read {
  * All per-thread storage for input read data.
  */
 struct PerThreadReadBuf {
-	
+
 	PerThreadReadBuf(size_t max_buf) :
 		max_buf_(max_buf),
 		bufa_(max_buf),
@@ -317,13 +317,13 @@ struct PerThreadReadBuf {
 		bufb_.resize(max_buf);
 		reset();
 	}
-	
+
 	Read& read_a() { return bufa_[cur_buf_]; }
 	Read& read_b() { return bufb_[cur_buf_]; }
-	
+
 	const Read& read_a() const { return bufa_[cur_buf_]; }
 	const Read& read_b() const { return bufb_[cur_buf_]; }
-	
+
 	/**
 	 * Return read id for read/pair currently in the buffer.
 	 */
@@ -331,7 +331,7 @@ struct PerThreadReadBuf {
 		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
 		return rdid_ + cur_buf_;
 	}
-	
+
 	/**
 	 * Reset state as though no reads have been read.
 	 */
@@ -343,7 +343,7 @@ struct PerThreadReadBuf {
 		}
 		rdid_ = std::numeric_limits<TReadId>::max();
 	}
-	
+
 	/**
 	 * Advance cursor to next element
 	 */
@@ -351,7 +351,7 @@ struct PerThreadReadBuf {
 		assert_lt(cur_buf_, bufa_.size());
 		cur_buf_++;
 	}
-	
+
 	/**
 	 * Return true when there's nothing left to dish out.
 	 */
@@ -359,7 +359,7 @@ struct PerThreadReadBuf {
 		assert_leq(cur_buf_, bufa_.size());
 		return cur_buf_ >= bufa_.size()-1;
 	}
-	
+
 	/**
 	 * Just after a new batch has been loaded, use init to
 	 * set the cuf_buf_ and rdid_ fields appropriately.
@@ -367,7 +367,7 @@ struct PerThreadReadBuf {
 	void init() {
 		cur_buf_ = 0;
 	}
-	
+
 	/**
 	 * Set the read id of the first read in the buffer.
 	 */
@@ -375,7 +375,7 @@ struct PerThreadReadBuf {
 		rdid_ = rdid;
 		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
 	}
-	
+
 	const size_t max_buf_; // max # reads to read into buffer at once
 	vector<Read> bufa_; // Read buffer for mate as
 	vector<Read> bufb_; // Read buffer for mate bs
@@ -412,12 +412,12 @@ public:
 		PerThreadReadBuf& pt,
 		bool batch_a,
 		bool lock = true) = 0;
-	
+
 	/**
 	 * Finishes parsing a given read.  Happens outside the critical section.
 	 */
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const = 0;
-	
+
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
 
@@ -480,9 +480,9 @@ public:
 		bool color,
 		int trim3 = 0,
 		int trim5 = 0);
-	
+
 	virtual ~VectorPatternSource() { }
-	
+
 	/**
 	 * Read next batch.  However, batch concept is not very applicable for this
 	 * PatternSource where all the info has already been parsed into the fields
@@ -502,7 +502,7 @@ public:
 		cur_ = 0;
 		paired_ = false;
 	}
-	
+
 	/**
 	 * Finishes parsing outside the critical section
 	 */
@@ -590,7 +590,7 @@ public:
 		PerThreadReadBuf& pt,
 		bool batch_a,
 		bool lock);
-	
+
 	/**
 	 * Reset so that next call to nextBatch* gets the first batch.
 	 * Should only be called by the master thread.
@@ -601,7 +601,7 @@ public:
 		open();
 		filecur_++;
 	}
-	
+
 protected:
 
 	/**
@@ -617,7 +617,7 @@ protected:
 	 * Reset state to handle a fresh file
 	 */
 	virtual void resetForNextFile() { }
-	
+
 	/**
 	 * Open the next file in the list of input files.
 	 */
@@ -647,7 +647,7 @@ protected:
 		}
 		return false;
 	}
-	
+
 	vector<string> infiles_; /// filenames for read files
 	vector<string> qinfiles_; /// filenames for quality files
 	vector<bool> errs_; /// whether we've already printed an error for each file
@@ -696,7 +696,7 @@ public:
 		solexa64_(solexa64),
 		phred64_(phred64),
 		intQuals_(intQuals) { }
-	
+
 	/**
 	 * Reset so that next call to nextBatch* gets the first batch.
 	 * Should only be called by the master thread.
@@ -727,7 +727,7 @@ protected:
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
-	
+
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
@@ -735,7 +735,7 @@ protected:
 	{
 		out << ">" << name << endl << seq << endl;
 	}
-	
+
 private:
 
 	bool first_;
@@ -789,7 +789,7 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 protected:
-	
+
 	/**
 	 * Light-parse a batch of tabbed-format reads into given buffer.
 	 */
@@ -797,7 +797,7 @@ protected:
 		PerThreadReadBuf& pt,
 		bool batch_a,
 		size_t read_idx);
-	
+
 	/**
 	 * Dump a FASTQ-style record for the read.
 	 */
@@ -809,7 +809,7 @@ protected:
 		out << "@" << name << endl << seq << endl
 		    << "+" << endl << qual << endl;
 	}
-	
+
 protected:
 
 	bool color_;        // colorspace reads?
@@ -857,7 +857,7 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 protected:
-	
+
 	/**
 	 * Light-parse a batch into the given buffer.
 	 */
@@ -922,7 +922,7 @@ public:
 		intQuals_(integer_quals),
 		interleaved_(interleaved),
 		color_(color) { }
-	
+
 	virtual void reset() {
 		first_ = true;
 		CFilePatternSource::reset();
@@ -934,7 +934,7 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 protected:
-	
+
 	/**
 	 * "Light" parser.  This is inside the critical section, so the key is to do
 	 * just enough parsing so that another function downstream (finalize()) can do
@@ -1002,7 +1002,7 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 protected:
-	
+
 	/**
 	 * Light-parse a batch into the given buffer.
 	 */
@@ -1014,7 +1014,7 @@ protected:
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
-	
+
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
@@ -1022,8 +1022,8 @@ protected:
 	{
 		out << seq << endl;
 	}
-	
-	
+
+
 private:
 
 	bool first_;
@@ -1037,16 +1037,16 @@ private:
 class PatternComposer {
 public:
 	PatternComposer() { }
-	
+
 	virtual ~PatternComposer() { }
 
 	virtual void reset() = 0;
-	
+
 	/**
 	 * Member function override by concrete, format-specific classes.
 	 */
 	virtual std::pair<bool, int> nextBatch(PerThreadReadBuf& pt) = 0;
-	
+
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
@@ -1099,7 +1099,7 @@ public:
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	pair<bool, int> nextBatch(PerThreadReadBuf& pt);
-	
+
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
@@ -1161,7 +1161,7 @@ public:
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	pair<bool, int> nextBatch(PerThreadReadBuf& pt);
-	
+
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
@@ -1195,7 +1195,7 @@ public:
 		uint32_t seed) :
 		composer_(composer),
 		buf_(max_buf),
-      	last_batch_(false),
+		last_batch_(false),
 		last_batch_size_(0),
 		skip_(skip),
 		seed_(seed) { }
@@ -1210,12 +1210,12 @@ public:
 
 	Read& bufa() { return buf_.read_a(); }
 	Read& bufb() { return buf_.read_b(); }
-	
+
 	const Read& bufa() const { return buf_.read_a(); }
 	const Read& bufb() const { return buf_.read_b(); }
-	
+
 	TReadId rdid() const { return buf_.rdid(); }
-	
+
 	/**
 	 * Return true iff the read currently in the buffer is a
 	 * paired-end read.
@@ -1254,7 +1254,7 @@ private:
 	 * structs.
 	 */
 	void finalizePair(Read& ra, Read& rb);
-	
+
 	/**
 	 * Call into composition layer (which in turn calls into
 	 * format layer) to parse the read.
@@ -1266,7 +1266,7 @@ private:
 	PatternComposer& composer_; // pattern composer
 	PerThreadReadBuf buf_;    // read data buffer
 	bool last_batch_;         // true if this is final batch
-	int last_batch_size_;     // # reads read in previous batch
+	size_t last_batch_size_;  // # reads read in previous batch
 	uint32_t skip_;           // skip reads with rdids less than this
 	uint32_t seed_;           // pseudo-random seed based on read content
 };
@@ -1328,7 +1328,7 @@ public:
 	}
 
 	virtual ~PatternSourcePerThreadFactory() {}
-	
+
 private:
 	/// Container for obtaining paired reads from PatternSources
 	PatternComposer& composer_;

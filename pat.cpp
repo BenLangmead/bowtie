@@ -708,7 +708,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	_setLength(r.patFw, seqoff - trim3);
 	r.trimmed3 = trim3;
 
-	for(size_t i = 0; i < seqoff - trim3; i++) {
+	for(int i = 0; i < seqoff - trim3; i++) {
 		r.qualBuf[i] = 'I';
 	}
 	r.qualBuf[seqoff - trim3] = '\0';
@@ -886,7 +886,7 @@ bool FastaContinuousPatternSource::parse(
 	// Make fake qualities
 	assert_eq(0, seqan::length(ra.qual));
 	int qualoff = 0;
-	for(size_t i = 0; i < seqoff; i++) {
+	for(int i = 0; i < seqoff; i++) {
 		ra.qualBuf[qualoff++] = 'I';
 	}
 	ra.qualBuf[qualoff] = '\0';

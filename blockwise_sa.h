@@ -209,7 +209,7 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 			noexcept(false)
 #endif
 		{
-			if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
+			if(_dc != NULL) delete _dc; // difference cover sample
 			if (_done != NULL) {
 				delete[] _done;
 				_done = NULL;
@@ -302,7 +302,7 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 						if(_threads.size() == 0) {
 #endif
 							_done = new volatile bool[length(_sampleSuffs)+1];
-							for (int i = 0; i < length(_sampleSuffs) + 1; i++) {
+							for (size_t i = 0; i < length(_sampleSuffs) + 1; i++) {
 								_done[i] = false;
 							}
 							resize(_itrBuckets, this->_nthreads);
