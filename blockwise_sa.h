@@ -102,7 +102,7 @@ class BlockwiseSA {
 		 * returns the lexicographically-first suffix.
 		 */
 		void resetSuffixItr() {
-			clear(_itrBucket);
+			_itrBucket.clear();
 			_itrBucketPos = OFF_MASK;
 			_itrPushedBackSuffix = OFF_MASK;
 			reset();

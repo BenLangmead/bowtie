@@ -5,6 +5,7 @@
  *      Author: Ben Langmead
  */
 
+#include <climits>
 #include <iostream>
 #include <string>
 #include <stdlib.h>

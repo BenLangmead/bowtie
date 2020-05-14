@@ -2,7 +2,9 @@
 #define HIT_H_
 
 #include <algorithm>
+#include <climits>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <stdint.h>
