@@ -424,11 +424,11 @@ in repetitive regions, but the user may use the [`--pairtries`] or
 Paired-end alignments where one mate's alignment is entirely contained
 within the other's are considered invalid.
 
-When colospace alignment is enabled via [`-C`], the default setting for
+When colorspace alignment is enabled via [`-C`], the default setting for
 paired-end orientation is [`--ff`].  This is because most SOLiD datasets
 have that orientation.  When colorspace alignment is not enabled
 (default), the default setting for orientation is [`--fr`], since most
-Illumina datasets have this orientation.  The default can be overriden
+Illumina datasets have this orientation.  The default can be overridden
 in either case.
 
 Because Bowtie uses an in-memory representation of the original
@@ -558,7 +558,7 @@ The `bowtie`, `bowtie-build` and `bowtie-inspect` executables are
 actually wrapper scripts that call binary programs as appropriate. The
 wrappers shield users from having to distinguish between "small" and
 "large" index formats, discussed briefly in the following section. The
-appropiate index type is selected based on the input size.
+appropriate index type is selected based on the input size.
 
 It is recommended that you always run the bowtie wrappers and not run
 the binaries directly.
@@ -692,7 +692,7 @@ Comma-separated list of files containing a mix of unpaired and
 paired-end reads in Tab-delimited format.  Tab-delimited format is a
 1-read-per-line format where unpaired reads consist of a read name,
 sequence and quality string each separated by tabs.  A paired-end read
-consists of a read name, sequnce of the #1 mate, quality values of the
+consists of a read name, sequence of the #1 mate, quality values of the
 #1 mate, sequence of the #2 mate, and quality values of the #2 mate
 separated by tabs.  Quality values can be expressed using any of the
 scales supported in FASTQ files.  Reads may be a mix of different
@@ -1483,7 +1483,7 @@ descriptions.  This option is ignored if the output mode is
 
 </td><td>
 
-Print the full refernce sequence name, including whitespace, in
+Print the full reference sequence name, including whitespace, in
 alignment output.  By default `bowtie` prints everything up to but not
 including the first whitespace.
 
@@ -1561,7 +1561,7 @@ decoding.  This option is ignored in [`-S`/`--sam`] mode.
 
 </td><td>
 
-When decoding colorpsace alignments, `bowtie` trims off a nucleotide
+When decoding colorspace alignments, `bowtie` trims off a nucleotide
 and quality from the left and right edges of the alignment.  This is
 because those nucleotides are supported by only one color, in contrast
 to the middle nucleotides which are supported by two.  Specify
@@ -1727,7 +1727,7 @@ memory permanently, or until the user deletes the shared memory chunks
 manually.  See your operating system documentation for details on how
 to manually list and remove shared memory chunks (on Linux and Mac OS
 X, these commands are `ipcs` and `ipcrm`).  You may also need to
-increase your OS's maximum shared-memory chunk size to accomodate
+increase your OS's maximum shared-memory chunk size to accommodate
 larger indexes; see your OS documentation.
 
 </td></tr></table>
@@ -1846,7 +1846,7 @@ When [`-S`/`--sam`] is specified, `bowtie` prints a SAM header with
 are specified, `bowtie` will also print an `@RG` line that includes all
 user-specified [`--sam-RG`] tokens separated by tabs.
 
-Each subsequnt line corresponds to a read or an alignment.  Each line
+Each subsequent line corresponds to a read or an alignment.  Each line
 is a collection of at least 12 fields separated by tabs; from left to
 right, the fields are:
 
@@ -2007,7 +2007,7 @@ Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
 For a read with no reported alignments, `<N>` is 0 if the read had
 no alignments.  If [`-m`] was specified and the read's alignments
-were supressed because the [`-m`] ceiling was exceeded, `<N>` equals
+were suppressed because the [`-m`] ceiling was exceeded, `<N>` equals
 the [`-m`] ceiling + 1, to indicate that there were at least that
 many valid alignments (but all were suppressed).  In [`-M`] mode, if
 the alignment was randomly selected because the [`-M`] ceiling was

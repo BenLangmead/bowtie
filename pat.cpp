@@ -1274,6 +1274,7 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf.append(c);
 			c = getc_wrapper();
 		}
+
 	}
 	while (readi > 0 && readbuf[readi-1].readOrigBuf.length() == 0)
 		readi--;

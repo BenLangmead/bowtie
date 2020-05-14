@@ -22,8 +22,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 5:
         num_refs = int(sys.argv[5])
     with open(tmp_fasta, 'w') as fh:
-        for i in xrange(num_refs):
+        for i in range(num_refs):
             gen_genome(fh, 'ref%d' % i, tot_len // num_refs)
     ret = os.system('%s %s %s' % (bt2_build_exe, tmp_fasta, tmp_idx))
-    print >> sys.stderr, "Exitlevel: %d" % ret
+    print("Exitlevel: %d" % ret, file=sys.stderr)
     exit(ret)

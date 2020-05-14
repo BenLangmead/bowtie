@@ -1049,7 +1049,7 @@ private:
 	PatternComposer& composer_; // pattern composer
 	PerThreadReadBuf buf_;    // read data buffer
 	bool last_batch_;         // true if this is final batch
-	int last_batch_size_;     // # reads read in previous batch
+	size_t last_batch_size_;  // # reads read in previous batch
 	uint32_t skip_;           // skip reads with rdids less than this
 	uint32_t seed_;           // pseudo-random seed based on read content
 };
