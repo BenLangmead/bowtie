@@ -808,7 +808,7 @@ bool FastaContinuousPatternSource::parse(
 	assert(ra.empty());
 	assert(rb.empty());
 	assert(!ra.readOrigBuf.empty()); // raw data for read/pair is here
-	assert(rb.readOrigBuf.length());
+	assert(!rb.readOrigBuf.empty());
 	int c = '\t';
 	size_t cur = 0;
 	const size_t buflen = ra.readOrigBuf.length();
@@ -826,7 +826,7 @@ bool FastaContinuousPatternSource::parse(
 	}
 
 	// Parse sequence
-	assert(ra.patFw.length());
+	assert(ra.patFw.empty());
 	int nchar = 0;
 	while(cur < buflen) {
 		c = ra.readOrigBuf[cur++];
