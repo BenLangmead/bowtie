@@ -2,12 +2,17 @@
 #define REFERENCE_H_
 
 #include <stdexcept>
+#include <vector>
+
+#include "btypes.h"
 #include "endian_swap.h"
 #include "mm.h"
+#include "ref_read.h"
 #include "shmem.h"
+#include "sequence_io.h"
 #include "timer.h"
-#include "btypes.h"
-
+#include "word_io.h"
+#include "sstring.h"
 
 /**
  * Concrete reference representation that bulk-loads the reference from
@@ -37,7 +42,7 @@ public:
 	                 bool color,
 	                 bool sanity,
 	                 std::vector<string>* infiles,
-	                 std::vector<String<Dna5> >* origs,
+	                 std::vector<BTRefString >* origs,
 	                 bool infilesSeq,
 	                 bool loadSequence, // as opposed to just records
 	                 bool useMm,
@@ -318,8 +323,8 @@ public:
 		if(sanity_) {
 			// Compare the sequence we just read from the compact index
 			// file to the true reference sequence.
-			std::vector<seqan::String<seqan::Dna5> > *os; // for holding references
-			std::vector<seqan::String<seqan::Dna5> > osv; // for holding references
+			std::vector<BTRefString > *os; // for holding references
+			std::vector<BTRefString > osv; // for holding references
 			if(infiles != NULL) {
 				if(infilesSeq) {
 					for(size_t i = 0; i < infiles->size(); i++) {
@@ -330,10 +335,10 @@ public:
 						if((*infiles)[i].at(0) == '\\') {
 							(*infiles)[i].erase(0, 1);
 						}
-						osv.push_back(String<Dna5>((*infiles)[i]));
+						osv.push_back(BTRefString((*infiles)[i].c_str()));
 					}
 				} else {
-					readSequenceFiles<seqan::String<seqan::Dna5>, seqan::Fasta>(*infiles, osv);
+					readSequenceFiles(*infiles, osv);
 				}
 				os = &osv;
 			} else {
@@ -367,7 +372,7 @@ public:
 			int longestStretch = 0;
 			int curStretch = 0;
 			for(size_t i = 0; i < os->size(); i++) {
-				size_t olen = seqan::length((*os)[i]);
+				size_t olen = (*os)[i].length();
 				for(size_t j = 0; j < olen; j++) {
 					if((int)(*os)[i][j] < 4) {
 						curStretch++;

@@ -1,16 +1,14 @@
 #include "ebwt_search_util.h"
-#include "seqan/file.h"
 
 using namespace std;
-using namespace seqan;
 
 /**
  * Print a hit along with information about the backtracking
  * regions constraining the hit.
  */
-void printHit(const vector<String<Dna5> >& os,
+void printHit(const vector<BTRefString >& os,
               const Hit& h,
-              const String<Dna5>& qry,
+              const BTDnaString& qry,
               size_t qlen,
               uint32_t unrevOff,
               uint32_t oneRevOff,

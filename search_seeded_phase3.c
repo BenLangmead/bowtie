@@ -31,7 +31,7 @@
 				btr3.setOffs(0, 0, s, s, s, s);
 			}
 			for(size_t i = 0; i < pals.size(); i++) {
-				seqan::clear(muts);
+                                muts.clear();
 				uint8_t oldQuals =
 					PartialAlignmentManager::toMutsString(
 						pals[i], patRc, qualRev, muts, !noMaqRound);
@@ -39,7 +39,7 @@
 				// Set the backtracking thresholds appropriately
 				// Now begin the backtracking, treating the first
 				// 24 bases as unrevisitable
-				ASSERT_ONLY(String<Dna5> tmp = patRc);
+				ASSERT_ONLY(BTDnaString tmp = patRc);
 				btr3.setMuts(&muts);
 				done = btr3.backtrack(oldQuals);
 				btr3.setMuts(NULL);
@@ -54,7 +54,7 @@
 				}
 			} // Loop over partial alignments
 		}
-		seqan::clear(muts);
+                muts.clear();
 		// Case 4R yielded a hit continue to next pattern
 		if(done) continue;
 		// If we're in two-mismatch mode, then now is the time to

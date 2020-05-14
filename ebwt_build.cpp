@@ -2,9 +2,6 @@
 #include <fstream>
 #include <string>
 #include <cassert>
-#include <seqan/index.h>
-#include <seqan/sequence.h>
-#include <seqan/file.h>
 #include <getopt.h>
 #include "assert_helpers.h"
 #include "endian_swap.h"
@@ -16,6 +13,7 @@
 #include "ref_read.h"
 #include "filebuf.h"
 #include "reference.h"
+#include "sstring.h"
 
 /**
  * \file Driver for the bowtie-build indexing tool.
@@ -65,7 +63,7 @@ static void resetOptions() {
 	showVersion  = 0;     // just print version and quit?
 	doubleEbwt   = true;  // build forward and reverse Ebwts
 	//   Ebwt parameters
-	lineRate     = Ebwt<String<Dna> >::default_lineRate;  // a "line" is 64 bytes
+	lineRate     = Ebwt::default_lineRate;  // a "line" is 64 bytes
 	linesPerSide = 1;  // 1 64-byte line on a side
 	offRate      = 5;  // sample 1 out of 32 SA elts
 	ftabChars    = 10; // 10 chars in initial lookup table
@@ -458,32 +456,34 @@ static void driver(const string& infile,
 	assert_gt(sztot.second, 0);
 	assert_gt(szs.size(), 0);
 	// Construct Ebwt from input strings and parameters
-	Ebwt<TStr> ebwt(refparams.color ? 1 : 0,
-	                lineRate,
-	                linesPerSide,
-	                offRate,      // suffix-array sampling rate
-	                -1,           // ISA sampling rate
-	                ftabChars,    // number of chars in initial arrow-pair calc
-			nthreads,
-	                outfile,      // basename for .?.ebwt files
-	                !reverse,     // fw
-	                !entireSA,    // useBlockwise
-	                bmax,         // block size for blockwise SA builder
-	                bmaxMultSqrt, // block size as multiplier of sqrt(len)
-	                bmaxDivN,     // block size as divisor of len
-	                noDc? 0 : dcv,// difference-cover period
-	                is,           // list of input streams
-	                szs,          // list of reference sizes
-	                plens,        // list of not-all-gap reference sequence lengths
-	                (TIndexOffU)sztot.first,  // total size of all unambiguous ref chars
-	                refparams,    // reference read-in parameters
-	                seed,         // pseudo-random number generator seed
-	                -1,           // override offRate
-	                -1,           // override isaRate
-	                verbose,      // be talkative
-	                autoMem,      // pass exceptions up to the toplevel so that we can adjust memory settings automatically
-	                sanityCheck,  // verify results and internal consistency
-	                false);       // are we building a bt2 index?
+	Ebwt ebwt(TStr(),
+		  packed,
+		  refparams.color ? 1 : 0,
+		  lineRate,
+		  linesPerSide,
+		  offRate,      // suffix-array sampling rate
+		  -1,           // ISA sampling rate
+		  ftabChars,    // number of chars in initial arrow-pair calc
+		  nthreads,
+		  outfile,      // basename for .?.ebwt files
+		  !reverse,     // fw
+		  !entireSA,    // useBlockwise
+		  bmax,         // block size for blockwise SA builder
+		  bmaxMultSqrt, // block size as multiplier of sqrt(len)
+		  bmaxDivN,     // block size as divisor of len
+		  noDc? 0 : dcv,// difference-cover period
+		  is,           // list of input streams
+		  szs,          // list of reference sizes
+		  plens,        // list of not-all-gap reference sequence lengths
+		  (TIndexOffU)sztot.first,  // total size of all unambiguous ref chars
+		  refparams,    // reference read-in parameters
+		  seed,         // pseudo-random number generator seed
+		  -1,           // override offRate
+		  -1,           // override isaRate
+		  verbose,      // be talkative
+		  autoMem,      // pass exceptions up to the toplevel so that we can adjust memory settings automatically
+		  sanityCheck,  // verify results and internal consistency
+		  false);       // are we building a bt2 index?
 	// Note that the Ebwt is *not* resident in memory at this time.  To
 	// load it into memory, call ebwt.loadIntoMemory()
 	if(verbose) {
@@ -499,26 +499,26 @@ static void driver(const string& infile,
 			-1,
 			false,
 			false);
-		TStr s2; ebwt.restore(s2);
+		BTRefString s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(
+			BTRefString joinedss = Ebwt::join<BTRefString >(
 				is,          // list of input streams
 				szs,         // list of reference sizes
 				(TIndexOffU)sztot.first, // total size of all unambiguous ref chars
 				refparams,   // reference read-in parameters
 				seed);       // pseudo-random number generator seed
 			if(refparams.reverse == REF_READ_REVERSE) {
-				reverseInPlace(joinedss);
+				joinedss.reverse();
 			}
-			assert_eq(length(joinedss), length(s2));
-			assert_eq(joinedss, s2);
+			assert_eq(joinedss.length(), s2.length());
+			assert(sstr_eq(joinedss, s2));
 		}
 		if(verbose) {
-			if(length(s2) < 1000) {
-				cout << "Passed restore check: " << s2 << endl;
+			if(s2.length() < 1000) {
+				cout << "Passed restore check: " << s2.toZBuf() << endl;
 			} else {
-				cout << "Passed restore check: (" << length(s2) << " chars)" << endl;
+				cout << "Passed restore check: (" << s2.length() << " chars)" << endl;
 			}
 		}
 	}
@@ -633,7 +633,7 @@ extern "C" {
 			Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
 			if(!packed) {
 				try {
-					driver<String<Dna, Alloc<> > >(infile, infiles, outfile);
+					driver<BTRefString >(infile, infiles, outfile);
 				} catch(bad_alloc& e) {
 					if(autoMem) {
 						cerr << "Switching to a packed string representation." << endl;
@@ -644,7 +644,7 @@ extern "C" {
 				}
 			}
 			if(packed) {
-				driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile);
+				driver<S2bDnaString>(infile, infiles, outfile);
 			}
 		}
 		if(doubleEbwt) {
@@ -652,7 +652,7 @@ extern "C" {
 			Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
 			if(!packed) {
 				try {
-					driver<String<Dna, Alloc<> > >(infile, infiles, outfile + ".rev", true);
+					driver<BTRefString >(infile, infiles, outfile + ".rev", true);
 				} catch(bad_alloc& e) {
 					if(autoMem) {
 						cerr << "Switching to a packed string representation." << endl;
@@ -663,7 +663,7 @@ extern "C" {
 				}
 			}
 			if(packed) {
-				driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile + ".rev", true);
+				driver<S2bDnaString>(infile, infiles, outfile + ".rev", true);
 			}
 		}
 		return 0;

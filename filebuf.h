@@ -1,20 +1,37 @@
 /*
- * filebuf.h
+ * Copyright 2011, Ben Langmead <langmea@cs.jhu.edu>
  *
- *      Author: Ben Langmead
+ * This file is part of Bowtie 2.
+ *
+ * Bowtie 2 is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Bowtie 2 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Bowtie 2.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef FILEBUF_H_
 #define FILEBUF_H_
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdexcept>
+#include <errno.h>
 #include <fcntl.h>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string>
 #include <zlib.h>
+
 #include "assert_helpers.h"
 
 /**
@@ -33,14 +50,17 @@ static inline bool isspace_notnl(int c) {
 }
 
 /**
- * Simple wrapper for a FILE*, istream or ifstream that reads it in
- * chunks (with fread) and keeps those chunks in a buffer.  It also
- * services calls to get(), peek() and gets() from the buffer, reading
- * in additional chunks when necessary.
+ * Simple wrapper for a FILE*, istream or ifstream that reads it in chunks
+ * using fread and keeps those chunks in a buffer.  It also services calls to
+ * get(), peek() and gets() from the buffer, reading in additional chunks when
+ * necessary.
+ *
+ * Helper functions do things like parse strings, numbers, and FASTA records.
+ *
+ *
  */
 class FileBuf {
 public:
-
 	FileBuf() {
 		init();
 	}
@@ -69,6 +89,11 @@ public:
 		assert(_ins != NULL);
 	}
 
+
+	~FileBuf() {
+		close();
+	}
+
 	/**
 	 * Return true iff there is a stream ready to read.
 	 */
@@ -86,7 +111,7 @@ public:
 			_inf->close();
 		} else if(_zIn != NULL) {
 			gzclose(_zIn);
-		}  else {
+		} else {
 			// can't close _ins
 		}
 	}
@@ -116,6 +141,7 @@ public:
 	 */
 	void newFile(FILE *in) {
 		_in = in;
+		_zIn = NULL;
 		_inf = NULL;
 		_ins = NULL;
 		_cur = BUF_SZ;
@@ -141,6 +167,7 @@ public:
 	 */
 	void newFile(std::ifstream *__inf) {
 		_in = NULL;
+		_zIn = NULL;
 		_inf = __inf;
 		_ins = NULL;
 		_cur = BUF_SZ;
@@ -153,6 +180,7 @@ public:
 	 */
 	void newFile(std::istream *__ins) {
 		_in = NULL;
+		_zIn = NULL;
 		_inf = NULL;
 		_ins = __ins;
 		_cur = BUF_SZ;
@@ -200,7 +228,7 @@ public:
 				if(_inf != NULL) {
 					_inf->read((char*)_buf, BUF_SZ);
 					_buf_sz = _inf->gcount();
-				} else if (_zIn != NULL) {
+				} else if(_zIn != NULL) {
 					_buf_sz = gzread(_zIn, (void *)_buf, BUF_SZ);
 				} else if(_ins != NULL) {
 					_ins->read((char*)_buf, BUF_SZ);
@@ -328,7 +356,84 @@ public:
 		return c;
 	}
 
-	size_t lastNCur() const { return _lastn_cur; }
+	/**
+	 * Parse a FASTA record.  Append name characters to 'name' and and append
+	 * all sequence characters to 'seq'.  If gotCaret is true, assuming the
+	 * file cursor has already moved just past the starting '>' character.
+	 */
+	template <typename TNameStr, typename TSeqStr>
+	void parseFastaRecord(
+		TNameStr& name,
+		TSeqStr&  seq,
+		bool      gotCaret = false)
+	{
+		int c;
+		if(!gotCaret) {
+			// Skip over caret and non-newline whitespace
+			c = peek();
+			while(isspace_notnl(c) || c == '>') { get(); c = peek(); }
+		} else {
+			// Skip over non-newline whitespace
+			c = peek();
+			while(isspace_notnl(c)) { get(); c = peek(); }
+		}
+		size_t namecur = 0, seqcur = 0;
+		// c is the first character of the fasta name record, or is the first
+		// newline character if the name record is empty
+		while(!isnewline(c) && c != -1) {
+			name[namecur++] = c; get(); c = peek();
+		}
+		// sequence consists of all the non-whitespace characters between here
+		// and the next caret
+		while(true) {
+			// skip over whitespace
+			while(isspace(c)) { get(); c = peek(); }
+			// if we see caret or EOF, break
+			if(c == '>' || c == -1) break;
+			// append and continue
+			seq[seqcur++] = c;
+			get(); c = peek();
+		}
+	}
+
+	/**
+	 * Parse a FASTA record and return its length.  If gotCaret is true,
+	 * assuming the file cursor has already moved just past the starting '>'
+	 * character.
+	 */
+	void parseFastaRecordLength(
+		size_t&   nameLen,
+		size_t&   seqLen,
+		bool      gotCaret = false)
+	{
+		int c;
+		nameLen = seqLen = 0;
+		if(!gotCaret) {
+			// Skip over caret and non-newline whitespace
+			c = peek();
+			while(isspace_notnl(c) || c == '>') { get(); c = peek(); }
+		} else {
+			// Skip over non-newline whitespace
+			c = peek();
+			while(isspace_notnl(c)) { get(); c = peek(); }
+		}
+		// c is the first character of the fasta name record, or is the first
+		// newline character if the name record is empty
+		while(!isnewline(c) && c != -1) {
+			nameLen++; get(); c = peek();
+		}
+		// sequence consists of all the non-whitespace characters between here
+		// and the next caret
+		while(true) {
+			// skip over whitespace
+			while(isspace(c)) { get(); c = peek(); }
+			// if we see caret or EOF, break
+			if(c == '>' || c == -1) break;
+			// append and continue
+			seqLen++;
+			get(); c = peek();
+		}
+	}
 
 	/**
 	 * Reset to the beginning of the last-N-chars buffer.
@@ -494,8 +599,6 @@ class OutFileBuf {
 
 public:
 
-    static const size_t BUF_SZ = 16 * 1024;
-
 	/**
 	 * Open a new output stream to a file with given name.
 	 */
@@ -507,7 +610,7 @@ public:
 			std::cerr << "Error: Could not open alignment output file " << out.c_str() << std::endl;
 			throw 1;
 		}
-		if(setvbuf(out_, NULL, _IOFBF, 10* 1024* 1024))
+		if(setvbuf(out_, NULL, _IOFBF, 10* 1024* 1024)) 
 			std::cerr << "Warning: Could not allocate the proper buffer size for output file stream. " << std::endl;
 	}
 
@@ -523,8 +626,6 @@ public:
 			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
 			throw 1;
 		}
-		if(setvbuf(out_, NULL, _IOFBF, 10* 1024* 1024)) 
-			std::cerr << "Warning: Could not allocate the proper buffer size for output file stream. " << std::endl;
 	}
 
 	/**
@@ -571,11 +672,8 @@ public:
 		if(cur_ + slen > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(slen >= BUF_SZ) {
-				size_t wlen = fwrite(s.c_str(), 1, slen, out_);
-				if(wlen != slen) {
-					std::cerr << "Error while writing string output; " << slen
-							  << " characters in string, " << wlen
-							  << " written" << std::endl;
+				if (slen != fwrite(s.c_str(), 1, slen, out_)) {
+					std::cerr << "Error: outputting data" << std::endl;
 					throw 1;
 				}
 			} else {
@@ -594,17 +692,16 @@ public:
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
 	template<typename T>
-	size_t writeString(const T& s) {
+	void writeString(const T& s) {
 		assert(!closed_);
 		size_t slen = s.length();
-		size_t bytes_written = 0;
 		if(cur_ + slen > BUF_SZ) {
-			if(cur_ > 0) {
-				flush();
-				bytes_written += cur_;;
-			}
+			if(cur_ > 0) flush();
 			if(slen >= BUF_SZ) {
-				fwrite(s.toZBuf(), slen, 1, out_);
+				if (slen != fwrite(s.toZBuf(), 1, slen, out_)) {
+					std::cerr << "Error outputting data" << std::endl;
+					throw 1;
+				}
 			} else {
 				memcpy(&buf_[cur_], s.toZBuf(), slen);
 				assert_eq(0, cur_);
@@ -614,9 +711,7 @@ public:
 			memcpy(&buf_[cur_], s.toZBuf(), slen);
 			cur_ += slen;
 		}
-		bytes_written += slen;
 		assert_leq(cur_, BUF_SZ);
-		return bytes_written;
 	}
 
 	/**
@@ -627,11 +722,8 @@ public:
 		if(cur_ + len > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(len >= BUF_SZ) {
-				size_t wlen = fwrite(s, 1, len, out_);
-				if(wlen != len) {
-					std::cerr << "Error while writing string output; " << len
-							  << " characters in string, " << wlen
-							  << " written" << std::endl;
+				if (fwrite(s, len, 1, out_) != 1) {
+					std::cerr << "Error outputting data" << std::endl;
 					throw 1;
 				}
 			} else {
@@ -675,6 +767,9 @@ public:
 
 	void flush() {
 		if(cur_ != fwrite((const void *)buf_, 1, cur_, out_)) {
+			if (errno == EPIPE) {
+				exit(EXIT_SUCCESS);
+			}
 			std::cerr << "Error while flushing and closing output" << std::endl;
 			throw 1;
 		}
@@ -697,9 +792,11 @@ public:
 
 private:
 
+	static const size_t BUF_SZ = 16 * 1024;
+
 	const char *name_;
 	FILE       *out_;
-	size_t    cur_;
+	size_t      cur_;
 	char        buf_[BUF_SZ]; // (large) input buffer
 	bool        closed_;
 };

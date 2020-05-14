@@ -1,31 +1,31 @@
 #ifndef HIT_H_
 #define HIT_H_
 
-#include <vector>
-#include <stdint.h>
-#include <iostream>
+#include <algorithm>
 #include <fstream>
-#include <string>
+#include <iostream>
 #include <stdexcept>
-#include <seqan/sequence.h>
+#include <stdint.h>
+#include <string>
+#include <vector>
+
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "threading.h"
 #include "bitset.h"
-#include "tokenize.h"
-#include "pat.h"
-#include "formats.h"
-#include "filebuf.h"
 #include "edit.h"
+#include "filebuf.h"
+#include "formats.h"
+#include "hit_set.h"
+#include "pat.h"
 #include "sstring.h"
-#include <algorithm>
+#include "threading.h"
+#include "tokenize.h"
 
 /**
  * Classes for dealing with reporting alignments.
  */
 
 using namespace std;
-using namespace seqan;
 
 /// Constants for the various output modes
 enum output_types {
@@ -58,11 +58,11 @@ public:
 	UPair             h;       /// reference index & offset
 	UPair             mh;      /// reference index & offset for mate
 	uint32_t            patId;   /// read index
-	String<char>        patName; /// read name
-	String<Dna5>        patSeq;  /// read sequence
-	String<Dna5>        colSeq;  /// original color sequence, not decoded
-	String<char>        quals;   /// read qualities
-	String<char>        colQuals;/// original color qualities, not decoded
+	BTString            patName; /// read name
+	BTDnaString         patSeq;  /// read sequence
+	BTDnaString         colSeq;  /// original color sequence, not decoded
+	BTString            quals;   /// read qualities
+	BTString            colQuals;/// original color qualities, not decoded
 	FixedBitset<1024>   mms;     /// nucleotide mismatch mask
 	FixedBitset<1024>   cmms;    /// color mismatch mask (if relevant)
 	vector<char>        refcs;   /// reference characters for mms
@@ -90,7 +90,7 @@ public:
 		return true;
 	}
 
-	size_t length() const { return seqan::length(patSeq); }
+	size_t length() const { return patSeq.length(); }
 
 	Hit& operator = (const Hit &other) {
 		this->h       = other.h;
@@ -377,18 +377,10 @@ public:
 			if(!dumpAlBase_.empty()) {
 				ThreadSafe _ts(&dumpAlignLock_);
 				if(dumpAl_ == NULL) {
-					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
 					assert(dumpAl_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpAlQv_ = openOf(dumpAlBase_ + ".qual", 0, "");
-						assert(dumpAlQv_ != NULL);
-					}
 				}
-				dumpAl_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				if(dumpAlQv_ != NULL) {
-					dumpAlQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-				}
+				*dumpAl_ << p.bufa().readOrigBuf;
 			}
 		} else {
 			// Dump paired-end read to an aligned-read file (or pair of
@@ -396,25 +388,13 @@ public:
 			if(!dumpAlBase_.empty()) {
 				ThreadSafe _ts(&dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
-					assert(dumpAlQv_1_ == NULL);
-					assert(dumpAlQv_2_ == NULL);
 					dumpAl_1_ = openOf(dumpAlBase_, 1, "");
 					dumpAl_2_ = openOf(dumpAlBase_, 2, "");
 					assert(dumpAl_1_ != NULL);
 					assert(dumpAl_2_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpAlQv_1_ = openOf(dumpAlBase_ + ".qual", 1, "");
-						dumpAlQv_2_ = openOf(dumpAlBase_ + ".qual", 2, "");
-						assert(dumpAlQv_1_ != NULL);
-						assert(dumpAlQv_2_ != NULL);
-					}
 				}
-				dumpAl_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				dumpAl_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
-				if(dumpAlQv_1_ != NULL) {
-					dumpAlQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-					dumpAlQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
-				}
+				*dumpAl_1_ << p.bufa().readOrigBuf;
+				*dumpAl_2_ << p.bufb().readOrigBuf;
 			}
 		}
 	}
@@ -432,20 +412,10 @@ public:
 			if(!dumpUnalBase_.empty()) {
 				ThreadSafe _ts(&dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
-					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
 					assert(dumpUnal_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpUnalQv_ = openOf(dumpUnalBase_ + ".qual", 0, "");
-						assert(dumpUnalQv_ != NULL);
-					}
 				}
-				dumpUnal_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				dumpUnal_->put('\n');
-				if(dumpUnalQv_ != NULL) {
-					dumpUnalQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-					dumpUnal_->put('\n');
-				}
+				*dumpUnal_ << p.bufa().readOrigBuf;
 			}
 		} else {
 			// Dump paired-end read to an unaligned-read file (or pair
@@ -459,21 +429,9 @@ public:
 					dumpUnal_2_ = openOf(dumpUnalBase_, 2, "");
 					assert(dumpUnal_1_ != NULL);
 					assert(dumpUnal_2_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpUnalQv_1_ = openOf(dumpUnalBase_ + ".qual", 1, "");
-						dumpUnalQv_2_ = openOf(dumpUnalBase_ + ".qual", 2, "");
-					}
 				}
-				dumpUnal_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				dumpUnal_1_->put('\n');
-				dumpUnal_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
-				dumpUnal_2_->put('\n');
-				if(dumpUnalQv_1_ != NULL) {
-					dumpUnalQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-					dumpUnalQv_1_->put('\n');
-					dumpUnalQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
-					dumpUnalQv_2_->put('\n');
-				}
+				*dumpUnal_1_ << p.bufa().readOrigBuf;
+				*dumpUnal_2_ << p.bufb().readOrigBuf;
 			}
 		}
 	}
@@ -496,16 +454,8 @@ public:
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpMaxQv_ = openOf(dumpMaxBase_ + ".qual", 0, "");
-					}
 				}
-				dumpMax_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				dumpMax_->put('\n');
-				if(dumpMaxQv_ != NULL) {
-					dumpMaxQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-					dumpMaxQv_->put('\n');
-				}
+				*dumpMax_ << p.bufa().readOrigBuf.toZBuf();
 			}
 		} else {
 			// Dump paired-end read to a maxed-out-read file (or pair
@@ -513,27 +463,13 @@ public:
 			if(!dumpMaxBase_.empty()) {
 				ThreadSafe _ts(&dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
-					assert(dumpMaxQv_1_ == NULL);
-					assert(dumpMaxQv_2_ == NULL);
 					dumpMax_1_ = openOf(dumpMaxBase_, 1, "");
 					dumpMax_2_ = openOf(dumpMaxBase_, 2, "");
 					assert(dumpMax_1_ != NULL);
 					assert(dumpMax_2_ != NULL);
-					if(p.bufa().qualOrigBufLen > 0) {
-						dumpMaxQv_1_ = openOf(dumpMaxBase_ + ".qual", 1, "");
-						dumpMaxQv_2_ = openOf(dumpMaxBase_ + ".qual", 2, "");
-					}
 				}
-				dumpMax_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
-				dumpMax_1_->put('\n');
-				dumpMax_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
-				dumpMax_2_->put('\n');
-				if(dumpMaxQv_1_ != NULL) {
-					dumpMaxQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
-					dumpMaxQv_1_->put('\n');
-					dumpMaxQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
-					dumpMaxQv_2_->put('\n');
-				}
+				*dumpMax_1_ << p.bufa().readOrigBuf;
+				*dumpMax_2_ << p.bufb().readOrigBuf;
 			}
 		}
 	}
@@ -631,17 +567,6 @@ protected:
 	std::ofstream *dumpMax_1_;    // for first mates
 	std::ofstream *dumpMax_2_;    // for second mates
 
-	// Output streams for dumping qualities
-	std::ofstream *dumpAlQv_;     // for single-ended reads
-	std::ofstream *dumpAlQv_1_;   // for first mates
-	std::ofstream *dumpAlQv_2_;   // for second mates
-	std::ofstream *dumpUnalQv_;   // for single-ended reads
-	std::ofstream *dumpUnalQv_1_; // for first mates
-	std::ofstream *dumpUnalQv_2_; // for second mates
-	std::ofstream *dumpMaxQv_;    // for single-ended reads
-	std::ofstream *dumpMaxQv_1_;  // for first mates
-	std::ofstream *dumpMaxQv_2_;  // for second mates
-
 	/**
 	 * Open an ofstream with given name; output error message and quit
 	 * if it fails.
@@ -686,9 +611,6 @@ protected:
 		dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
 		dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
 		dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
-		dumpAlQv_     = dumpAlQv_1_   = dumpAlQv_2_   = NULL;
-		dumpUnalQv_   = dumpUnalQv_1_ = dumpUnalQv_2_ = NULL;
-		dumpMaxQv_    = dumpMaxQv_1_  = dumpMaxQv_2_  = NULL;
 		dumpAlignFlag_   = !dumpAlBase_.empty();
 		dumpUnalignFlag_ = !dumpUnalBase_.empty();
 		dumpMaxedFlag_   = !dumpMaxBase_.empty();
@@ -704,15 +626,6 @@ protected:
 		if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
 		if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
 		if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
-		if(dumpAlQv_     != NULL) { dumpAlQv_->close();     delete dumpAlQv_; }
-		if(dumpAlQv_1_   != NULL) { dumpAlQv_1_->close();   delete dumpAlQv_1_; }
-		if(dumpAlQv_2_   != NULL) { dumpAlQv_2_->close();   delete dumpAlQv_2_; }
-		if(dumpUnalQv_   != NULL) { dumpUnalQv_->close();   delete dumpUnalQv_; }
-		if(dumpUnalQv_1_ != NULL) { dumpUnalQv_1_->close(); delete dumpUnalQv_1_; }
-		if(dumpUnalQv_2_ != NULL) { dumpUnalQv_2_->close(); delete dumpUnalQv_2_; }
-		if(dumpMaxQv_    != NULL) { dumpMaxQv_->close();    delete dumpMaxQv_; }
-		if(dumpMaxQv_1_  != NULL) { dumpMaxQv_1_->close();  delete dumpMaxQv_1_; }
-		if(dumpMaxQv_2_  != NULL) { dumpMaxQv_2_->close();  delete dumpMaxQv_2_; }
 	}
 
 	// Locks for dumping

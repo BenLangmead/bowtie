@@ -10,17 +10,19 @@
 #include <iostream>
 #include <set>
 #include <stdint.h>
-#include "seqan/sequence.h"
+#include <vector>
+
+#include "aligner_metrics.h"
 #include "assert_helpers.h"
 #include "ebwt.h"
 #include "pat.h"
 #include "range.h"
-#include "range_source.h"
 #include "range_chaser.h"
+#include "range_source.h"
 #include "ref_aligner.h"
 #include "reference.h"
-#include "aligner_metrics.h"
 #include "search_globals.h"
+#include "sstring.h"
 
 #ifdef PER_THREAD_TIMING
 /// Based on http://stackoverflow.com/questions/16862620/numa-get-current-node-core
@@ -242,10 +244,10 @@ public:
 #ifdef PER_THREAD_TIMING
 		uint64_t ncpu_changeovers = 0;
 		uint64_t nnuma_changeovers = 0;
-		
+
 		int current_cpu = 0, current_node = 0;
 		get_cpu_and_node(current_cpu, current_node);
-	
+
 		std::stringstream ss;
 		std::string msg;
 		ss << "thread: " << tid << " time: ";
@@ -379,13 +381,13 @@ class UnpairedAlignerV2 : public Aligner {
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 public:
 	UnpairedAlignerV2(
-		EbwtSearchParams<String<Dna> >* params,
+		EbwtSearchParams* params,
 		TDriver* driver,
-		RangeChaser<String<Dna> >* rchase,
+		RangeChaser* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
-		vector<String<Dna5> >& os,
+		vector<BTRefString >& os, // TODO: remove this, not used
 		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
@@ -585,10 +587,10 @@ protected:
 	HitSinkPerThread* sinkPt_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> >* params_;
+	EbwtSearchParams* params_;
 
 	// State for getting alignments from ranges statefully
-	RangeChaser<String<Dna> >* rchase_;
+	RangeChaser* rchase_;
 
 	// Range-finding state
 	TDriver* driver_;
@@ -618,11 +620,11 @@ class PairedBWAlignerV1 : public Aligner {
 
 public:
 	PairedBWAlignerV1(
-		EbwtSearchParams<String<Dna> >* params,
+		EbwtSearchParams* params,
 		TDriver* driver1Fw, TDriver* driver1Rc,
 		TDriver* driver2Fw, TDriver* driver2Rc,
-		RefAligner<String<Dna5> >* refAligner,
-		RangeChaser<String<Dna> >* rchase,
+		RefAligner* refAligner,
+		RangeChaser* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
@@ -982,17 +984,17 @@ protected:
 		if(doneFw_) fw = !fw;
 		// 'seq' gets sequence of outstanding mate w/r/t the forward
 		// reference strand
-		const String<Dna5>& seq  = fw ? (off1 ? patsrc_->bufb().patFw   :
+		const BTDnaString& seq  = fw ? (off1 ? patsrc_->bufb().patFw   :
 		                                        patsrc_->bufa().patFw)  :
 		                                (off1 ? patsrc_->bufb().patRc   :
 		                                        patsrc_->bufa().patRc);
 		// 'seq' gets qualities of outstanding mate w/r/t the forward
 		// reference strand
-		const String<char>& qual = fw ? (off1 ? patsrc_->bufb().qual  :
+		const BTString& qual = fw ? (off1 ? patsrc_->bufb().qual  :
 		                                        patsrc_->bufa().qual) :
 		                                (off1 ? patsrc_->bufb().qualRev  :
 		                                        patsrc_->bufa().qualRev);
-		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seq.length();  // length of outstanding mate
 		uint32_t alen = (off1 ? patsrc_->bufa().length() :
 		                        patsrc_->bufb().length());
 		int minins = minInsert_;
@@ -1364,14 +1366,14 @@ protected:
 	bool delayedChase2Rc_;
 
 	// For searching for outstanding mates
-	RefAligner<String<Dna5> >* refAligner_;
+	RefAligner* refAligner_;
 
 	// Temporary HitSink; to be deleted
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	HitSinkPerThread* sinkPt_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> >* params_;
+	EbwtSearchParams* params_;
 
 	// Paired-end boundaries
 	const uint32_t minInsert_;
@@ -1397,7 +1399,7 @@ protected:
 	const bool fw2_;
 
 	// State for getting alignments from ranges statefully
-	RangeChaser<String<Dna> >* rchase_;
+	RangeChaser* rchase_;
 
 	// true -> be talkative
 	bool verbose_;
@@ -1509,12 +1511,12 @@ class PairedBWAlignerV2 : public Aligner {
 
 public:
 	PairedBWAlignerV2(
-		EbwtSearchParams<String<Dna> >* params,
-		EbwtSearchParams<String<Dna> >* paramsSe1,
-		EbwtSearchParams<String<Dna> >* paramsSe2,
+		EbwtSearchParams* params,
+		EbwtSearchParams* paramsSe1,
+		EbwtSearchParams* paramsSe2,
 		TDriver* driver,
-		RefAligner<String<Dna5> >* refAligner,
-		RangeChaser<String<Dna> >* rchase,
+		RefAligner* refAligner,
+		RangeChaser* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
@@ -1826,7 +1828,7 @@ protected:
 	 * for each mate.
 	 */
 	void reportSe(const Range& r, UPair h, uint32_t tlen) {
-		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
+		EbwtSearchParams* params = (r.mate1 ? paramsSe1_ : paramsSe2_);
 		assert(!(r.mate1 ? doneSe1_ : doneSe2_));
 		params->setFw(r.fw);
 		Read* buf = r.mate1 ? bufa_ : bufb_;
@@ -1925,18 +1927,18 @@ protected:
 		bool fw = range.mate1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
 		if(!pairFw) fw = !fw;
 		// 'seq' = sequence for opposite mate
-		const String<Dna5>& seq  =
+		const BTDnaString& seq  =
 			fw ? (range.mate1 ? patsrc_->bufb().patFw   :
 		                        patsrc_->bufa().patFw)  :
 		         (range.mate1 ? patsrc_->bufb().patRc   :
 		                        patsrc_->bufa().patRc);
 		// 'qual' = qualities for opposite mate
-		const String<char>& qual =
+		const BTString& qual =
 			fw ? (range.mate1 ? patsrc_->bufb().qual  :
 			                    patsrc_->bufa().qual) :
 			     (range.mate1 ? patsrc_->bufb().qualRev :
 			                    patsrc_->bufa().qualRev);
-		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seq.length();  // length of outstanding mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
 		int minins = minInsert_;
@@ -2046,7 +2048,7 @@ protected:
 	bool donePe_, doneSe1_, doneSe2_;
 
 	// For searching for outstanding mates
-	RefAligner<String<Dna5> >* refAligner_;
+	RefAligner* refAligner_;
 
 	// Temporary HitSink; to be deleted
 	const HitSinkPerThreadFactory& sinkPtFactory_;
@@ -2054,9 +2056,9 @@ protected:
 	HitSinkPerThread* sinkPtSe1_, * sinkPtSe2_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> >* params_;
+	EbwtSearchParams* params_;
 	// for single-end:
-	EbwtSearchParams<String<Dna> >* paramsSe1_, * paramsSe2_;
+	EbwtSearchParams* paramsSe1_, * paramsSe2_;
 
 	// Paired-end boundaries
 	const uint32_t minInsert_;
@@ -2070,7 +2072,7 @@ protected:
 	const bool fw1_, fw2_;
 
 	// State for getting alignments from ranges statefully
-	RangeChaser<String<Dna> >* rchase_;
+	RangeChaser* rchase_;
 
 	// Range-finding state for first mate
 	TDriver* driver_;

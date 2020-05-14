@@ -22,9 +22,11 @@
 
 #include <string.h>
 #include <iostream>
+
 #include "assert_helpers.h"
 #include "alphabet.h"
 #include "random_source.h"
+#include "util.h"
 
 /**
  * Four kinds of strings defined here:
@@ -33,7 +35,7 @@
  *   A fixed-length string using heap memory with size set at construction time
  *   or when install() member is called.
  *
- * S2bDnaString:
+/ * S2bDnaString:
  *   Like SString, but stores a list uint32_t words where each word is divided
  *   into 16 2-bit slots interpreted as holding one A/C/G/T nucleotide each.
  *
@@ -2603,6 +2605,14 @@ std::ostream& operator<< (std::ostream& os, const SStringExpandable<T, S, M>& st
 	return os;
 }
 
+template<typename T, int S, int M, int I>
+std::ostream& operator<<(std::ostream& os, const SStringExpandable<T, S, M, I>& str)
+{
+	os << str.toZBuf();
+	return os;
+}
+
+
 template <typename T, int S>
 std::ostream& operator<< (std::ostream& os, const SStringFixed<T, S>& str) {
 	os << str.toZBuf();
@@ -3125,7 +3135,11 @@ public:
 		return this->get(i);
 	}
 
-	/**
+        inline char &operator[](size_t i) {
+		return this->get(i);
+	}
+
+        /**
 	 * Retrieve constant version of element i.
 	 */
 	inline const char& get(size_t i) const {
@@ -3134,7 +3148,13 @@ public:
 		return this->cs_[i];
 	}
 
-	/**
+        inline char &get(size_t i) {
+		assert_lt(i, this->len_);
+		assert_range(0, 4, (int)this->cs_[i]);
+		return this->cs_[i];
+	}
+
+        /**
 	 * Return the ith character in the window defined by fw, color,
 	 * depth and len.
 	 */
@@ -3468,6 +3488,7 @@ public:
 
 typedef SStringExpandable<char, 1024, 2> BTString;
 typedef SDnaStringExpandable<1024, 2>    BTDnaString;
+typedef SDnaStringExpandable<1024, 2>    BTRefString;
 typedef SDnaMaskString<32, 2>            BTDnaMask;
 
 #endif /* SSTRING_H_ */

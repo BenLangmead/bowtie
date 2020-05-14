@@ -17,13 +17,10 @@
  * randomly and then linearly scanning forward through the range,
  * reporting reference offsets as we go.
  */
-template<typename TStr>
 class RangeChaser {
 
-	typedef Ebwt<TStr> TEbwt;
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 	typedef std::vector<UPair> UPairVec;
-	typedef RowChaser<TStr> TRowChaser;
 
 public:
 	RangeChaser(uint32_t cacheThresh,
@@ -43,34 +40,9 @@ public:
 		cached_(false),
 		cacheFw_(cacheFw), cacheBw_(cacheBw),
 		metrics_(metrics)
-	{ }
+		{ }
 
 	~RangeChaser() { }
-
-	/**
-	 * Convert a range to a vector of reference loci, where a locus is
-	 * a u32 pair of <ref-idx, ref-offset>.
-	 */
-	static void toOffs(const TEbwt& ebwt,
-			TIndexOffU qlen,
-	                   RandomSource& rand,
-	                   TIndexOffU top,
-	                   TIndexOffU bot,
-	                   UPairVec& dest)
-	{
-		RangeChaser rc(ebwt, rand);
-		rc.setTopBot(top, bot, qlen);
-		rc.prep();
-		while(!rc.done) {
-			rc.advance();
-			if(rc.foundOff()) {
-				dest.push_back(rc.off());
-				rc.reset();
-				assert(!rc.foundOff());
-			}
-			rc.prep();
-		}
-	}
 
 	/**
 	 * Set the row to chase
@@ -88,7 +60,7 @@ public:
 				assert(cacheEnt_.valid());
 				if(cached != RANGE_NOT_SET) {
 					// Assert that it matches what we would have got...
-					ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, row_));
+					ASSERT_ONLY(uint32_t sanity = RowChaser::toFlatRefOff(ebwt_, 1, row_));
 					assert_eq(sanity, cached);
 					// We have a cached result.  Cached result is in the
 					// form of an offset into the joined reference string,
@@ -150,46 +122,46 @@ public:
 	 * to reference loci).
 	 */
 	void setTopBot(TIndexOffU top,
-					TIndexOffU bot,
-					TIndexOffU qlen,
+		       TIndexOffU bot,
+		       TIndexOffU qlen,
 	               RandomSource& rand,
-	               const TEbwt* ebwt)
-	{
-		assert_neq(OFF_MASK, top);
-		assert_neq(OFF_MASK, bot);
-		assert_gt(bot, top);
-		assert_gt(qlen, 0);
-		assert(ebwt != NULL);
-		ebwt_ = ebwt;
-		qlen_ = qlen;
-		top_ = top;
-		bot_ = bot;
-		TIndexOffU spread = bot - top;
-		irow_ = top + (rand.nextU32() % spread); // initial row
-		done = false;
-		cached_ = false;
-		reset();
-		if(cacheFw_ != NULL || cacheBw_ != NULL) {
-			if(spread > cacheThresh_) {
-				bool ret = false;
-				if(ebwt->fw() && cacheFw_ != NULL) {
-					ret = cacheFw_->lookup(top, bot, cacheEnt_);
-					if(ret) assert(cacheEnt_.ebwt()->fw());
-				} else if(!ebwt->fw() && cacheBw_ != NULL) {
-					ret = cacheBw_->lookup(top, bot, cacheEnt_);
-					if(ret) assert(!cacheEnt_.ebwt()->fw());
+	               const Ebwt* ebwt)
+		{
+			assert_neq(OFF_MASK, top);
+			assert_neq(OFF_MASK, bot);
+			assert_gt(bot, top);
+			assert_gt(qlen, 0);
+			assert(ebwt != NULL);
+			ebwt_ = ebwt;
+			qlen_ = qlen;
+			top_ = top;
+			bot_ = bot;
+			TIndexOffU spread = bot - top;
+			irow_ = top + (rand.nextU32() % spread); // initial row
+			done = false;
+			cached_ = false;
+			reset();
+			if(cacheFw_ != NULL || cacheBw_ != NULL) {
+				if(spread > cacheThresh_) {
+					bool ret = false;
+					if(ebwt->fw() && cacheFw_ != NULL) {
+						ret = cacheFw_->lookup(top, bot, cacheEnt_);
+						if(ret) assert(cacheEnt_.ebwt()->fw());
+					} else if(!ebwt->fw() && cacheBw_ != NULL) {
+						ret = cacheBw_->lookup(top, bot, cacheEnt_);
+						if(ret) assert(!cacheEnt_.ebwt()->fw());
+					} else {
+						cacheEnt_.reset();
+					}
+					assert_eq(cacheEnt_.valid(), ret);
+					cached_ = ret;
 				} else {
 					cacheEnt_.reset();
 				}
-				assert_eq(cacheEnt_.valid(), ret);
-				cached_ = ret;
-			} else {
-				cacheEnt_.reset();
 			}
+			setRow(irow_);
+			assert(chaser_.prepped_ || foundOff() || done);
 		}
-		setRow(irow_);
-		assert(chaser_.prepped_ || foundOff() || done);
-	}
 
 	/**
 	 * Advance the step-left process by one step.  Check if we're done.
@@ -276,7 +248,7 @@ public:
 
 protected:
 
-	const TEbwt* ebwt_;    /// index to resolve row in
+	const Ebwt* ebwt_;    /// index to resolve row in
 	TIndexOffU qlen_;        /// length of read; needed to convert to ref. coordinates
 	uint32_t cacheThresh_; /// ranges wider than thresh use cacheing
 	TIndexOffU top_;         /// range top
@@ -285,7 +257,7 @@ protected:
 	TIndexOffU row_;         /// current row within range
 	UPair off_;          /// calculated offset (OFF_MASK if not done)
 	TIndexOffU tlen_;        /// length of text hit
-	TRowChaser chaser_;    /// stateful row chaser
+	RowChaser chaser_;    /// stateful row chaser
 	RangeCacheEntry cacheEnt_; /// current cache entry
 	bool cached_;          /// cacheEnt is active for current range?
 	RangeCache* cacheFw_; /// cache for the forward index

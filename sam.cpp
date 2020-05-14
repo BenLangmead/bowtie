@@ -79,18 +79,18 @@ void SAMHitSink::reportUnOrMax(
 	if(hs != NULL) hssz = hs->size();
 	maybeFlush(threadId);
 	BTString& o = ptBufs_[threadId];
-	for(int i = 0; i < (int)seqan::length(p.bufa().name) - (paired ? 2 : 0); i++) {
+	for(int i = 0; i < (int)p.bufa().name.length() - (paired ? 2 : 0); i++) {
 		if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
 		o << p.bufa().name[i];
 	}
 	o << '\t'
 	  << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	  << "\t0\t0\t*\t*\t0\t0\t";
-	for(size_t i = 0; i < seqan::length(p.bufa().patFw); i++) {
-		o << (char)p.bufa().patFw[i];
+	for(size_t i = 0; i < p.bufa().patFw.length(); i++) {
+		o << (char)p.bufa().patFw.toChar(i);
 	}
 	o << '\t';
-	for(size_t i = 0; i < seqan::length(p.bufa().qual); i++) {
+	for(size_t i = 0; i < p.bufa().qual.length(); i++) {
 		o << (char)p.bufa().qual[i];
 	}
 	o << "\tXM:i:" << (paired ? (hssz+1)/2 : hssz);
@@ -109,18 +109,18 @@ void SAMHitSink::reportUnOrMax(
 	o << '\n';
 	if(paired) {
 		// truncate final 2 chars
-		for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
+		for(int i = 0; i < (int)p.bufb().name.length()-2; i++) {
 			if(!noQnameTrunc_ && isspace((int)p.bufb().name[i])) break;
 			o << p.bufb().name[i];
 		}
 		o << '\t'
 		  << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 		  << "\t0\t0\t*\t*\t0\t0\t";
-		for(size_t i = 0; i < seqan::length(p.bufb().patFw); i++) {
-			o << (char)p.bufb().patFw[i];
+		for(size_t i = 0; i < p.bufb().patFw.length(); i++) {
+			o << (char)p.bufb().patFw.toChar(i);
 		}
 		o << '\t';
-		for(size_t i = 0; i < seqan::length(p.bufb().qual); i++) {
+		for(size_t i = 0; i < p.bufb().qual.length(); i++) {
 			o << (char)p.bufb().qual[i];
 		}
 		o << "\tXM:i:" << (hssz+1)/2;
@@ -148,12 +148,12 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	// QNAME
 	if(h.mate > 0) {
 		// truncate final 2 chars
-		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
+		for(int i = 0; i < (int)h.patName.length()-2; i++) {
 			if(!noQnameTrunc_ && isspace((int)h.patName[i])) break;
 			o << h.patName[i];
 		}
 	} else {
-		for(int i = 0; i < (int)seqan::length(h.patName); i++) {
+		for(int i = 0; i < (int)h.patName.length(); i++) {
 			if(!noQnameTrunc_ && isspace((int)h.patName[i])) break;
 			o << h.patName[i];
 		}
@@ -210,12 +210,12 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	}
 	// SEQ
 	o << '\t';
-	for(size_t i = 0; i < seqan::length(h.patSeq); i++) {
-		o << (char)h.patSeq[i];
+	for(size_t i = 0; i < h.patSeq.length(); i++) {
+		o << (char)h.patSeq.toChar(i);
 	}
 	// QUAL
 	o << '\t';
-	for(size_t i = 0; i < seqan::length(h.quals); i++) {
+	for(size_t i = 0; i < h.quals.length(); i++) {
 		o << (char)h.quals[i];
 	}
 	//
@@ -227,12 +227,12 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	//ss << "\tXC:i:" << (int)h.cost;
 	// Look for SNP annotations falling within the alignment
 	// Output MD field
-	size_t len = length(h.patSeq);
+	size_t len = h.patSeq.length();
 	int nm = 0;
 	int run = 0;
 	o << "\tMD:Z:";
 	const FixedBitset<1024> *mms = &h.mms;
-	ASSERT_ONLY(const String<Dna5>* pat = &h.patSeq);
+	ASSERT_ONLY(const BTDnaString* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
 #if 0
 	if(h.color && false) {

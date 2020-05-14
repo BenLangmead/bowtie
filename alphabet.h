@@ -1,23 +1,21 @@
 #ifndef ALPHABETS_H_
 #define ALPHABETS_H_
 
+#include <math.h>
 #include <stdexcept>
 #include <string>
-#include <seqan/sequence.h>
-#include <seqan/file.h>
 #include <sstream>
+
 #include "assert_helpers.h"
 
 using namespace std;
-using namespace seqan;
 
 /// Reverse a string in-place
 template <typename TStr>
 static inline void reverseInPlace(TStr& s) {
-	typedef typename Value<TStr>::Type TVal;
-	size_t len = length(s);
+	size_t len = s.length();
 	for(size_t i = 0; i < (len>>1); i++) {
-		TVal tmp = s[i];
+		char tmp = s[i];
 		s[i] = s[len-i-1];
 		s[len-i-1] = tmp;
 	}
@@ -29,7 +27,6 @@ static inline void reverseInPlace(TStr& s) {
  */
 template<typename TStr>
 static inline TStr reverseComplement(const TStr& s, bool color) {
-	typedef typename Value<TStr>::Type TVal;
 	TStr s_rc;
 	size_t slen = length(s);
 	resize(s_rc, slen);
@@ -41,9 +38,9 @@ static inline TStr reverseComplement(const TStr& s, bool color) {
 		for(size_t i = 0; i < slen; i++) {
 			int sv = (int)s[slen-i-1];
 			if(sv == 4) {
-				s_rc[i] = (TVal)4;
+				s_rc[i] = (char)4;
 			} else {
-				s_rc[i] = (TVal)(sv ^ 3);
+				s_rc[i] = (char)(sv ^ 3);
 			}
 		}
 	}
@@ -55,29 +52,28 @@ static inline TStr reverseComplement(const TStr& s, bool color) {
  */
 template<typename TStr>
 static inline void reverseComplementInPlace(TStr& s, bool color) {
-	typedef typename Value<TStr>::Type TVal;
 	if(color) {
 		reverseInPlace(s);
 		return;
 	}
-	size_t len = length(s);
+	size_t len = s.length();
 	size_t i;
 	for(i = 0; i < (len>>1); i++) {
 		int sv = (int)s[len-i-1];
 		int sf = (int)s[i];
 		if(sv == 4) {
-			s[i] = (TVal)4;
+			s[i] = (char)4;
 		} else {
-			s[i] = (TVal)(sv ^ 3);
+			s[i] = (char)(sv ^ 3);
 		}
 		if(sf == 4)  {
-			s[len-i-1] = (TVal)4;
+			s[len-i-1] = (char)4;
 		} else {
-			s[len-i-1] = (TVal)(sf ^ 3);
+			s[len-i-1] = (char)(sf ^ 3);
 		}
 	}
 	if((len & 1) != 0 && (int)s[len >> 1] != 4) {
-		s[len >> 1] = (TVal)((int)s[len >> 1] ^ 3);
+		s[len >> 1] = (char)((int)s[len >> 1] ^ 3);
 	}
 }
 
@@ -86,12 +82,11 @@ static inline void reverseComplementInPlace(TStr& s, bool color) {
  */
 template<typename TStr>
 static inline TStr reverseCopy(const TStr& s) {
-	typedef typename Value<TStr>::Type TVal;
 	TStr s_rc;
 	size_t slen = length(s);
 	resize(s_rc, slen);
 	for(size_t i = 0; i < slen; i++) {
-		s_rc[i] = (TVal)((int)s[slen-i-1]);
+		s_rc[i] = (char)((int)s[slen-i-1]);
 	}
 	return s_rc;
 }
@@ -126,11 +121,10 @@ dollarGt(const TStr& l, const TStr& r) {
 template <typename TStr>
 static inline std::string
 suffixStr(const TStr& l, size_t off) {
-	typedef typename Value<TStr>::Type TVal;
 	std::string ret;
-	size_t len = seqan::length(l);
+	size_t len = l.length();
 	for(size_t i = off; i < len; i++) {
-		ret.push_back((char)(TVal)l[i]);
+		ret.push_back(l[i]);
 	}
 	return ret;
 }
@@ -139,44 +133,44 @@ suffixStr(const TStr& l, size_t off) {
  * Calculate the entropy of the given read.  Handle Ns by charging them
  * to the most frequent non-N character.
  */
-static inline float entropyDna5(const String<Dna5>& read) {
-	size_t cs[5] = {0, 0, 0, 0, 0};
-	size_t readLen = seqan::length(read);
-	for(size_t i = 0; i < readLen; i++) {
-		int c = (int)read[i];
-		assert_lt(c, 5);
-		assert_geq(c, 0);
-		cs[c]++;
-	}
-	if(cs[4] > 0) {
-		// Charge the Ns to the non-N character with maximal count and
-		// then exclude them from the entropy calculation (i.e.,
-		// penalize Ns as much as possible)
-		if(cs[0] >= cs[1] && cs[0] >= cs[2] && cs[0] >= cs[3]) {
-			// Charge Ns to As
-			cs[0] += cs[4];
-		} else if(cs[1] >= cs[2] && cs[1] >= cs[3]) {
-			// Charge Ns to Cs
-			cs[1] += cs[4];
-		} else if(cs[2] >= cs[3]) {
-			// Charge Ns to Gs
-			cs[2] += cs[4];
-		} else {
-			// Charge Ns to Ts
-			cs[3] += cs[4];
-		}
-	}
-	float ent = 0.0;
-	for(int i = 0; i < 4; i++) {
-		if(cs[i] > 0) {
-			float frac = (float)cs[i] / (float)readLen;
-			ent += (frac * log(frac));
-		}
-	}
-	ent = -ent;
-	assert_geq(ent, 0.0);
-	return ent;
-}
+// static inline float entropyDna5(const BTDnaString& read) {
+//	size_t cs[5] = {0, 0, 0, 0, 0};
+//	size_t readLen = read.length();
+//	for(size_t i = 0; i < readLen; i++) {
+//		int c = (int)read[i];
+//		assert_lt(c, 5);
+//		assert_geq(c, 0);
+//		cs[c]++;
+//	}
+//	if(cs[4] > 0) {
+//		// Charge the Ns to the non-N character with maximal count and
+//		// then exclude them from the entropy calculation (i.e.,
+//		// penalize Ns as much as possible)
+//		if(cs[0] >= cs[1] && cs[0] >= cs[2] && cs[0] >= cs[3]) {
+//			// Charge Ns to As
+//			cs[0] += cs[4];
+//		} else if(cs[1] >= cs[2] && cs[1] >= cs[3]) {
+//			// Charge Ns to Cs
+//			cs[1] += cs[4];
+//		} else if(cs[2] >= cs[3]) {
+//			// Charge Ns to Gs
+//			cs[2] += cs[4];
+//		} else {
+//			// Charge Ns to Ts
+//			cs[3] += cs[4];
+//		}
+//	}
+//	float ent = 0.0;
+//	for(int i = 0; i < 4; i++) {
+//		if(cs[i] > 0) {
+//			float frac = (float)cs[i] / (float)readLen;
+//			ent += (frac * log(frac));
+//		}
+//	}
+//	ent = -ent;
+//	assert_geq(ent, 0.0);
+//	return ent;
+// }
 
 /**
  * Return the DNA complement of the given ASCII char.

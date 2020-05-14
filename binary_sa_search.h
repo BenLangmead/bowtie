@@ -3,11 +3,13 @@
 
 #include <stdint.h>
 #include <iostream>
-#include <seqan/sequence.h>
 #include <limits>
+#include <vector>
+
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "btypes.h"
+#include "sstring.h"
 
 /**
  * Do a binary search using the suffix of 'host' beginning at offset
@@ -26,19 +28,19 @@
  */
 template<typename TStr, typename TSufElt> inline
 TIndexOffU binarySASearch(const TStr& host,
-			TIndexOffU qry,
-            const String<TSufElt>& sa)
+			  TIndexOffU qry,
+			  const std::vector<TSufElt>& sa)
 {
 	TIndexOffU lLcp = 0, rLcp = 0; // greatest observed LCPs on left and right
-	TIndexOffU l = 0, r = (TIndexOffU)length(sa)+1; // binary-search window
-	TIndexOffU hostLen = TIndexOffU(length(host));
+	TIndexOffU l = 0, r = (TIndexOffU)sa.size()+1; // binary-search window
+	TIndexOffU hostLen = TIndexOffU(host.length());
 	while(true) {
 		assert_gt(r, l);
 		TIndexOffU m = (l+r) >> 1;
 		if(m == l) {
 			// Binary-search window has closed: we have an answer
 			if(m > 0 && sa[m-1] == qry) return std::numeric_limits<TIndexOffU>::max(); // qry matches
-			assert_leq(m, length(sa));
+			assert_leq(m, sa.size());
 			return m; // Return index of right-hand suffix
 		}
 		assert_gt(m, 0);
@@ -46,9 +48,9 @@ TIndexOffU binarySASearch(const TStr& host,
 		if(suf == qry) return std::numeric_limits<TIndexOffU>::max(); // query matches an elt of sa
 		TIndexOffU lcp = min(lLcp, rLcp);
 #ifndef NDEBUG
-		if(prefix(suffix(host, qry), lcp) != prefix(suffix(host, suf), lcp)) {
+                if (sstr_suf_upto_neq(host, qry, host, suf, lcp)) {
 			assert(0);
-		}
+                }
 #endif
 		// Keep advancing lcp, but stop when query mismatches host or
 		// when the counter falls off either the query or the suffix

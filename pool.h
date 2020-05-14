@@ -13,6 +13,7 @@
 #include "bitset.h"
 #include "log.h"
 #include "search_globals.h"
+#include "read.h"
 
 /**
  * Very simple allocator for fixed-size chunks of memory.  Chunk size
@@ -55,7 +56,7 @@ public:
 	/**
 	 * Reset the pool, freeing all arrays that had been given out.
 	 */
-	void reset(String<char>* name, uint32_t patid_) {
+	void reset(BTString* name, uint32_t patid_) {
 		patid = patid_;
 		readName_ = name;
 		cur_ = 0;
@@ -172,7 +173,7 @@ protected:
 	FixedBitset2 bits_;
 	bool exhaustCrash_; /// abort hard when memory's exhausted?
 	uint32_t lastSkippedRead_;
-	String<char>* readName_;
+	BTString* readName_;
 };
 
 /**

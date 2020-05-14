@@ -30,7 +30,7 @@
 				btf4.setOffs(0, 0, s, s, s, s);
 			}
 			for(size_t i = 0; i < pals.size(); i++) {
-				seqan::clear(muts);
+                                muts.clear();
 				uint8_t oldQuals =
 					PartialAlignmentManager::toMutsString(
 						pals[i], patFwRev, qualRev, muts, !noMaqRound);
@@ -38,7 +38,7 @@
 				// Set the backtracking thresholds appropriately
 				// Now begin the backtracking, treating the first
 				// 24 bases as unrevisitable
-				ASSERT_ONLY(String<Dna5> tmp = patFwRev);
+				ASSERT_ONLY(BTDnaString tmp = patFwRev);
 				btf4.setMuts(&muts);
 				done = btf4.backtrack(oldQuals);
 				btf4.setMuts(NULL);
@@ -50,8 +50,7 @@
 				}
 			} // Loop over partial alignments
 		}
-		seqan::clear(muts);
-
+                muts.clear();
 		// Case 4F yielded a hit; continue to next pattern
 		if(done) continue;
 

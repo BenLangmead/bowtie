@@ -11,6 +11,7 @@
 #include "hit.h"
 #include "row_chaser.h"
 #include "range_chaser.h"
+#include "sstring.h"
 
 /**
  * Concrete factory class for constructing unpaired exact aligners.
@@ -23,8 +24,8 @@ class UnpairedExactAlignerV1Factory : public AlignerFactory {
 
 public:
 	UnpairedExactAlignerV1Factory(
-			Ebwt<String<Dna> >& ebwtFw,
-			Ebwt<String<Dna> >* ebwtBw,
+			Ebwt& ebwtFw,
+			Ebwt* ebwtBw,
 			bool doFw,
 			bool doRc,
 			HitSink& sink,
@@ -34,7 +35,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<String<Dna5> >& os,
+			vector<BTRefString >& os,
 			bool maqPenalty,
 			bool qualOrder,
 			bool strandFix,
@@ -68,8 +69,8 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
-		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true);
+		EbwtSearchParams* params =
+			new EbwtSearchParams(*sinkPt, os_, true, true);
 
 		const int halfAndHalf = 0;
 		const bool seeded = false;
@@ -104,8 +105,8 @@ public:
 		delete drVec;
 
 		// Set up a RangeChaser
-		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
+		RangeChaser *rchase =
+			new RangeChaser(cacheLimit_, cacheFw_, cacheBw_);
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
@@ -114,8 +115,8 @@ public:
 	}
 
 private:
-	Ebwt<String<Dna> >& ebwtFw_;
-	Ebwt<String<Dna> >* ebwtBw_;
+	Ebwt& ebwtFw_;
+	Ebwt* ebwtBw_;
 	bool doFw_;
 	bool doRc_;
 	HitSink& sink_;
@@ -125,7 +126,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference* refs_;
-	vector<String<Dna5> >& os_;
+	vector<BTRefString >& os_;
 	bool maqPenalty_;
 	bool qualOrder_;
 	bool strandFix_;
@@ -143,8 +144,8 @@ class PairedExactAlignerV1Factory : public AlignerFactory {
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	PairedExactAlignerV1Factory(
-			Ebwt<String<Dna> >& ebwtFw,
-			Ebwt<String<Dna> >* ebwtBw,
+			Ebwt& ebwtFw,
+			Ebwt* ebwtBw,
 			bool color,
 			bool doFw,
 			bool doRc,
@@ -164,7 +165,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<String<Dna5> >& os,
+			vector<BTRefString >& os,
 			bool reportSe,
 			bool maqPenalty,
 			bool strandFix,
@@ -210,16 +211,16 @@ public:
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		HitSinkPerThread* sinkPtSe1 = NULL, * sinkPtSe2 = NULL;
-		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true);
-		EbwtSearchParams<String<Dna> >* paramsSe1 = NULL, * paramsSe2 = NULL;
+		EbwtSearchParams* params =
+			new EbwtSearchParams(*sinkPt, os_, true, true);
+		EbwtSearchParams* paramsSe1 = NULL, * paramsSe2 = NULL;
 		if(reportSe_) {
 			sinkPtSe1 = sinkPtFactory_.create();
 			sinkPtSe2 = sinkPtFactory_.create();
 			paramsSe1 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_, true, true);
+				new EbwtSearchParams(*sinkPtSe1, os_, true, true);
 			paramsSe2 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_, true, true);
+				new EbwtSearchParams(*sinkPtSe2, os_, true, true);
 		}
 
 		const int halfAndHalf = 0;
@@ -303,12 +304,12 @@ public:
 				os_, verbose_, quiet_, false, pool_, NULL);
 		}
 
-		RefAligner<String<Dna5> >* refAligner
-			= new ExactRefAligner<String<Dna5> >(color_, verbose_, quiet_);
+		RefAligner* refAligner
+			= new ExactRefAligner(color_, verbose_, quiet_);
 
 		// Set up a RangeChaser
-		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
+		RangeChaser* rchase =
+			new RangeChaser(cacheLimit_, cacheFw_, cacheBw_);
 
 		if(v1_) {
 			PairedBWAlignerV1<EbwtRangeSource>* al = new PairedBWAlignerV1<EbwtRangeSource>(
@@ -344,8 +345,8 @@ public:
 	}
 
 private:
-	Ebwt<String<Dna> >& ebwtFw_;
-	Ebwt<String<Dna> >* ebwtBw_;
+	Ebwt& ebwtFw_;
+	Ebwt* ebwtBw_;
 	bool color_;
 	bool doFw_;
 	bool doRc_;
@@ -365,7 +366,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference* refs_;
-	vector<String<Dna5> >& os_;
+	vector<BTRefString >& os_;
 	const bool reportSe_;
 	const bool maqPenalty_;
 	const bool qualOrder_;

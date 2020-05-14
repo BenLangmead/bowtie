@@ -2,9 +2,6 @@
 #define MULTIKEY_QSORT_H_
 
 #include <iostream>
-#include <seqan/basic.h>
-#include <seqan/file.h>
-#include <seqan/sequence.h>
 #include "sequence_io.h"
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -12,17 +9,15 @@
 #include "btypes.h"
 
 using namespace std;
-using namespace seqan;
 
 /**
  * Swap elements a and b in seqan::String s
  */
 template <typename TStr, typename TPos>
 static inline void swap(TStr& s, size_t slen, TPos a, TPos b) {
-	typedef typename Value<TStr>::Type TAlphabet;
 	assert_lt(a, slen);
 	assert_lt(b, slen);
-	TAlphabet tmp = s[a];
+	char tmp = s[a];
 	s[a] = s[b];
 	s[b] = tmp;
 }
@@ -173,12 +168,12 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
 /// than any TAlphabet character - 'hi'.
-#define CHAR_AT(ss, aa) ((length(s[ss]) > aa) ? (int)(Dna)(s[ss][aa]) : hi)
+#define CHAR_AT(ss, aa) ((s[ss].length() > aa) ? (int)(s[ss][aa]) : hi)
 
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
 /// than any TAlphabet character - 'hi'.
-#define CHAR_AT_SUF(si, off) (((off+s[si]) < hlen) ? ((int)(Dna)(host[off+s[si]])) : (hi))
+#define CHAR_AT_SUF(si, off) (((off+s[si]) < hlen) ? ((int)(host[off+s[si]])) : (hi))
 
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
@@ -236,7 +231,7 @@ bool assertPartitionedSuf(
 	size_t end,
 	size_t depth)
 {
-	size_t hlen = length(host);
+	size_t hlen = host.length();
 	int state = 0; // 0 -> 1st = section, 1 -> < section, 2 -> > section, 3 -> 2nd = section
 	for(size_t i = begin; i < end; i++) {
 		switch(state) {
@@ -275,7 +270,7 @@ bool assertPartitionedSuf2(
 	size_t end,
 	size_t depth)
 {
-	size_t hlen = length(host);
+	size_t hlen = host.length();
 	int state = 0; // 0 -> < section, 1 -> = section, 2 -> > section
 	for(size_t i = begin; i < end; i++) {
 		switch(state) {
@@ -333,9 +328,9 @@ void sanityCheckOrderedSufs(const T& host,
 		if(s[i+1] >= hlen) continue;
 #ifndef NDEBUG
 		if(upto == OFF_MASK) {
-			assert(dollarLt(suffix(host, s[i]), suffix(host, s[i+1])));
+			assert(sstr_suf_lt(host, s[i], hlen, host, s[i+1], hlen, false));
 		} else {
-			if(prefix(suffix(host, s[i]), upto) > prefix(suffix(host, s[i+1]), upto)) {
+			if(sstr_suf_upto_lt(host, s[i], host, s[i+1], upto, false)) {
 				// operator > treats shorter strings as
 				// lexicographically smaller, but we want to opposite
 				//assert(isPrefix(suffix(host, s[i+1]), suffix(host, s[i])));
@@ -467,8 +462,8 @@ void mkeyQSortSuf(
 	bool sanityCheck = false,
 	size_t upto = OFF_MASK)
 {
-	size_t hlen = length(host);
-	assert(!empty(s));
+	size_t hlen = host.length();
+	assert_gt(slen, 0);
 	if(sanityCheck) sanityCheckInputSufs(s, slen);
 	mkeyQSortSuf(host, hlen, s, slen, hi, (size_t)0, slen, (size_t)0, upto);
 	if(sanityCheck) sanityCheckOrderedSufs(host, hlen, s, slen, upto);
@@ -626,7 +621,7 @@ void mkeyQSortSuf2(
 	size_t upto = OFF_MASK,
 	std::vector<size_t>* boundaries = NULL)
 {
-	size_t hlen = length(host);
+	size_t hlen = host.length();
 	if(sanityCheck) sanityCheckInputSufs(s, slen);
 	TIndexOffU *sOrig = NULL;
 	if(sanityCheck) {
@@ -659,9 +654,12 @@ bool sufDcLt(const T1& host,
              bool sanityCheck = false)
 {
 	size_t diff = dc.tieBreakOff(s1, s2);
+#ifndef NDEBUG
+	size_t hlen = host.length();
+#endif
 	assert_lt(diff, dc.v());
-	assert_lt(diff, length(host)-s1);
-	assert_lt(diff, length(host)-s2);
+	assert_lt(diff, hlen-s1);
+	assert_lt(diff, hlen-s2);
 	if(sanityCheck) {
 		for(size_t i = 0; i < diff; i++) {
 			assert_eq(host[s1+i], host[s2+i]);
@@ -669,9 +667,10 @@ bool sufDcLt(const T1& host,
 	}
 	bool ret = dc.breakTie(s1+diff, s2+diff) < 0;
 #ifndef NDEBUG
-	if(sanityCheck && ret != dollarLt(suffix(host, s1), suffix(host, s2))) {
+	if(sanityCheck && ret != sstr_suf_lt(host, s1, hlen, host, s2, hlen, false)) {
 		assert(false);
 	}
+
 #endif
 	return ret;
 }
@@ -705,7 +704,8 @@ void qsortSufDc(const T& host,
 	for(size_t i = begin; i < end-1; i++) {
 		if(sufDcLt(host, s[i], s[end-1], dc, sanityCheck)) {
 			if(sanityCheck)
-				assert(dollarLt(suffix(host, s[i]), suffix(host, s[end-1])));
+				assert(sstr_suf_lt(host, s[i], hlen, host, s[end-1], hlen, false));
+
 			assert_lt(begin + cur, end-1);
 			SWAP(s, i, begin + cur);
 			cur++;
@@ -763,11 +763,9 @@ bool sufDcLtU8(const T1& host1,
 	bool ret = dc.breakTie((TIndexOffU)(s1+diff), (TIndexOffU)(s2+diff)) < 0;
 	// Sanity-check return value using dollarLt
 #ifndef NDEBUG
-	if(sanityCheck &&
-	   ret != dollarLt(suffix(host1, s1), suffix(host1, s2)))
-	{
-		assert(false);
-	}
+	bool ret2 = sstr_suf_lt(host1, s1, hlen, host, s2, hlen, false);
+	assert(!sanityCheck || ret == ret2);
+
 #endif
 	return ret;
 }
@@ -802,9 +800,11 @@ void qsortSufDcU8(const T1& host1,
 	for(size_t i = begin; i < end-1; i++) {
 		if(sufDcLtU8(host1, host, hlen, s[i], s[end-1], dc, sanityCheck)) {
 #ifndef NDEBUG
-			if(sanityCheck)
-				assert(dollarLt(suffix(host1, s[i]), suffix(host1, s[end-1])));
+			if(sanityCheck) {
+				assert(sstr_suf_lt(host1, s[i], hlen, host1, s[end-1], hlen, false));
+			}
 			assert_lt(begin + cur, end-1);
+
 #endif
 			SWAP(s, i, begin + cur);
 			cur++;
@@ -835,8 +835,8 @@ inline uint8_t get_uint8(const TStr& t, size_t off) {
  * to Dna then to uint8_t.
  */
 template<>
-inline uint8_t get_uint8(const String<Dna, Packed<> >& t, size_t off) {
-	return (uint8_t)(Dna)t[off];
+inline uint8_t get_uint8<S2bDnaString>(const S2bDnaString& t, size_t off) {
+	return (uint8_t)t[off];
 }
 
 /**
@@ -869,11 +869,8 @@ static void selectionSortSufDcU8(
         bool sanityCheck = false)
 {
 #define ASSERT_SUF_LT(l, r) \
-	if(sanityCheck && \
-	   !dollarLt(suffix(host1, s[l]), \
-	             suffix(host1, s[r]))) { \
-		cout << "l: " << suffixStr(host1, s[l]) << endl; \
-		cout << "r: " << suffixStr(host1, s[r]) << endl; \
+	if(sanityCheck &&						\
+	   !sstr_suf_lt(host1, s[l], hlen, host1, s[r], hlen, false)) { \
 		assert(false); \
 	}
 

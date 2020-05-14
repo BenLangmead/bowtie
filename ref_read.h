@@ -8,7 +8,6 @@
 #include <ctype.h>
 #include <fstream>
 #include <stdexcept>
-#include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "filebuf.h"
@@ -16,7 +15,6 @@
 #include "endian_swap.h"
 
 using namespace std;
-using namespace seqan;
 
 class RefTooLongException : public exception {
 
@@ -139,10 +137,10 @@ template <typename TStr>
 static RefRecord fastaRefReadAppend(FileBuf& in,
                                     bool first,
                                     TStr& dst,
+				    TIndexOffU& dstoff,
                                     RefReadInParams& rparms,
                                     string* name = NULL)
 {
-	typedef typename Value<TStr>::Type TVal;
 	int c;
 	static int lastc = '>';
 	if(first) {
@@ -160,7 +158,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	size_t off = 0;
 	first = true;
 
-	size_t ilen = length(dst);
+	size_t ilen = dstoff;
 
 	// Chew up the id line; if the next line is either
 	// another id line or a comment line, keep chewing
@@ -256,18 +254,18 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	while(true) {
 		// Note: can't have a comment in the middle of a sequence,
 		// though a comment can end a sequence
-		int cat = dna4Cat[c];
+		int cat = asc2dnacat[c];
 		assert_neq(2, cat);
 		if(cat == 1) {
 			// Consume it
 			if(!rparms.color || lc != -1) len++;
 			// Add it to referenece buffer
 			if(rparms.color) {
-				appendValue(dst, (Dna)dinuc2color[charToDna5[(int)c]][lc]);
+				dst.set((char)dinuc2color[charToDna5[(int)c]][lc], dstoff++);
 			} else if(!rparms.color) {
-				appendValue(dst, (Dna)(char)c);
+				dst.set(charToDna5[c], dstoff++);
 			}
-			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
+			assert_lt(charToDna5[(int)dst[dst.length()-1]], 4);
 			lc = charToDna5[(int)c];
 		}
 		c = in.get();
@@ -284,19 +282,8 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	// ilen = length of buffer before this last sequence was appended.
 	if(rparms.reverse == REF_READ_REVERSE_EACH) {
 		// Find limits of the portion we just appended
-		size_t nlen = length(dst);
-		assert_eq(nlen - ilen, len);
-		if(len > 0) {
-			size_t halfway =  ilen + (len>>1);
-			// Reverse it in-place
-			for(size_t i = ilen; i < halfway; i++) {
-				size_t diff = i-ilen;
-				size_t j = nlen-diff-1;
-				TVal tmp = dst[i];
-				dst[i] = dst[j];
-				dst[j] = tmp;
-			}
-		}
+		size_t nlen = dstoff;
+		dst.reverseWindow(ilen, nlen);
 	}
 	return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 }

@@ -6,7 +6,6 @@
 #define ROW_CHASER_H_
 
 #include <iostream>
-#include "seqan/sequence.h"
 #include "ebwt.h"
 #include "aligner_metrics.h"
 
@@ -18,11 +17,9 @@
  * The "statefulness" in how the computation is organized here allows
  * some or all of that penalty to be hidden using prefetching.
  */
-template<typename TStr>
 class RowChaser {
 
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
-	typedef Ebwt<TStr> TEbwt;
 
 public:
 	RowChaser(AlignerMetrics *metrics = NULL) :
@@ -44,7 +41,7 @@ public:
 	 * converted to understand where it is w/r/t the reference hit and
 	 * offset within it.
 	 */
-	static TIndexOffU toFlatRefOff(const TEbwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
+	static TIndexOffU toFlatRefOff(const Ebwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done) {
@@ -56,7 +53,7 @@ public:
 	/**
 	 * Convert a row to a reference offset.
 	 */
-	static UPair toRefOff(const TEbwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
+	static UPair toRefOff(const Ebwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done) {
@@ -69,7 +66,7 @@ public:
 	 * Set the next row for us to "chase" (i.e. map to a reference
 	 * location using the BWT step-left operation).
 	 */
-	void setRow(TIndexOffU row, TIndexOffU qlen, const TEbwt* ebwt) {
+	void setRow(TIndexOffU row, TIndexOffU qlen, const Ebwt* ebwt) {
 		assert_neq(OFF_MASK, row);
 		assert_gt(qlen, 0);
 		assert(ebwt != NULL);
@@ -173,7 +170,7 @@ public:
 
 protected:
 
-	const TEbwt* ebwt_;      /// index to resolve row in
+	const Ebwt* ebwt_;      /// index to resolve row in
 	TIndexOffU qlen_;          /// length of read; needed to convert to ref. coordinates
 	const EbwtParams* eh_;   /// eh field from index
 	TIndexOffU row_;           /// current row

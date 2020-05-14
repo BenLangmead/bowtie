@@ -8,7 +8,6 @@
 #ifndef HIT_SET_H_
 #define HIT_SET_H_
 
-#include <seqan/sequence.h>
 #include <vector>
 #include <algorithm>
 #include "assert_helpers.h"
@@ -16,6 +15,7 @@
 #include "edit.h"
 #include "alphabet.h"
 #include "btypes.h"
+#include "sstring.h"
 
 /**
  * Encapsulates a hit contained within a HitSet that can be
@@ -240,18 +240,18 @@ struct HitSet {
 	 */
 	void serialize(OutFileBuf& fb) const {
 		fb.write(color ? 1 : 0);
-		uint32_t i = (uint32_t)seqan::length(name);
+		uint32_t i = (uint32_t)name.length();
 		assert_gt(i, 0);
 		fb.writeChars((const char*)&i, 4);
-		fb.writeChars(seqan::begin(name), i);
-		i = (uint32_t)seqan::length(seq);
+		fb.writeChars(name.buf(), i);
+		i = (uint32_t)seq.length();
 		assert_gt(i, 0);
 		assert_lt(i, 1024);
 		fb.writeChars((const char*)&i, 4);
 		for(size_t j = 0; j < i; j++) {
 			fb.write("ACGTN"[(int)seq[j]]);
 		}
-		fb.writeChars(seqan::begin(qual), i);
+		fb.writeChars(qual.buf(), i);
 		i = (uint32_t)ents.size();
 		fb.writeChars((const char*)&i, 4);
 		std::vector<HitSetEnt>::const_iterator it;
@@ -268,23 +268,23 @@ struct HitSet {
 		color = (fb.get() != 0 ? true : false);
 		uint32_t sz = 0;
 		if(fb.get((char*)&sz, 4) != 4) {
-			seqan::clear(name);
-			seqan::clear(seq);
+			name.clear();
+			seq.clear();
 			return;
 		}
 		assert_gt(sz, 0);
 		assert_lt(sz, 1024);
-		seqan::resize(name, sz);
-		fb.get(seqan::begin(name), sz);
+		name.resize(sz);
+		fb.get(name.wbuf(), sz);
 		fb.get((char*)&sz, 4);
 		assert_gt(sz, 0);
 		assert_lt(sz, 1024);
-		seqan::resize(seq, sz);
+		seq.resize(sz);
 		for(size_t j = 0; j < sz; j++) {
 			seq[j] = charToDna5[fb.get()];
 		}
-		seqan::resize(qual, sz);
-		fb.get(seqan::begin(qual), sz);
+                qual.resize(sz);
+		fb.get(qual.wbuf(), sz);
 		fb.get((char*)&sz, 4);
 		if(sz > 0) {
 			ents.resize(sz);
@@ -302,7 +302,7 @@ struct HitSet {
 	 * necessarily any alignments).
 	 */
 	bool initialized() const {
-		return !seqan::empty(seq);
+		return !seq.empty();
 	}
 
 	/**
@@ -419,9 +419,9 @@ struct HitSet {
 	 * Clear out all the strings and all the entries.
 	 */
 	void clearAll() {
-		seqan::clear(name);
-		seqan::clear(seq);
-		seqan::clear(qual);
+		name.clear();
+		seq.clear();
+		qual.clear();
 		ents.clear();
 		color = false;
 	}
@@ -463,9 +463,9 @@ struct HitSet {
 	 */
 	friend std::ostream& operator << (std::ostream& os, const HitSet& hs);
 
-	seqan::String<char> name;
-	seqan::String<seqan::Dna5> seq;
-	seqan::String<char> qual;
+	BTString name;
+	BTDnaString seq;
+	BTString qual;
 	int8_t maxedStratum;
 	std::vector<HitSetEnt> ents;
 	bool color; // whether read was orginally in colorspace

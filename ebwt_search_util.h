@@ -5,9 +5,9 @@
 #include <vector>
 #include <map>
 #include <stdint.h>
-#include <seqan/sequence.h>
 #include "hit.h"
 #include "qual.h"
+#include "sstring.h"
 
 /// Encapsulates a change made to a query base, i.e. "the 3rd base from
 /// the 5' end was changed from an A to a T".  Useful when using
@@ -65,9 +65,9 @@ typedef union {
 	/**
 	 *
 	 */
-	bool repOk(uint32_t qualMax, uint32_t slen, const String<char>& quals, bool maqPenalty) {
+	bool repOk(uint32_t qualMax, uint32_t slen, const BTString& quals, bool maqPenalty) {
 		uint32_t qual = 0;
-		assert_leq(slen, seqan::length(quals));
+		assert_leq(slen, quals.length());
 		if(entry.pos0 != 0xffff) {
 			assert_lt(entry.pos0, slen);
 			qual += mmPenalty(maqPenalty, phredCharToPhredQual(quals[entry.pos0]));
@@ -150,9 +150,9 @@ static bool validPartialAlignment(PartialAlignment pa) {
 #endif
 
 extern
-void printHit(const vector<String<Dna5> >& os,
+void printHit(const vector<BTRefString >& os,
 			  const Hit& h,
-			  const String<Dna5>& qry,
+			  const BTDnaString& qry,
 			  size_t qlen,
 			  uint32_t unrevOff,
 			  uint32_t oneRevOff,
@@ -307,14 +307,14 @@ public:
 	 * Convert a partial alignment into a QueryMutation string.
 	 */
 	static uint8_t toMutsString(const PartialAlignment& pal,
-	                            const String<Dna5>& seq,
-	                            const String<char>& quals,
-	                            String<QueryMutation>& muts,
+	                            const BTDnaString& seq,
+	                            const BTString& quals,
+	                            std::vector<QueryMutation>& muts,
 	                            bool maqPenalty = true)
 	{
-		reserve(muts, 4);
-		assert_eq(0, length(muts));
-		uint32_t plen = (uint32_t)length(seq);
+		muts.reserve(4);
+		assert_eq(0, muts.size());
+		uint32_t plen = (uint32_t)seq.length();
 		assert_gt(plen, 0);
 		assert_neq(1, pal.unk.type);
 		// Do first mutation
@@ -327,7 +327,7 @@ public:
 		uint8_t oldQual0 = mmPenalty(maqPenalty, phredCharToPhredQual(quals[tpos0]));
 		assert_leq(oldQual0, 99);
 		oldQuals += oldQual0; // take quality hit
-		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
+		muts.push_back(QueryMutation(tpos0, oldChar, chr0));
 		if(pal.entry.pos1 != 0xffff) {
 			// Do second mutation
 			uint32_t pos1 = pal.entry.pos1;
@@ -339,7 +339,7 @@ public:
 			assert_leq(oldQual1, 99);
 			oldQuals += oldQual1; // take quality hit
 			assert_neq(tpos1, tpos0);
-			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
+			muts.push_back(QueryMutation(tpos1, oldChar, chr1));
 			if(pal.entry.pos2 != 0xffff) {
 				// Do second mutation
 				uint32_t pos2 = pal.entry.pos2;
@@ -352,11 +352,11 @@ public:
 				oldQuals += oldQual2; // take quality hit
 				assert_neq(tpos2, tpos0);
 				assert_neq(tpos2, tpos1);
-				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation
+				muts.push_back(QueryMutation(tpos2, oldChar, chr2)); // apply mutation
 			}
 		}
-		assert_gt(length(muts), 0);
-		assert_leq(length(muts), 3);
+		assert_gt(muts.size(), 0);
+		assert_leq(muts.size(), 3);
 		return oldQuals;
 	}
 private:

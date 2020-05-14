@@ -8,6 +8,7 @@
 #ifndef SAM_H_
 #define SAM_H_
 
+#include "hit.h"
 #include "pat.h"
 #include "random_source.h"
 #include "btypes.h"

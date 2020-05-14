@@ -25,7 +25,7 @@
 		size_t slen = min<size_t>(plen, seedLen);
 		int ns = 0;
 		for(size_t i = 0; i < slen; i++) {
-			if((int)(Dna5)patFw[i] == 4) {
+			if((int)patFw[i] == 4) {
 				if(++ns > seedMms) {
 					// Set 'done' so that
 					done = true;

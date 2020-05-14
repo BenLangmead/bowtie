@@ -3,7 +3,6 @@
 #include "search_globals.h"
 
 using namespace std;
-using namespace seqan;
 
 /// Sort by text-id then by text-offset
 bool operator< (const Hit& a, const Hit& b) {
@@ -178,9 +177,8 @@ void VerboseHitSink::append(
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else o << '\t';
-				for(size_t i = 0; i < seqan::length(h.patName); i++) {
-					o << (char)(h.patName[i]);
-				}
+				for (size_t i = 0; i < h.patName.length(); i++)
+					o << h.patName[i];
 			}
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
@@ -207,20 +205,21 @@ void VerboseHitSink::append(
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			const String<Dna5>* pat = &h.patSeq;
-			if(h.color && colorSeq) pat = &h.colSeq;
-			for(size_t i = 0; i < seqan::length(*pat); i++) {
-				o << (char)((*pat)[i]);
+			size_t plen = h.patSeq.length();
+			const char *pat = h.patSeq.toZBuf();
+			if(h.color && colorSeq) pat = h.colSeq.toZBuf();
+			for (size_t i = 0; i < plen; i++) {
+				o << pat[i];
+
 			}
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			const String<char>* qual = &h.quals;
+			const BTString* qual = &h.quals;
 			if(h.color && colorQual) qual = &h.colQuals;
-			for(size_t i = 0; i < seqan::length(*qual); i++) {
-				o << (char)((*qual)[i]);
-			}
+			for (size_t i = 0; i < qual->length(); i++)
+				o << (*qual)[i];
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
@@ -230,10 +229,9 @@ void VerboseHitSink::append(
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			const size_t len = length(h.patSeq);
 			// Output mismatch column
 			bool firstmm = true;
-			for (unsigned int i = 0; i < len; ++ i) {
+			for (unsigned int i = 0; i < h.patSeq.length(); ++ i) {
 				if(h.mms.test(i)) {
 					// There's a mismatch at this position
 					if (!firstmm) {
@@ -242,7 +240,7 @@ void VerboseHitSink::append(
 					o << i; // position
 					assert_gt(h.refcs.size(), i);
 					char refChar = toupper(h.refcs[i]);
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					char qryChar = (h.fw ? h.patSeq.toChar(i) : h.patSeq.toChar(h.patSeq.length()-i-1));
 					assert_neq(refChar, qryChar);
 					o << ":" << refChar << ">" << qryChar;
 					firstmm = false;
@@ -263,14 +261,14 @@ void VerboseHitSink::append(
 				else o << '\t';
 				int labelOff = -1;
 				// If LB: field is present, print its value
-				for(int i = 0; i < (int)seqan::length(h.patName)-3; i++) {
+				for(int i = 0; i < (int)h.patName.length() - 3; i++) {
 					if(h.patName[i]   == 'L' &&
 					   h.patName[i+1] == 'B' &&
 					   h.patName[i+2] == ':' &&
 					   ((i == 0) || h.patName[i-1] == ';'))
 					{
 						labelOff = i+3;
-						for(int j = labelOff; j < (int)seqan::length(h.patName); j++) {
+						for(int j = labelOff; j < (int)h.patName.length(); j++) {
 							if(h.patName[j] != ';') {
 								o << h.patName[j];
 							} else {
@@ -281,9 +279,8 @@ void VerboseHitSink::append(
 				}
 				// Otherwise, print the whole read name
 				if(labelOff == -1) {
-					for(size_t i = 0; i < seqan::length(h.patName); i++) {
-						o << (char)(h.patName[i]);
-					}
+					for (size_t i = 0; i < h.patName.length(); i++)
+						o << h.patName[i];
 				}
 			}
 		}

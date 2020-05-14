@@ -1,6 +1,7 @@
 #ifndef ASSERT_HELPERS_H_
 #define ASSERT_HELPERS_H_
 
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <cassert>

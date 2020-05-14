@@ -5,13 +5,7 @@
 prefix = /usr/local
 bindir = $(prefix)/bin
 
-SEQAN_DIR = ./SeqAn-1.1
-# treat SeqAn as a sysdir to suppress warnings
-SEQAN_INC = -isystem $(SEQAN_DIR)
-INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) $(SEQAN_INC) -I third_party
-CPP = g++
-CXX = $(CPP)
-CC = gcc
+INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) -I third_party
 LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
@@ -22,7 +16,7 @@ EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
 WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
-				-Wno-unused-local-typedefs
+		-Wno-unused-private-field
 
 RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
 
@@ -205,7 +199,6 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
-               SeqAn-1.1 \
                bowtie \
                bowtie-build \
                bowtie-inspect \

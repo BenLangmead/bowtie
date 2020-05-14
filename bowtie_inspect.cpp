@@ -3,15 +3,14 @@
 #include <iostream>
 #include <getopt.h>
 #include <stdexcept>
-#include <seqan/find.h>
 
 #include "assert_helpers.h"
 #include "endian_swap.h"
 #include "ebwt.h"
 #include "reference.h"
+#include "sstring.h"
 
 using namespace std;
-using namespace seqan;
 
 static bool showVersion = false; // just print version and quit?
 int verbose             = 0;  // be talkative
@@ -274,7 +273,7 @@ void print_ref_sequences(
 template<typename TStr>
 void print_index_sequences(
 	ostream& fout,
-	Ebwt<TStr>& ebwt,
+	Ebwt& ebwt,
 	const BitPairReference& refs)
 {
 	vector<string>* refnames = &(ebwt.refnames());
@@ -286,7 +285,7 @@ void print_index_sequences(
 	string curr_ref_seq = "";
 	TIndexOffU curr_ref_len = OFF_MASK;
 	uint32_t last_text_off = 0;
-	size_t orig_len = seqan::length(cat_ref);
+	size_t orig_len = cat_ref.length();
 	TIndexOffU tlen = OFF_MASK;
 	bool first = true;
 	for(size_t i = 0; i < orig_len; i++) {
@@ -320,7 +319,7 @@ void print_index_sequences(
 			if (textoff_adj - last_text_off > 1)
 				curr_ref_seq += string(textoff_adj - last_text_off - 1, 'N');
 
-			curr_ref_seq.push_back(getValue(cat_ref,i));
+			curr_ref_seq.push_back(cat_ref[i]);
 			last_text_off = textoff;
 			first = false;
 		}
@@ -347,7 +346,7 @@ void print_index_sequence_names(const string& fname, ostream& fout)
 	}
 }
 
-typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
+// typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
 
 /**
  * Print a short summary of what's in the index and its flags.
@@ -361,7 +360,7 @@ void print_index_summary(
 	int32_t flagsr = readFlags(fname + ".rev");
 	bool color = readEbwtColor(fname);
 	bool entireReverse = readEntireReverse(fname + ".rev");
-	TPackedEbwt ebwt(
+	Ebwt ebwt(
 		fname,
 		color,                // index is colorspace
 		-1,                   // don't require entire reverse
@@ -437,7 +436,7 @@ static void driver(
 		print_index_summary(adjustedEbwtFileBase, cout, refs);
 	} else {
 		// Initialize Ebwt object
-		TPackedEbwt ebwt(
+		Ebwt ebwt(
 			adjustedEbwtFileBase,
 			color,                // index is colorspace
 			-1,                   // don't care about entire-reverse
@@ -456,7 +455,7 @@ static void driver(
 		// Load whole index into memory
 		if(refFromEbwt) {
 			ebwt.loadIntoMemory(-1, -1, true, false);
-			print_index_sequences(cout, ebwt, refs);
+			print_index_sequences<BTRefString >(cout, ebwt, refs);
 		} else {
 			vector<string> refnames;
 			readEbwtRefnames(adjustedEbwtFileBase, refnames);

@@ -7,8 +7,8 @@
 
 #include <math.h>
 #include <iostream>
-#include <seqan/sequence.h>
 #include "alphabet.h"
+#include "sstring.h"
 #include "timer.h"
 
 using namespace std;
@@ -176,7 +176,7 @@ public:
 	/**
 	 *
 	 */
-	void nextRead(const seqan::String<seqan::Dna5>& read) {
+	void nextRead(const BTDnaString& read) {
 		if(!first_) {
 			finishRead();
 		}
@@ -189,10 +189,49 @@ public:
 		curBacktracks_ = 0;
 		// Count Ns
 		curNumNs_ = 0;
-		const size_t len = seqan::length(read);
+		const size_t len = read.length();
 		for(size_t i = 0; i < len; i++) {
 			if((int)read[i] == 4) curNumNs_++;
 		}
+	}
+
+	inline float entropyDna5(const BTDnaString& read) {
+		size_t cs[5] = {0, 0, 0, 0, 0};
+		size_t readLen = read.length();
+		for(size_t i = 0; i < readLen; i++) {
+			int c = (int)read[i];
+			assert_lt(c, 5);
+			assert_geq(c, 0);
+			cs[c]++;
+		}
+		if(cs[4] > 0) {
+			// Charge the Ns to the non-N character with maximal count and
+			// then exclude them from the entropy calculation (i.e.,
+			// penalize Ns as much as possible)
+			if(cs[0] >= cs[1] && cs[0] >= cs[2] && cs[0] >= cs[3]) {
+				// Charge Ns to As
+				cs[0] += cs[4];
+			} else if(cs[1] >= cs[2] && cs[1] >= cs[3]) {
+				// Charge Ns to Cs
+				cs[1] += cs[4];
+			} else if(cs[2] >= cs[3]) {
+				// Charge Ns to Gs
+				cs[2] += cs[4];
+			} else {
+				// Charge Ns to Ts
+				cs[3] += cs[4];
+			}
+		}
+		float ent = 0.0;
+		for(int i = 0; i < 4; i++) {
+			if(cs[i] > 0) {
+				float frac = (float)cs[i] / (float)readLen;
+				ent += (frac * log(frac));
+			}
+		}
+		ent = -ent;
+		assert_geq(ent, 0.0);
+		return ent;
 	}
 
 	/**

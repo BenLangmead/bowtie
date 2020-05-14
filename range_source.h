@@ -6,8 +6,8 @@
 #define RANGE_SOURCE_H_
 
 #include <stdint.h>
+#include <queue>
 #include <vector>
-#include "seqan/sequence.h"
 #include "ebwt.h"
 #include "range.h"
 #include "pool.h"
@@ -792,8 +792,8 @@ public:
 	/**
 	 * Pretty-print the state of this branch.
 	 */
-	void print(const String<Dna5>& qry,
-	           const String<char>& quals,
+	void print(const BTDnaString& qry,
+	           const BTString& quals,
 	           uint16_t minCost,
 	           std::ostream& out,
 	           bool halfAndHalf,
@@ -803,7 +803,7 @@ public:
 	{
 		size_t editidx = 0;
 		size_t printed = 0;
-		const size_t qlen = seqan::length(qry);
+		const size_t qlen = qry.length();
 		if(exhausted_)      out << "E ";
 		else if(curtailed_) out << "C ";
 		else                out << "  ";
@@ -1579,7 +1579,6 @@ protected:
  * ranges, and stopping when the consumer is satisfied.
  */
 class RangeSource {
-	typedef Ebwt<String<Dna> > TEbwt;
 public:
 	RangeSource() :
 		done(false), foundRange(false), curEbwt_(NULL) { }
@@ -1596,7 +1595,7 @@ public:
 	/// Return the last valid range found
 	virtual Range& range() = 0;
 	/// Return ptr to index this RangeSource is currently getting ranges from
-	const TEbwt *curEbwt() const { return curEbwt_; }
+	const Ebwt *curEbwt() const { return curEbwt_; }
 
 	/// All searching w/r/t the current query is finished
 	bool done;
@@ -1604,7 +1603,7 @@ public:
 	bool foundRange;
 protected:
 	/// ptr to index this RangeSource is currently getting ranges from
-	const TEbwt *curEbwt_;
+	const Ebwt *curEbwt_;
 };
 
 /**
@@ -1612,7 +1611,6 @@ protected:
  */
 template<typename TRangeSource>
 class RangeSourceDriver {
-	typedef Ebwt<String<Dna> > TEbwt;
 public:
 	RangeSourceDriver(bool _done, uint32_t minCostAdjustment = 0) :
 		foundRange(false), done(_done), minCostAdjustment_(minCostAdjustment)
@@ -1716,16 +1714,14 @@ protected:
 template<typename TRangeSource>
 class SingleRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef Ebwt<String<Dna> > TEbwt;
-
 public:
 	SingleRangeSourceDriver(
-		EbwtSearchParams<String<Dna> >& params,
+		EbwtSearchParams& params,
 		TRangeSource* rs,
 		bool fw,
 		HitSink& sink,
 		HitSinkPerThread* sinkPt,
-		vector<String<Dna5> >& os,
+		vector<BTRefString >& os,
 		bool verbose,
 		bool quiet,
 		bool mate1,
@@ -1864,7 +1860,7 @@ public:
 		return fw_;
 	}
 
-	virtual void initRangeSource(const String<char>& qual) = 0;
+	virtual void initRangeSource(const BTString& qual) = 0;
 
 protected:
 
@@ -1876,7 +1872,7 @@ protected:
 	HitSinkPerThread* sinkPt_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> >& params_;
+	EbwtSearchParams& params_;
 	bool                            fw_;
 	TRangeSource*                   rs_; // delete this in destructor
 	bool ebwtFw_;
@@ -1893,7 +1889,6 @@ protected:
 template<typename TRangeSource>
 class StubRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef Ebwt<String<Dna> > TEbwt;
 	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
@@ -1942,7 +1937,6 @@ public:
 template<typename TRangeSource>
 class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef Ebwt<String<Dna> > TEbwt;
 	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
@@ -2037,7 +2031,6 @@ protected:
 template<typename TRangeSource>
 class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef Ebwt<String<Dna> > TEbwt;
 	typedef RangeSourceDriver<TRangeSource>* TRangeSrcDrPtr;
 	typedef std::vector<TRangeSrcDrPtr> TRangeSrcDrPtrVec;
 
