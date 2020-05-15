@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdexcept>
+#include <stdint.h>
 #include <string>
 #include <sstream>
 
@@ -128,49 +129,6 @@ suffixStr(const TStr& l, size_t off) {
 	}
 	return ret;
 }
-
-/**
- * Calculate the entropy of the given read.  Handle Ns by charging them
- * to the most frequent non-N character.
- */
-// static inline float entropyDna5(const BTDnaString& read) {
-//	size_t cs[5] = {0, 0, 0, 0, 0};
-//	size_t readLen = read.length();
-//	for(size_t i = 0; i < readLen; i++) {
-//		int c = (int)read[i];
-//		assert_lt(c, 5);
-//		assert_geq(c, 0);
-//		cs[c]++;
-//	}
-//	if(cs[4] > 0) {
-//		// Charge the Ns to the non-N character with maximal count and
-//		// then exclude them from the entropy calculation (i.e.,
-//		// penalize Ns as much as possible)
-//		if(cs[0] >= cs[1] && cs[0] >= cs[2] && cs[0] >= cs[3]) {
-//			// Charge Ns to As
-//			cs[0] += cs[4];
-//		} else if(cs[1] >= cs[2] && cs[1] >= cs[3]) {
-//			// Charge Ns to Cs
-//			cs[1] += cs[4];
-//		} else if(cs[2] >= cs[3]) {
-//			// Charge Ns to Gs
-//			cs[2] += cs[4];
-//		} else {
-//			// Charge Ns to Ts
-//			cs[3] += cs[4];
-//		}
-//	}
-//	float ent = 0.0;
-//	for(int i = 0; i < 4; i++) {
-//		if(cs[i] > 0) {
-//			float frac = (float)cs[i] / (float)readLen;
-//			ent += (frac * log(frac));
-//		}
-//	}
-//	ent = -ent;
-//	assert_geq(ent, 0.0);
-//	return ent;
-// }
 
 /**
  * Return the DNA complement of the given ASCII char.

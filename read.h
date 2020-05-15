@@ -24,9 +24,9 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include "sstring.h"
 #include "filebuf.h"
 #include "hit_set.h"
+#include "sstring.h"
 #include "util.h"
 
 typedef uint64_t TReadId;

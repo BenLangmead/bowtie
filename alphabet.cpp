@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include "alphabet.h"
 
 uint8_t dna4Cat[] = {
 	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

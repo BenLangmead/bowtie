@@ -1,18 +1,19 @@
 #ifndef REF_READ_H_
 #define REF_READ_H_
 
-#include <iostream>
 #include <cassert>
-#include <vector>
-#include <string>
 #include <ctype.h>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
+#include <string>
+#include <vector>
+
 #include "alphabet.h"
 #include "assert_helpers.h"
+#include "endian_swap.h"
 #include "filebuf.h"
 #include "word_io.h"
-#include "endian_swap.h"
 
 using namespace std;
 
