@@ -635,14 +635,20 @@ class BinarySorting_worker {
 				Timer timer(cout, "QSorting sample offsets, eliminating duplicates time: ", this->verbose());
 				VMSG_NL("QSorting " << _sampleSuffs.size() << " sample offsets, eliminating duplicates");
 				std::sort(_sampleSuffs.begin(), _sampleSuffs.end());
-				std::unique(_sampleSuffs.begin(), _sampleSuffs.end());
-
-			}
-			// Multikey quicksort the samples
-			{
-				Timer timer(cout, "  Multikey QSorting samples time: ", this->verbose());
-				VMSG_NL("Multikey QSorting " << _sampleSuffs.size() << " samples");
-				this->qsort(_sampleSuffs);
+				size_t sslen = _sampleSuffs.size();
+				for (size_t i = 0; i < sslen-1; i++) {
+					if (_sampleSuffs[i] == _sampleSuffs[i+1]) {
+						_sampleSuffs.erase(_sampleSuffs.begin() + i);
+						i--;
+						sslen--;
+					}
+				}
+				// Multikey quicksort the samples
+				{
+					Timer timer(cout, "  Multikey QSorting samples time: ", this->verbose());
+					VMSG_NL("Multikey QSorting " << _sampleSuffs.size() << " samples");
+					this->qsort(_sampleSuffs);
+				 }
 			}
 			// Calculate bucket sizes
 			VMSG_NL("Calculating bucket sizes");

@@ -737,7 +737,6 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					// can re-use this prefix for all the reads
 					// that are substrings of this FASTA sequence
 					name_prefix_buf_.append(c);
-					subReadCnt_ = 0;
 				}
 				c = getc_wrapper();
 			}
@@ -767,13 +766,13 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 				// the sampling gaps are by looking at the read
 				// name
 				if(!beginning_) {
-					subReadCnt_++;
+					cur_++;
 				}
 				continue;
 			}
 			// install name
-			readbuf[readi].readOrigBuf = name_prefix_buf_;
-			itoa10<TReadId>(subReadCnt_, name_int_buf_);
+			readbuf[readi].readOrigBuf.append(name_prefix_buf_.buf());
+			itoa10<TReadId>(cur_ - last_, name_int_buf_);
 			readbuf[readi].readOrigBuf.append(name_int_buf_);
 			readbuf[readi].readOrigBuf.append('\t');
 			// install sequence
@@ -787,8 +786,8 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 				readbuf[readi].readOrigBuf.append(c);
 			}
 			eat_ = freq_-1;
+			cur_++;
 			beginning_ = false;
-			subReadCnt_++;
 			readi++;
 		}
 	}
@@ -808,13 +807,12 @@ bool FastaContinuousPatternSource::parse(
 	assert(ra.empty());
 	assert(rb.empty());
 	assert(!ra.readOrigBuf.empty()); // raw data for read/pair is here
-	assert(!rb.readOrigBuf.empty());
+	assert(rb.readOrigBuf.empty());
 	int c = '\t';
 	size_t cur = 0;
 	const size_t buflen = ra.readOrigBuf.length();
 
 	// Parse read name
-	assert(ra.name.empty());
 	c = ra.readOrigBuf[cur++];
 	while(c != '\t' && cur < buflen) {
 		ra.name.append(c);
@@ -1048,6 +1046,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 				r.qual.append(c);
 			}
 		}
+		r.qual.trimEnd(r.trimmed3);
 		if(r.qual.length() < r.patFw.length()) {
 			tooFewQualities(r.name);
 			return false;
@@ -1060,6 +1059,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			if (r.color && r.qual.length() - r.patFw.length() <= 2) {
 				// TODO: reimplement this
 				// memmove(r.qualBuf, r.qualBuf + (qualoff - seqoff), seqoff);
+				memmove(r.qual.wbuf(), r.qual.buf() + (r.qual.length() - r.patFw.length()), r.patFw.length());
 			}
 			else {
 				tooManyQualities(r.name);

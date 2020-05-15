@@ -30,8 +30,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <unistd.h>
 #include <zlib.h>
 
+#include "alphabet.h"
 #include "assert_helpers.h"
 
 /**
@@ -391,7 +393,7 @@ public:
 			// if we see caret or EOF, break
 			if(c == '>' || c == -1) break;
 			// append and continue
-			seq[seqcur++] = c;
+			seq[seqcur++] = charToDna5[c];
 			get(); c = peek();
 		}
 	}

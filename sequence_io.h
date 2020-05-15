@@ -71,7 +71,7 @@ static void readSequenceFile(const std::string& infile,
 	for (size_t i = 0; !fb.eof(); i++) {
 		std::string names;
 		names.reserve(namelens[i] + 1);
-		ss.push_back(TStr(new char[seqlens[i] + 1])); // add a new empty string to the end
+		ss.push_back(TStr(new char[seqlens[i]], seqlens[i])); // add a new empty string to the end
 		// Fill the new empty string with the next sequence from
 		// the file.  SeqAn allocates just enough mem for it (at
 		// the expense of lots of file seeks, which can add up)
