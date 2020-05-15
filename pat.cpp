@@ -737,7 +737,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					// Put it in the name prefix buffer so we
 					// can re-use this prefix for all the reads
 					// that are substrings of this FASTA sequence
-					name_prefix_buf_.append(c);
+					name_prefix_buf_.push_back(c);
 				}
 				c = getc_wrapper();
 			}
@@ -747,7 +747,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 			if(c < 0) {
 				break;
 			}
-			name_prefix_buf_.append('_');
+			name_prefix_buf_.push_back('_');
 		}
 		int cat = asc2dnacat[c];
 		if(cat >= 2) c = 'N';
@@ -772,7 +772,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 				continue;
 			}
 			// install name
-			readbuf[readi].readOrigBuf.append(name_prefix_buf_.buf());
+			readbuf[readi].readOrigBuf.append(name_prefix_buf_.c_str());
 			itoa10<TReadId>(cur_ - last_, name_int_buf_);
 			readbuf[readi].readOrigBuf.append(name_int_buf_);
 			readbuf[readi].readOrigBuf.append('\t');

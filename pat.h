@@ -323,6 +323,7 @@ public:
 		filecur_(0),
 		fp_(NULL),
 		qfp_(NULL),
+		zfp_(NULL),
 		is_open_(false),
 		first_(true)
 	{
@@ -670,7 +671,7 @@ private:
 	                    /// window
 	bool beginning_;    /// skipping over the first read length?
 	char buf_[1024];    /// read buffer
-	Read::TBuf name_prefix_buf_; /// FASTA sequence name buffer
+	std::string name_prefix_buf_; /// FASTA sequence name buffer
 	char name_int_buf_[20]; /// for composing offsets for names
 	size_t bufCur_;     /// buffer cursor; points to where we should
 	                    /// insert the next character
