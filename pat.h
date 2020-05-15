@@ -301,7 +301,7 @@ private:
 	size_t cur_;                      // index for first read of next batch
 	bool paired_;                     // whether reads are paired
 	std::vector<std::string> tokbuf_; // buffer for storing parsed tokens
-	std::vector<Read::TBuf> bufs_;   // per-read buffers
+	std::vector<std::string> bufs_;   // per-read buffers
 	char nametmp_[20];                // temp buffer for constructing name
 };
 

@@ -381,18 +381,18 @@ VectorPatternSource::VectorPatternSource(
 		bufs_.back().clear();
 		// Install name
 		itoa10<TReadId>(static_cast<TReadId>(i), nametmp_);
-		bufs_.back().install(nametmp_);
-		bufs_.back().append('\t');
+		bufs_.back() = nametmp_;
+		bufs_.back().push_back('\t');
 		// Install sequence
 		bufs_.back().append(tokbuf_[0].c_str());
-		bufs_.back().append('\t');
+		bufs_.back().push_back('\t');
 		// Install qualities
 		if(tokbuf_.size() > 1) {
 			bufs_.back().append(tokbuf_[1].c_str());
 		} else {
 			const size_t len = tokbuf_[0].length();
 			for(size_t i = 0; i < len; i++) {
-				bufs_.back().append('I');
+				bufs_.back().push_back('I');
 			}
 		}
 	}
@@ -413,7 +413,7 @@ pair<bool, int> VectorPatternSource::nextBatchImpl(
 	size_t readi = 0;
 
 	for(; readi < pt.max_buf_ && cur_ < bufs_.size(); readi++, cur_++) {
-		readbuf[readi].readOrigBuf = bufs_[cur_];
+		readbuf[readi].readOrigBuf.append(bufs_[cur_].c_str());
 	}
 	readCnt_ += readi;
 	return make_pair(cur_ == bufs_.size(), readi);
