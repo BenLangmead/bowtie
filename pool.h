@@ -284,7 +284,6 @@ public:
 		}
 		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
 			cur_--;
-			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
 				rewindPool();
 			}
@@ -304,7 +303,6 @@ public:
 		}
 		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
 			cur_ -= num;
-			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
 				rewindPool();
 			}
@@ -345,7 +343,6 @@ protected:
 			pool_->exhausted();
 			return false;
 		}
-		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 		pools_.push_back(pool);
 		lastCurInPool_.push_back(cur_);
 		curPool_++;
@@ -365,7 +362,6 @@ protected:
 				pool_->exhausted();
 				return false;
 			}
-			ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 			pools_.push_back(pool);
 			assert_eq(1, pools_.size());
 		}
