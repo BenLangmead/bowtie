@@ -18,10 +18,10 @@
 #include "multikey_qsort.h"
 #include "random_source.h"
 #include "binary_sa_search.h"
+#include "ds.h"
 #include "zbox.h"
 #include "alphabet.h"
 #include "timer.h"
-#include "auto_array.h"
 #include "util.h"
 #include "word_io.h"
 

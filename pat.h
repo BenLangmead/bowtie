@@ -17,6 +17,7 @@
 #include "sstring.h"
 #include "alphabet.h"
 #include "assert_helpers.h"
+#include "ds.h"
 #include "tokenize.h"
 #include "random_source.h"
 #include "threading.h"
@@ -92,8 +93,6 @@ struct PerThreadReadBuf {
 
 	PerThreadReadBuf(size_t max_buf) :
 		max_buf_(max_buf),
-		bufa_(max_buf),
-		bufb_(max_buf),
 		rdid_()
 	{
 		bufa_.resize(max_buf);
@@ -160,8 +159,8 @@ struct PerThreadReadBuf {
 	}
 
 	const size_t max_buf_; // max # reads to read into buffer at once
-	vector<Read> bufa_; // Read buffer for mate as
-	vector<Read> bufb_; // Read buffer for mate bs
+	EList<Read> bufa_; // Read buffer for mate as
+	EList<Read> bufb_; // Read buffer for mate bs
 	size_t cur_buf_;       // Read buffer currently active
 	TReadId rdid_;         // index of read at offset 0 of bufa_/bufb_
 };

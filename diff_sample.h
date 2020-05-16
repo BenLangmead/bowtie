@@ -10,8 +10,8 @@
 #include <vector>
 
 #include "assert_helpers.h"
-#include "auto_array.h"
 #include "btypes.h"
+#include "ds.h"
 #include "ls.h"
 #include "multikey_qsort.h"
 #include "timer.h"

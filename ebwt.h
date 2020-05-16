@@ -21,11 +21,11 @@
 
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "auto_array.h"
 #include "bitpack.h"
 #include "bitset.h"
 #include "blockwise_sa.h"
 #include "color_dec.h"
+#include "ds.h"
 #include "endian_swap.h"
 #include "hit.h"
 #include "mm.h"
