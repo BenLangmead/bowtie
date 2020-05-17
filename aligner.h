@@ -388,7 +388,6 @@ public:
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
 		vector<BTRefString >& os, // TODO: remove this, not used
-		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -397,7 +396,6 @@ public:
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode),
-		refs_(refs),
 		doneFirst_(true),
 		firstIsFw_(true),
 		chase_(false),
@@ -470,19 +468,12 @@ public:
 	{
 		bool ebwtFw = ra.ebwt->fw();
 		params_->setFw(ra.fw);
-		assert_eq(bufa_->color, color);
 		return params_->reportHit(
 				ra.fw ? (ebwtFw? bufa_->patFw    : bufa_->patFwRev) :
 				        (ebwtFw? bufa_->patRc    : bufa_->patRcRev),
 				ra.fw ? (ebwtFw? &bufa_->qual    : &bufa_->qualRev) :
 				        (ebwtFw? &bufa_->qualRev : &bufa_->qual),
 				&bufa_->name,
-				bufa_->color,
-				bufa_->primer,
-				bufa_->trimc,
-				colorExEnds,
-				snpPhred,
-				refs_,
 				ebwtFw,
 				ra.mms,                   // mismatch positions
 				ra.refcs,                 // reference characters for mms
@@ -573,9 +564,6 @@ public:
 	}
 
 protected:
-
-	// Reference sequences (needed for colorspace decoding)
-	const BitPairReference* refs_;
 
 	// Progress state
 	bool doneFirst_;
@@ -881,7 +869,6 @@ protected:
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
-		assert_eq(bufL->color, color);
 		// Print upstream mate first
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
@@ -889,12 +876,6 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
-				bufL->color,
-				bufL->primer,
-				bufL->trimc,
-				colorExEnds,
-				snpPhred,
-				refs_,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -916,19 +897,12 @@ protected:
 			return true; // can happen when -m is set
 		}
 		params_->setFw(rR.fw);
-		assert_eq(bufR->color, color);
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
 					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
 				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
-				bufR->color,
-				bufR->primer,
-				bufR->trimc,
-				colorExEnds,
-				snpPhred,
-				refs_,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -1754,7 +1728,6 @@ protected:
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
-		assert_eq(bufL->color, color);
 		// Print upstream mate first
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
@@ -1762,12 +1735,6 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
-				bufL->color,
-				bufL->primer,
-				bufL->trimc,
-				colorExEnds,
-				snpPhred,
-				refs_,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -1789,19 +1756,12 @@ protected:
 			return true; // can happen when -m is set
 		}
 		params_->setFw(rR.fw);
-		assert_eq(bufR->color, color);
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
 				        (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
 				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
-				bufR->color,
-				bufR->primer,
-				bufR->trimc,
-				colorExEnds,
-				snpPhred,
-				refs_,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -1834,7 +1794,6 @@ protected:
 		Read* buf = r.mate1 ? bufa_ : bufb_;
 		bool ebwtFw = r.ebwt->fw();
 		uint32_t len = r.mate1 ? alen_ : blen_;
-		assert_eq(buf->color, color);
 		// Print upstream mate first
 		if(params->reportHit(
 			r.fw ? (ebwtFw?  buf->patFw   :  buf->patFwRev) :
@@ -1842,12 +1801,6 @@ protected:
 			r.fw ? (ebwtFw? &buf->qual    : &buf->qualRev) :
 			       (ebwtFw? &buf->qualRev : &buf->qual),
 			&buf->name,
-			buf->color,
-			buf->primer,
-			buf->trimc,
-			colorExEnds,
-			snpPhred,
-			refs_,
 			ebwtFw,
 			r.mms,                   // mismatch positions
 			r.refcs,                 // reference characters for mms

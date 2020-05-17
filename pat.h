@@ -259,7 +259,6 @@ class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(
 		const vector<string>& v,
-		bool color,
 		int trim3 = 0,
 		int trim5 = 0);
 
@@ -296,7 +295,6 @@ private:
 		PerThreadReadBuf& pt,
 		bool batch_a);
 
-	bool color_;                      // colorspace?
 	size_t cur_;                      // index for first read of next batch
 	bool paired_;                     // whether reads are paired
 	std::vector<std::string> tokbuf_; // buffer for storing parsed tokens
@@ -453,8 +451,7 @@ private:
 };
 
 /**
- * Synchronized concrete pattern source for a list of FASTA or CSFASTA
- * (if color = true) files.
+ * Synchronized concrete pattern source for a list of FASTA
  */
 class FastaPatternSource : public CFilePatternSource {
 
@@ -463,7 +460,6 @@ public:
 	FastaPatternSource(
 		const vector<string>& infiles,
 		const vector<string>* qinfiles,
-		bool color,
 		int trim3 = 0,
 		int trim5 = 0,
 		bool solexa64 = false,
@@ -475,7 +471,6 @@ public:
 			trim3,
 			trim5),
 		first_(true),
-		color_(color),
 		solexa64_(solexa64),
 		phred64_(phred64),
 		intQuals_(intQuals) { }
@@ -522,7 +517,6 @@ protected:
 private:
 
 	bool first_;
-	bool color_;
 	bool solexa64_;
 	bool phred64_;
 	bool intQuals_;
@@ -550,7 +544,6 @@ public:
 	TabbedPatternSource(
 		const vector<string>& infiles,
 		bool secondName,  // whether it's --12/--tab5 or --tab6
-		bool color,
 		int trim3 = 0,
 		int trim5 = 0,
 		bool solQuals = false,
@@ -561,7 +554,6 @@ public:
 			NULL,
 			trim3,
 			trim5),
-		color_(color),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
 		intQuals_(intQuals) { }
@@ -595,7 +587,6 @@ protected:
 
 protected:
 
-	bool color_;        // colorspace reads?
 	bool solQuals_;     // base qualities are log odds
 	bool phred64Quals_; // base qualities are on -64 scale
 	bool intQuals_;     // base qualities are space-separated strings
@@ -688,7 +679,6 @@ class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(
 		const vector<string>& infiles,
-		bool color,
 		int trim3 = 0,
 		int trim5 = 0,
 		bool solexa_quals = false,
@@ -705,8 +695,7 @@ public:
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals),
-		interleaved_(interleaved),
-		color_(color) { }
+		interleaved_(interleaved) { }
 
 	virtual void reset() {
 		first_ = true;
@@ -751,7 +740,6 @@ private:
 	bool phred64Quals_;
 	bool intQuals_;
 	bool interleaved_;
-	bool color_;
 };
 
 /**
@@ -765,7 +753,6 @@ public:
 
 	RawPatternSource(
 		const vector<string>& infiles,
-		bool color,
 		int trim3 = 0,
 		int trim5 = 0) :
 		CFilePatternSource(
@@ -773,8 +760,7 @@ public:
 			NULL,
 			trim3,
 			trim5),
-		first_(true),
-		color_(color) { }
+		first_(true) { }
 
 	virtual void reset() {
 		first_ = true;
@@ -812,7 +798,6 @@ protected:
 private:
 
 	bool first_;
-	bool color_;
 };
 
 /**

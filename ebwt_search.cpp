@@ -134,15 +134,10 @@ static bool fullRef;
 static bool samNoQnameTrunc; // don't truncate QNAME field at first whitespace
 static bool samNoHead; // don't print any header lines in SAM output
 static bool samNoSQ;   // don't print @SQ header lines
-bool color;     // true -> inputs are colorspace
-bool colorExEnds; // true -> nucleotides on either end of decoded cspace alignment should be excluded
 static string rgs; // SAM outputs for @RG header line
-int snpPhred; // probability of SNP, for scoring colorspace alignments
 static Bitset suppressOuts(64); // output fields to suppress
 static bool sampleMax; // whether to report a random alignment when maxed-out via -m/-M
 static int defaultMapq; // default mapping quality to print in SAM mode
-bool colorSeq; // true -> show colorspace alignments as colors, not decoded bases
-bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
 static bool printCost; // true -> print stratum and cost
 bool showSeed;
 static vector<string> qualities;
@@ -150,7 +145,6 @@ static vector<string> qualities1;
 static vector<string> qualities2;
 static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
-bool gReportColorPrimer;
 bool noUnal; // don't print unaligned reads
 MUTEX_T gLock;
 
@@ -241,15 +235,10 @@ static void resetOptions() {
 	samNoQnameTrunc         = false; // don't truncate at first whitespace?
 	samNoHead				= false; // don't print any header lines in SAM output
 	samNoSQ					= false; // don't print @SQ header lines
-	color					= false; // don't align in colorspace by default
-	colorExEnds				= true;  // true -> nucleotides on either end of decoded cspace alignment should be excluded
 	rgs						= "";    // SAM outputs for @RG header line
-	snpPhred				= 30;    // probability of SNP, for scoring colorspace alignments
 	suppressOuts.clear();            // output fields to suppress
 	sampleMax				= false;
 	defaultMapq				= 255;
-	colorSeq				= false; // true -> show colorspace alignments as colors, not decoded bases
-	colorQual				= false; // true -> show colorspace qualities as original quals, not decoded quals
 	printCost				= false; // true -> print cost and stratum
 	showSeed				= false; // true -> print per-read pseudo-random seed
 	qualities.clear();
@@ -257,7 +246,6 @@ static void resetOptions() {
 	qualities2.clear();
 	wrapper.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
-	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
 	noUnal					= false; // true -> do not report unaligned reads
 }
 
@@ -319,23 +307,17 @@ enum {
 	ARG_FUZZY,
 	ARG_FULLREF,
 	ARG_USAGE,
-	ARG_SNPPHRED,
-	ARG_SNPFRAC,
 	ARG_SAM_NO_QNAME_TRUNC,
 	ARG_SAM_NOHEAD,
 	ARG_SAM_NOSQ,
 	ARG_SAM_RG,
 	ARG_SUPPRESS_FIELDS,
 	ARG_DEFAULT_MAPQ,
-	ARG_COLOR_SEQ,
-	ARG_COLOR_QUAL,
 	ARG_COST,
-	ARG_COLOR_KEEP_ENDS,
 	ARG_SHOWSEED,
 	ARG_QUALS1,
 	ARG_QUALS2,
 	ARG_ALLOW_CONTAIN,
-	ARG_COLOR_PRIMER,
 	ARG_WRAPPER,
 	ARG_INTERLEAVED_FASTQ,
 	ARG_SAM_NO_UNAL,
@@ -427,19 +409,12 @@ static struct option long_options[] = {
 {(char*)"sam-nohead",                        no_argument,        0,                    ARG_SAM_NOHEAD},
 {(char*)"sam-nosq",                          no_argument,        0,                    ARG_SAM_NOSQ},
 {(char*)"sam-noSQ",                          no_argument,        0,                    ARG_SAM_NOSQ},
-{(char*)"color",                             no_argument,        0,                    'C'},
 {(char*)"sam-RG",                            required_argument,  0,                    ARG_SAM_RG},
-{(char*)"snpphred",                          required_argument,  0,                    ARG_SNPPHRED},
-{(char*)"snpfrac",                           required_argument,  0,                    ARG_SNPFRAC},
 {(char*)"suppress",                          required_argument,  0,                    ARG_SUPPRESS_FIELDS},
 {(char*)"mapq",                              required_argument,  0,                    ARG_DEFAULT_MAPQ},
-{(char*)"col-cseq",                          no_argument,        0,                    ARG_COLOR_SEQ},
-{(char*)"col-cqual",                         no_argument,        0,                    ARG_COLOR_QUAL},
-{(char*)"col-keepends",                      no_argument,        0,                    ARG_COLOR_KEEP_ENDS},
 {(char*)"cost",                              no_argument,        0,                    ARG_COST},
 {(char*)"showseed",                          no_argument,        0,                    ARG_SHOWSEED},
 {(char*)"allow-contain",no_argument,         0,                  ARG_ALLOW_CONTAIN},
-{(char*)"col-primer",                        no_argument,        0,                    ARG_COLOR_PRIMER},
 {(char*)"wrapper",                           required_argument,  0,                    ARG_WRAPPER},
 {(char*)"interleaved",                       required_argument,  0,                    ARG_INTERLEAVED_FASTQ},
 {(char*)"no-unal",                           no_argument,        0,                    ARG_SAM_NO_UNAL},
@@ -483,7 +458,6 @@ static void printUsage(ostream& out) {
 	    << "                     and aligned at offsets 1, 1+i, 1+2i ... end of reference" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
-	    << "  -C                 reads and index are in colorspace" << endl
 	    << "  -Q/--quals <file>  QV file(s) corresponding to CSFASTA inputs; use with -f -C" << endl
 	    << "  --Q1/--Q2 <file>   same as -Q, but for mate files 1 and 2 respectively" << endl
 	    << "  -s/--skip <int>    skip the first <int> reads/pairs in the input" << endl
@@ -532,13 +506,6 @@ static void printUsage(ostream& out) {
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
 	    << "  --suppress <cols>  suppresses given columns (comma-delim'ed) in default output" << endl
 	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
-	    << "Colorspace:" << endl
-	    << "  --snpphred <int>   Phred penalty for SNP when decoding colorspace (def: 30)" << endl
-	    << "     or" << endl
-	    << "  --snpfrac <dec>    approx. fraction of SNP bases (e.g. 0.001); sets --snpphred" << endl
-	    << "  --col-cseq         print aligned colorspace seqs as colors, not decoded bases" << endl
-	    << "  --col-cqual        print original colorspace quals, not decoded quals" << endl
-	    << "  --col-keepends     keep nucleotides at extreme ends of decoded alignment" << endl
 	    << "SAM:" << endl
 	    << "  -S/--sam           write hits in SAM format" << endl
 	    << "  --mapq <int>       default mapping quality (MAPQ) to print for SAM alignments" << endl
@@ -665,7 +632,6 @@ static void parseOptions(int argc, const char **argv) {
 			case 'q': format = FASTQ; break;
 			case 'r': format = RAW; break;
 			case 'c': format = CMDLINE; break;
-			case 'C': color = true; break;
 			case 'I':
 				minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
 				break;
@@ -681,11 +647,8 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_RANGE: rangeMode = true; break;
 			case 'S': outType = OUTPUT_SAM; break;
 			case ARG_SHMEM: useShmem = true; break;
-			case ARG_COLOR_SEQ: colorSeq = true; break;
-			case ARG_COLOR_QUAL: colorQual = true; break;
 			case ARG_SHOWSEED: showSeed = true; break;
 			case ARG_ALLOW_CONTAIN: gAllowMateContainment = true; break;
-			case ARG_COLOR_PRIMER: gReportColorPrimer = true; break;
 			case ARG_SUPPRESS_FIELDS: {
 				vector<string> supp;
 				tokenize(optarg, ",", supp);
@@ -717,24 +680,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PHRED64: phred64Quals = true; break;
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
-			case ARG_COLOR_KEEP_ENDS: colorExEnds = false; break;
-			case ARG_SNPPHRED: snpPhred = parseInt(0, "--snpphred must be at least 0"); break;
-			case ARG_SNPFRAC: {
-				double p = parse<double>(optarg);
-				if(p <= 0.0) {
-					cerr << "Error: --snpfrac parameter must be > 0.0" << endl;
-					throw 1;
-				}
-				p = (log10(p) * -10);
-				snpPhred = (int)(p + 0.5);
-				if(snpPhred < 10)
-				cout << "snpPhred: " << snpPhred << endl;
-				break;
-			}
-			case 'z': {
-				cerr << "Error: -z/--phased mode is no longer supported" << endl;
-				throw 1;
-			}
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
 			case ARG_REPORTSE: reportSe = true; break;
@@ -906,48 +851,6 @@ static void parseOptions(int argc, const char **argv) {
 		     << "sequences must be specified with -1 and -2." << endl;
 		throw 1;
 	}
-	if(qualities.size() && format != FASTA) {
-		cerr << "Error: one or more quality files were specified with -Q but -f was not" << endl
-		     << "enabled.  -Q works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities.size() && !color) {
-		cerr << "Error: one or more quality files were specified with -Q but -C was not" << endl
-		     << "enabled.  -Q works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities1.size() && format != FASTA) {
-		cerr << "Error: one or more quality files were specified with --Q1 but -f was not" << endl
-		     << "enabled.  --Q1 works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities1.size() && !color) {
-		cerr << "Error: one or more quality files were specified with --Q1 but -C was not" << endl
-		     << "enabled.  --Q1 works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities2.size() && format != FASTA) {
-		cerr << "Error: one or more quality files were specified with --Q2 but -f was not" << endl
-		     << "enabled.  --Q2 works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities2.size() && !color) {
-		cerr << "Error: one or more quality files were specified with --Q2 but -C was not" << endl
-		     << "enabled.  --Q2 works only in combination with -f and -C." << endl;
-		throw 1;
-	}
-	if(qualities1.size() > 0 && mates1.size() != qualities1.size()) {
-		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << qualities1.size() << endl
-		     << "quality files were specified with --Q1.  The same number of mate and quality" << endl
-		     << "files must sequences must be specified with -1 and --Q1." << endl;
-		throw 1;
-	}
-	if(qualities2.size() > 0 && mates2.size() != qualities2.size()) {
-		cerr << "Error: " << mates2.size() << " mate files/sequences were specified with -2, but " << qualities2.size() << endl
-		     << "quality files were specified with --Q2.  The same number of mate and quality" << endl
-		     << "files must sequences must be specified with -2 and --Q2." << endl;
-		throw 1;
-	}
 	// Check for duplicate mate input files
 	if(format != CMDLINE) {
 		for(size_t i = 0; i < mates1.size(); i++) {
@@ -988,19 +891,10 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "Warning: --shmem overrides --mm..." << endl;
 		useMm = false;
 	}
-	if(snpPhred <= 10 && color && !quiet) {
-		cerr << "Warning: the colorspace SNP penalty (--snpphred) is very low: " << snpPhred << endl;
-	}
 	if(!mateFwSet) {
-		if(color) {
-			// Set colorspace default (--ff)
-			mate1fw = true;
-			mate2fw = true;
-		} else {
-			// Set nucleotide space default (--fr)
-			mate1fw = true;
-			mate2fw = false;
-		}
+		// Set nucleotide space default (--fr)
+		mate1fw = true;
+		mate2fw = false;
 	}
 	if(outType != OUTPUT_FULL && suppressOuts.count() > 0 && !quiet) {
 		cerr << "Warning: Ignoring --suppress because output type is not default." << endl;
@@ -1254,7 +1148,6 @@ static void exactSearchWorker(void *vp) {
 	        true);       // index is forward
 	GreedyDFSRangeSource bt(
 	        &ebwt, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -1353,7 +1246,6 @@ static void exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
-			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -1365,7 +1257,6 @@ static void exactSearchWorkerStateful(void *vp) {
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
 			NULL,
-			color,
 			!nofw,
 			!norc,
 			useV1,
@@ -1449,14 +1340,14 @@ static void exactSearch(PatternComposer& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwt.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwt.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 
 	BitPairReference *refs = NULL;
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
-	if(color || (pair && mixedThresh < 0xffffffff)) {
+	if((pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
@@ -1643,7 +1534,6 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
-			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -1655,7 +1545,6 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	Paired1mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
-			color,
 			!nofw,
 			!norc,
 			useV1,
@@ -1737,7 +1626,6 @@ static void mismatchSearchWorkerFull(void *vp){
 	        false);     // index is mirror index
 	GreedyDFSRangeSource bt(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -1826,19 +1714,19 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
-	if(color || (pair && mixedThresh < 0xffffffff)) {
+	if(pair && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	mismatchSearch_refs = refs;
@@ -1978,7 +1866,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
 		Timer _t(cerr, "Time loading forward index: ", timing); \
-		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose); \
+		ebwtFw.loadIntoMemory(-1, !noRefNames, startVerbose); \
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -1991,7 +1879,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
 		Timer _t(cerr, "Time loading mirror index: ", timing); \
-		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose); \
+		ebwtBw.loadIntoMemory(-1, !noRefNames, startVerbose);   \
 	} \
 	assert(ebwtBw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -2106,7 +1994,6 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
-			color,
 			!nofw,
 			!norc,
 			useV1,
@@ -2190,7 +2077,6 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
 	GreedyDFSRangeSource btr1(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2204,7 +2090,6 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt2(
 	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2218,7 +2103,6 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt3(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2232,7 +2116,6 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2320,19 +2203,19 @@ static void twoOrThreeMismatchSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
-	if(color || (pair && mixedThresh < 0xffffffff)) {
+	if(pair && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -2526,7 +2409,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// oriented read
 	GreedyDFSRangeSource btf1(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -2539,7 +2421,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -2554,7 +2435,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
 	GreedyDFSRangeSource btf2(
 	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
@@ -2569,7 +2449,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for partial alignments for case 4R
 	GreedyDFSRangeSource btr2(
 	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
@@ -2584,7 +2463,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource btf3(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
@@ -2600,7 +2478,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// the partial alignments found in Phase 2
 	GreedyDFSRangeSource btr3(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2615,7 +2492,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// The half-and-half GreedyDFSRangeSource
 	GreedyDFSRangeSource btr23(
 	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2632,7 +2508,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// the partial alignments found in Phase 3
 	GreedyDFSRangeSource btf4(
 	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2647,7 +2522,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 	// Half-and-half GreedyDFSRangeSource for forward read
 	GreedyDFSRangeSource btf24(
 	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2784,7 +2658,6 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	PairedSeedAlignerFactory alPEfact(
 			ebwtFw,
 			&ebwtBw,
-			color,
 			useV1,
 			!nofw,
 			!norc,
@@ -2887,9 +2760,9 @@ static void seededQualCutoffSearchFull(
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
-	if(color || (pair && mixedThresh < 0xffffffff)) {
+	if(pair && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	seededQualSearch_refs = refs;
@@ -2913,7 +2786,7 @@ static void seededQualCutoffSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(-1, !noRefNames, startVerbose);
 	}
 	CHUD_START();
 	{
@@ -3047,7 +2920,7 @@ patsrcFromStrings(int format,
 {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (reads, quals, color,
+			return new FastaPatternSource (reads, quals,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
@@ -3056,24 +2929,19 @@ patsrcFromStrings(int format,
 			                               reads, fastaContLen,
 			                               fastaContFreq);
 		case RAW:
-			return new RawPatternSource   (reads, color,
-			                               trim3, trim5);
+			return new RawPatternSource   (reads, trim3, trim5);
 		case FASTQ:
-			return new FastqPatternSource (reads, color,
-			                               trim3, trim5,
+			return new FastqPatternSource (reads, trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
 		case INTERLEAVED:
-			return new FastqPatternSource (reads, color,
-			                               trim3, trim5,
+			return new FastqPatternSource (reads, trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, true /* is interleaved */);
 		case TAB_MATE:
-			return new TabbedPatternSource(reads, false, color,
-			                               trim3, trim5);
+			return new TabbedPatternSource(reads, false, trim3, trim5);
 		case CMDLINE:
-			return new VectorPatternSource(reads, color,
-			                               trim3, trim5);
+			return new VectorPatternSource(reads, trim3, trim5);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;
@@ -3249,7 +3117,6 @@ static void driver(const char * type,
 		cerr << "About to initialize fw Ebwt: "; logTime(cerr, true);
 	}
 	Ebwt ebwt(adjustedEbwtFileBase,
-	                color,  // index is colorspace
 	                -1,     // don't care about entireReverse
 	                true,     // index is for the forward direction
 	                /* overriding: */ offRate,
@@ -3271,7 +3138,6 @@ static void driver(const char * type,
 		}
 		ebwtBw = new Ebwt(
 			adjustedEbwtFileBase + ".rev",
-			color,  // index is colorspace
 			-1,     // don't care about entireReverse
 			false, // index is for the reverse direction
 			/* overriding: */ offRate,
@@ -3299,7 +3165,7 @@ static void driver(const char * type,
 					curStretch = 0;
 				}
 			}
-			if(longestStretch < (color ? 2 : 1)) {
+			if(longestStretch < 1) {
 				os.erase(os.begin() + i);
 				i--;
 			}
@@ -3310,10 +3176,10 @@ static void driver(const char * type,
 		// against original strings
 		assert_eq(os.size(), ebwt.nPat());
 		for(size_t i = 0; i < os.size(); i++) {
-			assert_eq(os[i].length(), ebwt.plen()[i] + (color ? 1 : 0));
+			assert_eq(os[i].length(), ebwt.plen()[i]);
 		}
-		ebwt.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
-		ebwt.checkOrigs(os, color, false);
+		ebwt.loadIntoMemory(-1, !noRefNames, startVerbose);
+		ebwt.checkOrigs(os, false);
 		ebwt.evictFromMemory();
 	}
 	{
@@ -3330,7 +3196,7 @@ static void driver(const char * type,
 		if(outType == OUTPUT_FULL) {
 			sink = new VerboseHitSink(
 					*fout, offBase,
-					colorSeq, colorQual, printCost,
+					printCost,
 					suppressOuts,
 					fullRef,
 					dumpAlBase,
@@ -3360,7 +3226,7 @@ static void driver(const char * type,
 				sam->appendHeaders(
 					sam->out(),
 					ebwt.nPat(),
-					refnames, color, samNoSQ,
+					refnames, samNoSQ,
 					ebwt.plen(), fullRef,
 					samNoQnameTrunc,
 					argstr.c_str(),

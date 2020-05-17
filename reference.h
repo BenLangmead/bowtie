@@ -39,7 +39,6 @@ public:
 	 * Load from .3.ebwt/.4.ebwt Bowtie index files.
 	 */
 	BitPairReference(const string& in,
-	                 bool color,
 	                 bool sanity,
 	                 std::vector<string>* infiles,
 	                 std::vector<BTRefString >* origs,
@@ -155,23 +154,12 @@ public:
 				// nPat/plen/refnames, but we also omit reference
 				// sequences that never have a stretch of more than 1
 				// unambiguous character.
-				if(unambiglen > 0 && (!color || maxlen > 1)) {
+				if(unambiglen > 0 && maxlen > 1) {
 					refApproxLens_.push_back(cumlen);
 				}
 				// More hackery to detect references that won't be
 				// in the Ebwt even though they have non-zero length
 				bool willBeInEbwt = true;
-				if(recs_[i].len > 0 && color) {
-					// Omit until we prove it should be kept
-					willBeInEbwt = false;
-					for(uint32_t j = i; j < sz; j++) {
-						if(j > i && recs_[j].first) break;
-						if(recs_[j].len >= 2) {
-							willBeInEbwt = true;
-							break;
-						}
-					}
-				}
 				if(recs_[i].len > 0 && willBeInEbwt) {
 					// Remember that this is the first record for this
 					// reference sequence (and the last record for the one
@@ -218,7 +206,7 @@ public:
 		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back((TIndexOffU)recs_.size());
 		refOffs_.push_back(cumsz);
-		if(unambiglen > 0 && (!color || maxlen > 1)) {
+		if(unambiglen > 0 && maxlen > 1) {
 			refApproxLens_.push_back(cumlen);
 		}
 		refLens_.push_back(cumlen);
@@ -346,25 +334,6 @@ public:
 				os = origs;
 			}
 
-			// Never mind; reference is always letters, even if index
-			// and alignment run are colorspace
-
-			// If we're building a colorspace index, we need to convert
-			// osv to colors first
-//			if(color) {
-//				for(size_t i = 0; i < os->size(); i++) {
-//					size_t olen = seqan::length((*os)[i]);
-//					for(size_t j = 0; j < olen-1; j++) {
-//						int b1 = (int)(*os)[i][j];
-//						assert_geq(b1, 0); assert_leq(b1, 4);
-//						int b2 = (int)(*os)[i][j+1];
-//						assert_geq(b2, 0); assert_leq(b2, 4);
-//						(*os)[i][j] = (Dna5)dinuc2color[b1][b2];
-//						assert((b1 != 4 && b2 != 4) || (int)(*os)[i][j] == 4);
-//					}
-//					seqan::resize((*os)[i], olen-1);
-//				}
-//			}
 			// Go through the loaded reference files base-by-base and
 			// sanity check against what we get by calling getBase and
 			// getStretch
@@ -381,7 +350,7 @@ public:
 						curStretch = 0;
 					}
 				}
-				if(longestStretch == 0 || (color && longestStretch == 1)) {
+				if(longestStretch == 0) {
 					continue;
 				}
 				longestStretch = 0;

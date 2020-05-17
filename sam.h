@@ -79,7 +79,6 @@ public:
 		OutFileBuf& os,
 		size_t numRefs,
 		const vector<string>& refnames,
-		bool color,
 		bool nosq,
 		const TIndexOffU* plen,
 		bool fullRef,

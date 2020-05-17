@@ -76,8 +76,6 @@ void VerboseHitSink::append(
 	bool fullRef,
 	int partition,
 	int offBase,
-	bool colorSeq,
-	bool colorQual,
 	bool cost,
 	const Bitset& suppress)
 {
@@ -205,21 +203,12 @@ void VerboseHitSink::append(
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			size_t plen = h.patSeq.length();
-			const char *pat = h.patSeq.toZBuf();
-			if(h.color && colorSeq) pat = h.colSeq.toZBuf();
-			for (size_t i = 0; i < plen; i++) {
-				o << pat[i];
-
-			}
+			o << h.patSeq.toZBuf();
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else o << '\t';
-			const BTString* qual = &h.quals;
-			if(h.color && colorQual) qual = &h.colQuals;
-			for (size_t i = 0; i < qual->length(); i++)
-				o << (*qual)[i];
+			o << h.quals.toZBuf();
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;

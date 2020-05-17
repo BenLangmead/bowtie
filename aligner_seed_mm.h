@@ -61,7 +61,6 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
-			refs_(refs),
 			os_(os),
 			strandFix_(strandFix),
 			maqPenalty_(maqPenalty),
@@ -535,7 +534,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, refs_,
+			sink_, sinkPtFactory_, sinkPt, os_,
 			rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt,
 			metrics_);
 	}
@@ -555,7 +554,6 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
-	BitPairReference* refs_;
 	vector<BTRefString >& os_;
 	bool strandFix_;
 	bool maqPenalty_;
@@ -577,7 +575,6 @@ public:
 	PairedSeedAlignerFactory(
 			Ebwt& ebwtFw,
 			Ebwt* ebwtBw,
-			bool color,
 			bool v1,
 			bool doFw,
 			bool doRc,
@@ -611,7 +608,6 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
-			color_(color),
 			v1_(v1),
 			doFw_(doFw),
 			doRc_(doRc),
@@ -633,7 +629,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
-			refs_(refs), os_(os),
+			os_(os),
 			reportSe_(reportSe),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -667,13 +663,13 @@ public:
 		int *btCnt = new int[1];
 		*btCnt = maxBts_;
 		if(seedMms_ == 0) {
-			refAligner = new Seed0RefAligner(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed0RefAligner(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else if(seedMms_ == 1) {
-			refAligner = new Seed1RefAligner(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed1RefAligner(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else if(seedMms_ == 2) {
-			refAligner = new Seed2RefAligner(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed2RefAligner(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else {
-			refAligner = new Seed3RefAligner(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed3RefAligner(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		}
 		bool do1Fw = true;
 		bool do1Rc = true;
@@ -1354,7 +1350,6 @@ public:
 private:
 	Ebwt& ebwtFw_;
 	Ebwt* ebwtBw_;
-	bool color_;
 	const bool v1_; // whether to use V1 PairedAligner
 	const bool doFw_;
 	const bool doRc_;

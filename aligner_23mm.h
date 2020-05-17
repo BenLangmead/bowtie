@@ -215,7 +215,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, refs_,
+			sink_, sinkPtFactory_, sinkPt, os_,
 			rangeMode_, verbose_, quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
@@ -231,8 +231,8 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
-	BitPairReference* refs_;
 	vector<BTRefString >& os_;
+	BitPairReference *refs_;
 	const bool maqPenalty_;
 	const bool qualOrder_;
 	const bool strandFix_;
@@ -253,7 +253,6 @@ public:
 	Paired23mmAlignerV1Factory(
 			Ebwt& ebwtFw,
 			Ebwt* ebwtBw,
-			bool color,
 			bool doFw,
 			bool doRc,
 			bool v1,
@@ -284,7 +283,6 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
-			color_(color),
 			doFw_(doFw),
 			doRc_(doRc),
 			v1_(v1),
@@ -609,9 +607,9 @@ public:
 
 		RefAligner* refAligner;
 		if(two_) {
-			refAligner = new TwoMMRefAligner(color_, verbose_, quiet_);
+			refAligner = new TwoMMRefAligner(verbose_, quiet_);
 		} else {
-			refAligner = new ThreeMMRefAligner(color_, verbose_, quiet_);
+			refAligner = new ThreeMMRefAligner(verbose_, quiet_);
 		}
 
 		// Set up a RangeChaser
@@ -654,7 +652,6 @@ public:
 private:
 	Ebwt& ebwtFw_;
 	Ebwt* ebwtBw_;
-	bool color_;
 	bool doFw_;
 	bool doRc_;
 	bool v1_;

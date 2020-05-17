@@ -62,11 +62,8 @@ public:
 	uint32_t            patId;   /// read index
 	BTString            patName; /// read name
 	BTDnaString         patSeq;  /// read sequence
-	BTDnaString         colSeq;  /// original color sequence, not decoded
 	BTString            quals;   /// read qualities
-	BTString            colQuals;/// original color qualities, not decoded
 	FixedBitset<1024>   mms;     /// nucleotide mismatch mask
-	FixedBitset<1024>   cmms;    /// color mismatch mask (if relevant)
 	vector<char>        refcs;   /// reference characters for mms
 	vector<char>        crefcs;  /// reference characters for cmms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
@@ -78,9 +75,7 @@ public:
 	uint8_t             mate;    /// matedness; 0 = not a mate
 	                             ///            1 = upstream mate
 	                             ///            2 = downstream mate
-	bool                color;   /// read is in colorspace?
 	char                primer;  /// primer base, for csfasta files
-	char                trimc;   /// trimmed color, for csfasta files
 	uint32_t            seed;    /// pseudo-random seed for aligned read
 
 	/**
@@ -100,11 +95,8 @@ public:
 		this->patId   = other.patId;
 		this->patName = other.patName;
 		this->patSeq  = other.patSeq;
-		this->colSeq  = other.colSeq;
 		this->quals   = other.quals;
-		this->colQuals= other.colQuals;
 		this->mms     = other.mms;
-		this->cmms    = other.cmms;
 		this->refcs   = other.refcs;
 		this->crefcs  = other.crefcs;
 		this->oms     = other.oms;
@@ -114,8 +106,6 @@ public:
 		this->stratum = other.stratum;
 		this->cost    = other.cost;
 		this->mate    = other.mate;
-		this->color   = other.color;
-		this->cmms    = other.cmms;
 		this->seed    = other.seed;
 		return *this;
 	}
@@ -1237,8 +1227,6 @@ public:
 	VerboseHitSink(
 		OutFileBuf& out,
 		int offBase,
-		bool colorSeq,
-		bool colorQual,
 		bool printCost,
 		const Bitset& suppressOuts,
 		bool fullRef,
@@ -1264,8 +1252,6 @@ public:
 			false),
 		partition_(partition),
 		offBase_(offBase),
-		colorSeq_(colorSeq),
-		colorQual_(colorQual),
 		cost_(printCost),
 		suppress_(suppressOuts),
 		fullRef_(fullRef)
@@ -1278,8 +1264,6 @@ public:
 		bool fullRef,
 		int partition,
 		int offBase,
-		bool colorSeq,
-		bool colorQual,
 		bool cost,
 		const Bitset& suppress);
 
@@ -1289,9 +1273,7 @@ public:
 	 */
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
 		VerboseHitSink::append(o, h, _refnames,
-		                       fullRef_, partition_, offBase_,
-		                       colorSeq_, colorQual_, cost_,
-		                       suppress_);
+		                       fullRef_, partition_, offBase_, cost_, suppress_);
 	}
 
 	/**
@@ -1307,8 +1289,6 @@ private:
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
-	bool     colorSeq_;    /// true -> print colorspace alignment sequence in colors
-	bool     colorQual_;   /// true -> print colorspace quals as originals, not decoded
 	bool     cost_;        /// true -> print statum and cost
 	Bitset   suppress_;    /// output fields to suppress
 	bool fullRef_;         /// print full reference name

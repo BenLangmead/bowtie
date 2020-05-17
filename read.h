@@ -62,7 +62,6 @@ struct Read {
 		filter = '?';
 		seed = 0;
 		parsed = false;
-		color = false;
 		ns_ = 0;
 	}
 
@@ -266,7 +265,6 @@ struct Read {
 	bool     parsed;    // true iff read has been fully parsed
 	size_t   ns_;       // # Ns
 	char     filter;    // if read format permits filter char, set it here
-	bool     color;
 	char     primer;
 	char     trimc;
 	uint32_t patid;

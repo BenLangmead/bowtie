@@ -27,22 +27,16 @@ static inline void reverseInPlace(TStr& s) {
  * Ns.
  */
 template<typename TStr>
-static inline TStr reverseComplement(const TStr& s, bool color) {
+static inline TStr reverseComplement(const TStr& s) {
 	TStr s_rc;
 	size_t slen = length(s);
 	resize(s_rc, slen);
-	if(color) {
-		for(size_t i = 0; i < slen; i++) {
-			s_rc[i] = s[slen-i-1];
-		}
-	} else {
-		for(size_t i = 0; i < slen; i++) {
-			int sv = (int)s[slen-i-1];
-			if(sv == 4) {
-				s_rc[i] = (char)4;
-			} else {
-				s_rc[i] = (char)(sv ^ 3);
-			}
+	for(size_t i = 0; i < slen; i++) {
+		int sv = (int)s[slen-i-1];
+		if(sv == 4) {
+			s_rc[i] = (char)4;
+		} else {
+			s_rc[i] = (char)(sv ^ 3);
 		}
 	}
 	return s_rc;
@@ -52,11 +46,7 @@ static inline TStr reverseComplement(const TStr& s, bool color) {
  * Reverse-complement s in-place.  Ns go to Ns.
  */
 template<typename TStr>
-static inline void reverseComplementInPlace(TStr& s, bool color) {
-	if(color) {
-		reverseInPlace(s);
-		return;
-	}
+static inline void reverseComplementInPlace(TStr& s) {
 	size_t len = s.length();
 	size_t i;
 	for(i = 0; i < (len>>1); i++) {

@@ -46,7 +46,6 @@ static bool justRef;
 static int reverseType;
 static int nthreads;
 static string wrapper;
-bool color;
 
 
 static void resetOptions() {
@@ -76,7 +75,6 @@ static void resetOptions() {
 	reverseType  = REF_READ_REVERSE_EACH;
 	nthreads     = 1;
 	wrapper.clear();
-	color        = false;
 }
 
 // Argument constants for getopts
@@ -177,7 +175,6 @@ static struct option long_options[] = {
 	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
-	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"threads",      required_argument, 0,            ARG_THREADS},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
@@ -224,7 +221,6 @@ static void parseOptions(int argc, const char **argv) {
 			case 'f': format = FASTA; break;
 			case 'c': format = CMDLINE; break;
 			case 'p': packed = true; break;
-			case 'C': color = true; break;
 			case 'l':
 				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
 				break;
@@ -313,7 +309,7 @@ static void driver(const string& infile,
 {
 	vector<FileBuf*> is;
 	bool bisulfite = false;
-	RefReadInParams refparams(color, reverse ? reverseType : REF_READ_FORWARD, nsToAs, bisulfite);
+	RefReadInParams refparams(reverse ? reverseType : REF_READ_FORWARD, nsToAs, bisulfite);
 	assert_gt(infiles.size(), 0);
 	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
@@ -383,30 +379,10 @@ static void driver(const string& infile,
 			// the genome into a vector of RefRecords.  The input
 			// streams are reset once it's done.
 			writeU<int32_t>(fout3, 1, bigEndian); // endianness sentinel
-			if(color) {
-				refparams.color = false;
-				// Make sure the .3.ebwt and .4.ebwt files contain
-				// nucleotides; not colors
-				TIndexOff numSeqs = 0;
-				fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
-				refparams.color = true;
-				writeU<TIndexOffU>(fout3, (TIndexOffU)szs.size(), bigEndian); // write # records
-				for(size_t i = 0; i < szs.size(); i++) {
-					szs[i].write(fout3, bigEndian);
-				}
-				szs.clear();
-				plens.clear();
-				// Now read in the colorspace size records; these are
-				// the ones that were indexed
-				TIndexOff numSeqs2 = 0;
-				sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs2);
-				assert_geq(numSeqs, numSeqs2);
-			} else {
-				TIndexOff numSeqs = 0;
-				sztot = fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
-				writeU<TIndexOffU>(fout3, (TIndexOffU)szs.size(), bigEndian); // write # records
-				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
-			}
+			TIndexOff numSeqs = 0;
+			sztot = fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
+			writeU<TIndexOffU>(fout3, (TIndexOffU)szs.size(), bigEndian); // write # records
+			for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			if(sztot.first == 0) {
 				cerr << "Error: No unambiguous stretches of characters in the input.  Aborting..." << endl;
 				throw 1;
@@ -419,7 +395,6 @@ static void driver(const string& infile,
 			if(sanityCheck) {
 				BitPairReference bpr(
 					outfile, // ebwt basename
-					color,   // expect color?
 					true,    // sanity check?
 					&infiles,// files to check against
 					NULL,    // sequences to check against
@@ -437,18 +412,6 @@ static void driver(const string& infile,
 			// genome into a vector of RefRecords
 			TIndexOff numSeqs = 0;
 			sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs);
-#ifndef NDEBUG
-			if(refparams.color) {
-				refparams.color = false;
-				vector<RefRecord> szs2;
-				vector<uint32_t> plens2;
-				TIndexOff numSeqs2 = 0;
-				fastaRefReadSizes(is, szs2, plens2, refparams, NULL, numSeqs2);
-				assert_leq(numSeqs, numSeqs2);
-				// One less color than base
-				refparams.color = true;
-			}
-#endif
 		}
 	}
 	if(justRef) return;
@@ -458,7 +421,6 @@ static void driver(const string& infile,
 	// Construct Ebwt from input strings and parameters
 	Ebwt ebwt(TStr(),
 		  packed,
-		  refparams.color ? 1 : 0,
 		  lineRate,
 		  linesPerSide,
 		  offRate,      // suffix-array sampling rate
@@ -495,7 +457,6 @@ static void driver(const string& infile,
 		// multiple texts, what we'll get back is the joined,
 		// padded string, not a list)
 		ebwt.loadIntoMemory(
-			refparams.color ? 1 : 0,
 			-1,
 			false,
 			false);

@@ -34,7 +34,6 @@ public:
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
 			ChunkPool *pool,
-			BitPairReference* refs,
 			vector<BTRefString >& os,
 			bool maqPenalty,
 			bool qualOrder,
@@ -52,7 +51,6 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
-			refs_(refs),
 			os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -110,7 +108,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, refs_,
+			sink_, sinkPtFactory_, sinkPt, os_,
 			rangeMode_, verbose_, quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
@@ -125,7 +123,6 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
-	BitPairReference* refs_;
 	vector<BTRefString >& os_;
 	bool maqPenalty_;
 	bool qualOrder_;
@@ -146,7 +143,6 @@ public:
 	PairedExactAlignerV1Factory(
 			Ebwt& ebwtFw,
 			Ebwt* ebwtBw,
-			bool color,
 			bool doFw,
 			bool doRc,
 			bool v1,
@@ -175,7 +171,6 @@ public:
 			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
-			color_(color),
 			doFw_(doFw),
 			doRc_(doRc),
 			v1_(v1),
@@ -305,7 +300,7 @@ public:
 		}
 
 		RefAligner* refAligner
-			= new ExactRefAligner(color_, verbose_, quiet_);
+			= new ExactRefAligner(verbose_, quiet_);
 
 		// Set up a RangeChaser
 		RangeChaser* rchase =
@@ -347,7 +342,6 @@ public:
 private:
 	Ebwt& ebwtFw_;
 	Ebwt* ebwtBw_;
-	bool color_;
 	bool doFw_;
 	bool doRc_;
 	bool v1_;

@@ -65,40 +65,27 @@ RefRecord fastaRefReadSize(FileBuf& in,
 
 	// Now skip to the first DNA character, counting gap characters
 	// as we go
-	int lc = -1; // last-DNA char variable for color conversion
 	while(true) {
 		int cat = dna4Cat[c];
 		if(rparms.nsToAs && cat == 2) c = 'A';
 		if(cat == 1) {
 			// This is a DNA character
-			if(rparms.color) {
-				if(lc != -1) {
-					// Got two consecutive unambiguous DNAs
-					break; // to read-in loop
-				}
-				// Keep going; we need two consecutive unambiguous DNAs
-				lc = charToDna5[(int)c];
-				// The 'if(off > 0)' takes care of the case where
-				// the reference is entirely unambiguous and we don't
-				// want to incorrectly increment off.
-				if(off > 0) off++;
-			} else {
-				break; // to read-in loop
-			}
-		} else if(cat == 2) {
-			if(lc != -1 && off == 0) off++;
-			lc = -1;
+			break; // to read-in loop
+                } else if (cat == 2) {
 			off++; // skip over gap character and increment
-		} else if(c == '>') {
-			if(off > 0 && lastc == '>') {
-				cerr << "Warning: Encountered reference sequence with only gaps" << endl;
-			} else if(lastc == '>') {
-				cerr << "Warning: Encountered empty reference sequence" << endl;
-			}
-			lastc = '>';
-			return RefRecord((TIndexOffU)off, 0, first);
-		}
-		c = in.get();
+                } else if (c == '>') {
+                  if (off > 0 && lastc == '>') {
+                    cerr << "Warning: Encountered reference sequence with only "
+                            "gaps"
+                         << endl;
+                  } else if (lastc == '>') {
+                    cerr << "Warning: Encountered empty reference sequence"
+                         << endl;
+                  }
+                  lastc = '>';
+                  return RefRecord((TIndexOffU)off, 0, first);
+                }
+                c = in.get();
 		if(c == -1) {
 			// End-of-file
 			if(off > 0 && lastc == '>') {
@@ -110,14 +97,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			return RefRecord((TIndexOffU)off, 0, first);
 		}
 	}
-	assert(!rparms.color || (lc != -1));
 	assert_eq(1, dna4Cat[c]); // C must be unambiguous base
-	if(off > 0 && rparms.color && first) {
-		// Handle the case where the first record has ambiguous
-		// characters but we're in color space; one of those counts is
-		// spurious
-		off--;
-	}
 
 	// in now points just past the first character of a sequence
 	// line, and c holds the first character
@@ -133,15 +113,9 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			len++;
 			// Output it
 			if(bpout != NULL) {
-				if(rparms.color) {
-					// output color
-					bpout->write(dinuc2color[charToDna5[(int)c]][lc]);
-				} else if(!rparms.color) {
-					// output nucleotide
-					bpout->write(charToDna5[c]);
-				}
+				// output nucleotide
+				bpout->write(charToDna5[c]);
 			}
-			lc = charToDna5[(int)c];
 		} else if(cat == 2) {
 			// It's an N or a gap
 			lastc = c;

@@ -219,14 +219,12 @@ void print_ref_sequence(
  */
 void print_ref_sequences(
 	ostream& fout,
-	bool color,
 	const vector<string>& refnames,
 	const TIndexOffU* plen,
 	const string& adjustedEbwtFileBase)
 {
 	BitPairReference ref(
 		adjustedEbwtFileBase, // input basename
-		color,                // true -> expect colorspace reference
 		false,                // sanity-check reference
 		NULL,                 // infiles
 		NULL,                 // originals
@@ -261,7 +259,7 @@ void print_ref_sequences(
 			ref,
 			refnames[i],
 			i,
-			plen[i] + (color ? 1 : 0));
+			plen[i]);
 	}
 #endif
 }
@@ -358,11 +356,9 @@ void print_index_summary(
 {
 	int32_t flags = readFlags(fname);
 	int32_t flagsr = readFlags(fname + ".rev");
-	bool color = readEbwtColor(fname);
 	bool entireReverse = readEntireReverse(fname + ".rev");
 	Ebwt ebwt(
 		fname,
-		color,                // index is colorspace
 		-1,                   // don't require entire reverse
 		true,                 // index is for the forward direction
 		-1,                   // offrate (-1 = index default)
@@ -382,7 +378,6 @@ void print_index_summary(
 		cout << "Flags" << '\t' << (-flags) << endl;
 		cout << "Reverse flags" << '\t' << (-flagsr) << endl;
 	}
-	cout << "Colorspace" << '\t' << (color ? "1" : "0") << endl;
 	if(extra) {
 		cout << "Concat then reverse" << '\t' << (entireReverse ? "1" : "0") << endl;
 		cout << "Reverse then concat" << '\t' << (entireReverse ? "0" : "1") << endl;
@@ -396,7 +391,7 @@ void print_index_summary(
 	for(size_t i = 0; i < ebwt.nPat(); i++) {
 		cout << "Sequence-" << (i+1)
 		     << '\t' << p_refnames[refs.expandIdx((uint32_t)i)]
-		     << '\t' << (ebwt.plen()[i] + (color ? 1 : 0))
+		     << '\t' << (ebwt.plen()[i])
 		     << endl;
 	}
 	if(extra) {
@@ -418,10 +413,8 @@ static void driver(
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
 		return;
 	}
-	bool color = readEbwtColor(adjustedEbwtFileBase);
 	BitPairReference refs(
 		adjustedEbwtFileBase,
-		color,
 		false,
 		NULL,
 		NULL,
@@ -438,7 +431,6 @@ static void driver(
 		// Initialize Ebwt object
 		Ebwt ebwt(
 			adjustedEbwtFileBase,
-			color,                // index is colorspace
 			-1,                   // don't care about entire-reverse
 			true,                 // index is for the forward direction
 			-1,                   // offrate (-1 = index default)
@@ -454,14 +446,13 @@ static void driver(
 			false);               // sanity check?
 		// Load whole index into memory
 		if(refFromEbwt) {
-			ebwt.loadIntoMemory(-1, -1, true, false);
+			ebwt.loadIntoMemory(-1, true, false);
 			print_index_sequences<BTRefString >(cout, ebwt, refs);
 		} else {
 			vector<string> refnames;
 			readEbwtRefnames(adjustedEbwtFileBase, refnames);
 			print_ref_sequences(
 				cout,
-				readEbwtColor(ebwtFileBase),
 				refnames,
 				ebwt.plen(),
 				adjustedEbwtFileBase);

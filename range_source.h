@@ -320,7 +320,6 @@ struct RangeState {
 	              TIndexOffU& top, TIndexOffU& bot, bool indels,
 	              bool& last)
 	{
-		bool color = false;
 		Edit ret;
 		ret.type = EDIT_TYPE_MM;
 		ret.pos = pos;
@@ -421,7 +420,7 @@ struct RangeState {
 					bot = bots[0];
 					eq.flags.mmA = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = color ? '0' : 'A';
+					ret.chr = 'A';
 					return ret;
 				}
 				dart -= (bots[0] - tops[0]);
@@ -433,7 +432,7 @@ struct RangeState {
 					bot = bots[1];
 					eq.flags.mmC = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = color ? '1' : 'C';
+					ret.chr = 'C';
 					return ret;
 				}
 				dart -= (bots[1] - tops[1]);
@@ -445,7 +444,7 @@ struct RangeState {
 					bot = bots[2];
 					eq.flags.mmG = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = color ? '2' : 'G';
+					ret.chr = 'G';
 					return ret;
 				}
 				dart -= (bots[2] - tops[2]);
@@ -457,7 +456,7 @@ struct RangeState {
 				bot = bots[3];
 				eq.flags.mmT = 1;
 				assert_lt(eq.join2.mmElims, 15);
-				ret.chr = color ? '3' : 'T';
+				ret.chr = 'T';
 			}
 		} else {
 			last = true; // last at this pos
@@ -473,7 +472,7 @@ struct RangeState {
 				assert(!eq.flags.mmT);
 				chr = 3;
 			}
-			ret.chr = color ? "0123"[chr] : "ACGT"[chr];
+			ret.chr = "ACGT"[chr];
 			top = tops[chr];
 			bot = bots[chr];
 			//assert_eq(15, eq.join2.mmElims);

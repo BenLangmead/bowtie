@@ -22,7 +22,6 @@ void SAMHitSink::appendHeaders(
 	OutFileBuf& os,
 	size_t numRefs,
 	const vector<string>& refnames,
-	bool color,
 	bool nosq,
 	const TIndexOffU* plen,
 	bool fullRef,
@@ -41,7 +40,7 @@ void SAMHitSink::appendHeaders(
 			} else {
 				o << i;
 			}
-			o << "\tLN:" << (plen[i] + (color ? 1 : 0)) << '\n';
+			o << "\tLN:" << (plen[i]) << '\n';
 		}
 	}
 	if(rgline != NULL) {
@@ -94,18 +93,6 @@ void SAMHitSink::reportUnOrMax(
 		o << (char)p.bufa().qual[i];
 	}
 	o << "\tXM:i:" << (paired ? (hssz+1)/2 : hssz);
-	// Add optional fields reporting the primer base and the downstream color,
-	// which, if they were present, were clipped when the read was read in
-	if(p.bufa().color && gReportColorPrimer) {
-		if(p.bufa().primer != '?') {
-			o << "\tZP:Z:" << p.bufa().primer;
-			assert(isprint(p.bufa().primer));
-		}
-		if(p.bufa().trimc != '?') {
-			o << "\tZp:Z:" << p.bufa().trimc;
-			assert(isprint(p.bufa().trimc));
-		}
-	}
 	o << '\n';
 	if(paired) {
 		// truncate final 2 chars
@@ -124,18 +111,6 @@ void SAMHitSink::reportUnOrMax(
 			o << (char)p.bufb().qual[i];
 		}
 		o << "\tXM:i:" << (hssz+1)/2;
-		// Add optional fields reporting the primer base and the downstream color,
-		// which, if they were present, were clipped when the read was read in
-		if(p.bufb().color && gReportColorPrimer) {
-			if(p.bufb().primer != '?') {
-				o << "\tZP:Z:" << p.bufb().primer;
-				assert(isprint(p.bufb().primer));
-			}
-			if(p.bufb().trimc != '?') {
-				o << "\tZp:Z:" << p.bufb().trimc;
-				assert(isprint(p.bufb().trimc));
-			}
-		}
 		o << '\n';
 	}
 	ptCounts_[threadId]++;
@@ -234,16 +209,6 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	const FixedBitset<1024> *mms = &h.mms;
 	ASSERT_ONLY(const BTDnaString* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
-#if 0
-	if(h.color && false) {
-		// Disabled: print MD:Z string w/r/t to colors, not letters
-		mms = &h.cmms;
-		ASSERT_ONLY(pat = &h.colSeq);
-		assert_eq(length(h.colSeq), len+1);
-		len = length(h.colSeq);
-		refcs = &h.crefcs;
-	}
-#endif
 	if(h.fw) {
 		for (int i = 0; i < (int)len; ++ i) {
 			if(mms->test(i)) {
@@ -278,21 +243,6 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	o << run;
 	// Add optional edit distance field
 	o << "\tNM:i:" << nm;
-	if(h.color) {
-		o << "\tCM:i:" << h.cmms.count();
-	}
-	// Add optional fields reporting the primer base and the downstream color,
-	// which, if they were present, were clipped when the read was read in
-	if(h.color && gReportColorPrimer) {
-		if(h.primer != '?') {
-			o << "\tZP:Z:" << h.primer;
-			assert(isprint(h.primer));
-		}
-		if(h.trimc != '?') {
-			o << "\tZp:Z:" << h.trimc;
-			assert(isprint(h.trimc));
-		}
-	}
 	if(xms > 0) {
 		o << "\tXM:i:" << xms;
 	}

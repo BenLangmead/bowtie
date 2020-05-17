@@ -28,7 +28,6 @@ public:
 	GreedyDFSRangeSource(
 			const Ebwt* ebwt,
 			const EbwtSearchParams& params,
-			const BitPairReference* refs,
 			uint32_t qualThresh,  /// max acceptable q-distance
 			const int maxBts, /// maximum # backtracks allowed
 			uint32_t reportPartials = 0,
@@ -41,7 +40,6 @@ public:
 			bool considerQuals = true,  // whether to consider quality values when making backtracking decisions
 			bool halfAndHalf = false, // hacky way of supporting separate revisitable regions
 			bool maqPenalty = true) :
-		_refs(refs),
 		_qry(NULL),
 		_qlen(0),
 		_qual(NULL),
@@ -136,11 +134,8 @@ public:
 		}
 		// Initialize the random source using new read as part of the
 		// seed.
-		_color = r.color;
 		_seed = r.seed;
 		_patid = r.rdid;
-		_primer = r.primer;
-		_trimc = r.trimc;
 		_rand.init(r.seed);
 	}
 
@@ -1549,8 +1544,7 @@ protected:
 			// of their offset from the 3' or 5' end.
 			assert_geq(cost, (uint32_t)(stratum << 14));
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
-			                         _color, _primer, _trimc, colorExEnds,
-			                         snpPhred, _refs, _mms, _refcs,
+			                         _mms, _refcs,
 			                         stackDepth, ri, top, bot,
 			                         (uint32_t)_qlen, stratum, cost, _patid,
 			                         _seed, _params))
@@ -1701,12 +1695,10 @@ protected:
 		return true;
 	}
 
-	const BitPairReference* _refs; // reference sequences (or NULL if not colorspace)
 	BTDnaString*        _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	BTString*           _qual;   // quality values for _qry
 	BTString*           _name;   // name of _qry
-	bool                _color;  // whether read is colorspace
 	const Ebwt* _ebwt;   // Ebwt to search in
 	const EbwtSearchParams& _params;   // Ebwt to search in
 	uint32_t            _unrevOff; // unrevisitable chunk
@@ -1780,8 +1772,6 @@ protected:
 	// Current range to expose to consumers
 	Range               _curRange;
 	uint32_t            _patid;
-	char                _primer;
-	char                _trimc;
 	uint32_t            _seed;
 #ifndef NDEBUG
 	std::set<TIndexOff> allTops_;
@@ -1876,7 +1866,6 @@ public:
 		assert_geq(qual_->length(), qlen_);
 		this->done = false;
 		this->foundRange = false;
-		color_ = r.color;
 		rand_.init(r.seed);
 	}
 
@@ -2554,18 +2543,17 @@ protected:
 		return ftabOff;
 	}
 
-	BTDnaString*           qry_;    // query (read) sequence
-	BTDnaString            qryBuf_; // for composing modified qry_ strings
-	size_t              qlen_;   // length of _qry
-	BTString*           qual_;   // quality values for _qry
-	BTString*           name_;   // name of _qry
-	bool                color_;  // true -> read is colorspace
-	const Ebwt*   ebwt_;   // Ebwt to search in
-	bool                fw_;
-	uint32_t            offRev0_; // unrevisitable chunk
-	uint32_t            offRev1_;  // 1-revisitable chunk
-	uint32_t            offRev2_;  // 2-revisitable chunk
-	uint32_t            offRev3_;  // 3-revisitable chunk
+	BTDnaString*    qry_;      // query (read) sequence
+	BTDnaString     qryBuf_;   	// for composing modified qry_ strings
+	size_t          qlen_;     // length of _qry
+	BTString*       qual_;     // quality values for _qry
+	BTString*       name_;     // name of _qry
+	const Ebwt*	ebwt_;     // Ebwt to search in
+	bool            fw_;
+	uint32_t        offRev0_;  // unrevisitable chunk
+	uint32_t        offRev1_;  // 1-revisitable chunk
+	uint32_t        offRev2_;  // 2-revisitable chunk
+	uint32_t        offRev3_;  // 3-revisitable chunk
 	/// Whether to round qualities off Maq-style when calculating penalties
 	bool                maqPenalty_;
 	/// Whether to order paths on our search in a way that takes

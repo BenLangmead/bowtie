@@ -11,15 +11,10 @@
 #include "threading.h"
 
 // declared in ebwt_search.cpp
-extern bool color;
-extern bool colorExEnds;
-extern bool colorSeq;
-extern bool colorQual;
 extern int  snpPhred;
 extern bool showSeed;
 extern bool quiet;
 extern bool gAllowMateContainment;
-extern bool gReportColorPrimer;
 extern bool noUnal;
 
 extern MUTEX_T gLock;
