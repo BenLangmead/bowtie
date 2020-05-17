@@ -215,7 +215,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_,
+			sink_, sinkPtFactory_, sinkPt, os_, refs_,
 			rangeMode_, verbose_, quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
@@ -231,8 +231,8 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
-	vector<BTRefString >& os_;
 	BitPairReference *refs_;
+	vector<BTRefString >& os_;
 	const bool maqPenalty_;
 	const bool qualOrder_;
 	const bool strandFix_;

@@ -388,6 +388,7 @@ public:
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
 		vector<BTRefString >& os, // TODO: remove this, not used
+		BitPairReference *refs,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -401,6 +402,7 @@ public:
 		chase_(false),
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
+		refs_(refs),
 		params_(params),
 		rchase_(rchase),
 		driver_(driver),
@@ -564,6 +566,9 @@ public:
 	}
 
 protected:
+
+        // Reference sequences (needed for colorspace decoding)
+	const BitPairReference* refs_;
 
 	// Progress state
 	bool doneFirst_;

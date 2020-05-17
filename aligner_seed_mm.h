@@ -61,7 +61,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
-			os_(os),
+			refs_(refs), os_(os),
 			strandFix_(strandFix),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -534,7 +534,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_,
+			sink_, sinkPtFactory_, sinkPt, os_, refs_,
 			rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt,
 			metrics_);
 	}
@@ -554,6 +554,7 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
+	BitPairReference *refs_;
 	vector<BTRefString >& os_;
 	bool strandFix_;
 	bool maqPenalty_;
@@ -629,7 +630,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
-			os_(os),
+			refs_(refs), os_(os),
 			reportSe_(reportSe),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
