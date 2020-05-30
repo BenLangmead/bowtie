@@ -323,7 +323,7 @@ public:
 						if((*infiles)[i].at(0) == '\\') {
 							(*infiles)[i].erase(0, 1);
 						}
-						osv.push_back(BTRefString((*infiles)[i].c_str()));
+						osv.push_back(BTRefString((*infiles)[i].c_str(), true));
 					}
 				} else {
 					readSequenceFiles(*infiles, osv);

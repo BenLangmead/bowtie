@@ -114,7 +114,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			// Output it
 			if(bpout != NULL) {
 				// output nucleotide
-				bpout->write(charToDna5[c]);
+				bpout->write(asc2dna[c]);
 			}
 		} else if(cat == 2) {
 			// It's an N or a gap

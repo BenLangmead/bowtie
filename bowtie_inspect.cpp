@@ -61,7 +61,7 @@ static void printUsage(ostream& out) {
 	<< "Options:" << endl;
 	if(wrapper == "basic-0") {
 		out << "  --large-index      force inspection of the 'large' index, even if a" << endl
-			<< "                     'small' one is present." << endl;
+		    << "                     'small' one is present." << endl;
 	}
 	out << "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
@@ -74,9 +74,9 @@ static void printUsage(ostream& out) {
 	if(wrapper.empty()) {
 		cerr << endl
 		     << "*** Warning ***" << endl
-			 << "'boowtie-inspect' was run directly.  It is recommended "
-			 << "to use the wrapper script instead."
-			 << endl << endl;
+		     << "'bowtie-inspect' was run directly.  It is recommended "
+		     << "to use the wrapper script instead."
+		     << endl << endl;
 	}
 }
 
@@ -317,7 +317,7 @@ void print_index_sequences(
 			if (textoff_adj - last_text_off > 1)
 				curr_ref_seq += string(textoff_adj - last_text_off - 1, 'N');
 
-			curr_ref_seq.push_back(cat_ref[i]);
+			curr_ref_seq.push_back("ACGT"[(int)cat_ref[i]]);
 			last_text_off = textoff;
 			first = false;
 		}

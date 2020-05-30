@@ -477,7 +477,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 				assert_in(toupper(c), "ACGTN");
 				if(nchar++ >= this->trim5_) {
 					assert_neq(0, asc2dnacat[c]);
-					r.patFw.append(charToDna5[c]); // ascii to int
+					r.patFw.append(asc2dna[c]); // ascii to int
 				}
 			}
 			c = ra.readOrigBuf[cur++];
@@ -610,7 +610,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		if(isalpha(c)) {
 			// If it's past the 5'-end trim point
 			if(nchar++ >= this->trim5_) {
-				r.patFw.append(charToDna5[c]);
+				r.patFw.append(asc2dna[c]);
 			}
 		}
 		assert_lt(cur, buflen);
@@ -768,7 +768,7 @@ bool FastaContinuousPatternSource::parse(
 			assert_in(toupper(c), "ACGTN");
 			if(nchar++ >= this->trim5_) {
 				assert_neq(0, asc2dnacat[c]);
-				ra.patFw.append(charToDna5[c]); // ascii to int
+				ra.patFw.append(asc2dna[c]); // ascii to int
 			}
 		}
 	}
@@ -893,7 +893,7 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 		if(isalpha(c)) {
 			// If it's past the 5'-end trim point
 			if(nchar++ >= this->trim5_) {
-				r.patFw.append(charToDna5[c]);
+				r.patFw.append(asc2dna[c]);
 			}
 		}
 		assert_lt(cur, buflen);
@@ -994,7 +994,17 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf.append(c);
 			c = getc_wrapper();
 		}
-		while(c >= 0 && (c == '\n' || c == '\r') && readi < pt.max_buf_ - 1) {
+                if (c == '\n') {
+			readbuf[readi].readOrigBuf.append(c);
+			c = getc_wrapper();
+			if (c == '\r')
+				readbuf[readi].readOrigBuf.append(c);
+                        else {
+				ungetc_wrapper(c);
+				c = '\n'; // reset to last seen char
+                        }
+                }
+                while(c >= 0 && (c == '\n' || c == '\r') && readi < pt.max_buf_ - 1) {
 			c = getc_wrapper();
 		}
 	}
@@ -1050,7 +1060,7 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 				assert_in(toupper(c), "ACGTN");
 				if(nchar++ >= this->trim5_) {
 					assert_neq(0, asc2dnacat[c]);
-					r.patFw.append(charToDna5[c]);
+					r.patFw.append(asc2dna[c]);
 				}
 			}
 			c = ra.readOrigBuf[cur++];
@@ -1136,8 +1146,17 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf.append(c);
 			c = getc_wrapper();
 		}
-
-	}
+                if (c == '\n') {
+			readbuf[readi].readOrigBuf.append(c);
+			c = getc_wrapper();
+			if (c == '\r')
+				readbuf[readi].readOrigBuf.append(c);
+			else {
+				ungetc_wrapper(c);
+				c = '\n'; // reset to last character seen
+			}
+                }
+        }
 	while (readi > 0 && readbuf[readi-1].readOrigBuf.length() == 0)
 		readi--;
 	return make_pair(c < 0, readi);
@@ -1161,12 +1180,11 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	cur--;
 	while(cur < buflen) {
 		c = r.readOrigBuf[cur++];
-		assert(c != '\r' && c != '\n');
 		if(isalpha(c)) {
 			assert_in(toupper(c), "ACGTN");
 			if(nchar++ >= this->trim5_) {
 				assert_neq(0, asc2dnacat[c]);
-				r.patFw.append(charToDna5[c]);
+				r.patFw.append(asc2dna[c]);
 			}
 		}
 	}

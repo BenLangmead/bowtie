@@ -2619,6 +2619,12 @@ std::ostream& operator<< (std::ostream& os, const SStringFixed<T, S>& str) {
 	return os;
 }
 
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const SString<T>& str) {
+	os << str.toZBuf();
+	return os;
+}
+
 extern uint8_t asc2dna[];
 extern uint8_t asc2col[];
 
@@ -3488,7 +3494,7 @@ public:
 
 typedef SStringExpandable<char, 1024, 2> BTString;
 typedef SDnaStringExpandable<1024, 2>    BTDnaString;
-typedef SDnaStringExpandable<1024, 2>    BTRefString;
 typedef SDnaMaskString<32, 2>            BTDnaMask;
+typedef SString<char>                    BTRefString;
 
 #endif /* SSTRING_H_ */

@@ -393,7 +393,7 @@ public:
 			// if we see caret or EOF, break
 			if(c == '>' || c == -1) break;
 			// append and continue
-			seq[seqcur++] = charToDna5[c];
+			seq[seqcur++] = asc2dna[c];
 			get(); c = peek();
 		}
 	}
