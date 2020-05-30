@@ -1596,7 +1596,7 @@ protected:
 		ASSERT_ONLY(qualTot += qual0);
 		uint32_t ci = (uint32_t)(_qlen - _mms[0] - 1);
 		// _chars[] is index in terms of RHS-relative depth
-		int c = charToDna5[(int)_chars[ci]];
+		int c = asc2dna[(int)_chars[ci]];
 		assert_lt(c, 4);
 		assert_neq(c, (int)(*_qry)[_mms[0]]);
 		// Second, append the substituted character for the position
@@ -1612,7 +1612,7 @@ protected:
 			ASSERT_ONLY(qualTot += qual1);
 			ci = (uint32_t)(_qlen - _mms[1] - 1);
 			// _chars[] is index in terms of RHS-relative depth
-			c = charToDna5[(int)_chars[ci]];
+			c = asc2dna[(int)_chars[ci]];
 			assert_lt(c, 4);
 			assert_neq(c, (int)(*_qry)[_mms[1]]);
 			// Second, append the substituted character for the position
@@ -1627,7 +1627,7 @@ protected:
 				ASSERT_ONLY(qualTot += qual2);
 				ci = (uint32_t)(_qlen - _mms[2] - 1);
 				// _chars[] is index in terms of RHS-relative depth
-				c = charToDna5[(int)_chars[ci]];
+				c = asc2dna[(int)_chars[ci]];
 				assert_lt(c, 4);
 				assert_neq(c, (int)(*_qry)[_mms[2]]);
 				// Second, append the substituted character for the position
@@ -1854,7 +1854,7 @@ public:
 				assert(rc == 'A' || rc == 'C' || rc == 'G' || rc == 'T');
 				ASSERT_ONLY(char oc = (char)qryBuf_[qlen_ - seedRange_.mms[i] - 1]);
 				assert_neq(rc, oc);
-				qryBuf_[qlen_ - seedRange_.mms[i] - 1] = charToDna5[(int)rc];
+				qryBuf_[qlen_ - seedRange_.mms[i] - 1] = asc2dna[(int)rc];
 				assert_neq(rc, (*qry_)[qlen_ - seedRange_.mms[i] - 1]);
 			}
 			qry_ = &qryBuf_;

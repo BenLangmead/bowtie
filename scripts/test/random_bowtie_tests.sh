@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 PREFIX=${0%/*}
 
@@ -9,13 +9,19 @@ else
 	shift
 fi
 
+MAKE=make
+gmake -v > /dev/null 2>&1
+if [ $? -eq 0 ] ; then
+    $MAKE=gmake
+fi
+
 if [ "$1" == "-c" ] ; then
-	make clean
+	$MAKE clean
 	shift
 fi
 
-make allall
-
+$MAKE allall "$@"
+MAKE_ARGS="$*"
 # Args: seed, outer, inner, tbase, trand, pbase, prand
 
 echo "Long test emphasizing building..."

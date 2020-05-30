@@ -431,7 +431,7 @@ simple-test: allall perl-deps
 .PHONY: random-test
 random-test: all perl-deps
 	eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
-	./scripts/test/random_bowtie_tests.sh
+	./scripts/test/random_bowtie_tests.sh $(*-command-variables-*-)
 
 .PHONY: perl-deps
 perl-deps:

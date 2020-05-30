@@ -257,7 +257,7 @@ struct HitSet {
 		assert_lt(sz, 1024);
 		seq.resize(sz);
 		for(size_t j = 0; j < sz; j++) {
-			seq[j] = charToDna5[fb.get()];
+			seq[j] = asc2dna[fb.get()];
 		}
                 qual.resize(sz);
 		fb.get(qual.wbuf(), sz);

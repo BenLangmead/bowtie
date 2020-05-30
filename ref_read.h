@@ -231,8 +231,8 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 			// Consume it
 			len++;
 			// Add it to referenece buffer
-			dst.set(charToDna5[c], dstoff++);
-			assert_lt(charToDna5[(int)dst[dst.length()-1]], 4);
+			dst.set(asc2dna[c], dstoff++);
+			assert_lt((int)dst[dstoff-1], 4);
 		}
 		c = in.get();
 		if(rparms.nsToAs && dna4Cat[c] == 2) c = 'A';
@@ -248,8 +248,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	// ilen = length of buffer before this last sequence was appended.
 	if(rparms.reverse == REF_READ_REVERSE_EACH) {
 		// Find limits of the portion we just appended
-		size_t nlen = dstoff;
-		dst.reverseWindow(ilen, nlen);
+		dst.reverseWindow(ilen, len);
 	}
 	return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 }

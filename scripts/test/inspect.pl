@@ -274,7 +274,7 @@ if($ref ne "") {
 
 my $fn = ".inspect.pl.tmp.$seed.fa";
 for my $ca (@cases) {
-	for my $col (0, 1) {
+	for my $col (0,) {
 		my ($c, $e) = split(/:/, $ca);
 		if(stripAllGaps($c, $col) eq "") {
 			print "Skipping test case because it had no unambiguous stretches\n";
