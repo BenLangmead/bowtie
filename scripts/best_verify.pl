@@ -77,8 +77,8 @@ if($reads =~ /\.fa$/) {
 }
 
 my $vmode = ($match_mode =~ /[-]v/);
-
-system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
+my $make = system("gmake -v") == 0 ? "gmake" : "make";
+system($make . " -C $bowtie_dir $bowtie_exe" . $ENV{"MAKE_ARGS"}) == 0 || die;
 
 # Run Bowtie to get best alignments
 my $bowtie_best_cmd = "$bowtie_dir/$bowtie_exe -y $round $match_mode --best --refidx $index $reads";

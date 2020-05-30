@@ -99,8 +99,9 @@ if($reads1 =~ /\.fa/) {
 }
 
 my $sesMustHavePes = 0; # force se pairs to have corresponding pe pairs 
+my $make = system("gmake -v") == 0 ? "gmake" : "make";
+system($make . " -C $bowtie_dir $bowtie_exe" . $ENV{"MAKE_ARGS"}) == 0 || die;
 
-system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
 
 # Run Bowtie not in paired-end mode for first mate file
 my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode $args -y $extra_args -a --refidx $index $reads1";
