@@ -1,9 +1,8 @@
 #ifndef DIFF_SAMPLE_H_
 #define DIFF_SAMPLE_H_
 
-#ifdef WITH_TBB
-#include <tbb/tbb.h>
-#include <tbb/task_group.h>
+#if (__cplusplus >= 201103)
+#include <thread>
 #endif
 
 #include <stdint.h>
@@ -15,6 +14,7 @@
 #include "ls.h"
 #include "multikey_qsort.h"
 #include "timer.h"
+#include "threading.h"
 
 using namespace std;
 
@@ -785,20 +785,8 @@ struct VSortingParam {
 };
 
 template<typename TStr>
-#ifdef WITH_TBB
-class VSorting_worker {
-        void *vp;
-
- public:
-
-       VSorting_worker(const VSorting_worker& W): vp(W.vp) {};
-       VSorting_worker(void *vp_):vp(vp_) {};
-	void operator()() const
-	{
-#else
 static void VSorting_worker(void *vp)
 {
-#endif
         VSortingParam<TStr>* param = (VSortingParam<TStr>*)vp;
 	DifferenceCoverSample<TStr>* dcs = param->dcs;
 	const TStr& host = dcs->text();
@@ -829,10 +817,7 @@ static void VSorting_worker(void *vp)
 			v);
 	}
 }
- 
-#ifdef WITH_TBB
-};
-#endif
+
 /**
  * Calculates a ranking of all suffixes in the sample and stores them,
  * packed according to the mu mapping, in _isaPrime.
@@ -900,8 +885,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
 				              this->verbose(), false, query_depth, &boundaries);
 				if(boundaries.size() > 0) {
-#ifdef WITH_TBB
-					tbb::task_group tbb_grp;
+#if (__cplusplus >= 201103)
+					AutoArray<std::thread*> threads(nthreads);
 #else
 					AutoArray<tthread::thread*> threads(nthreads);
 #endif
@@ -920,17 +905,15 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 						tparams[tid].boundaries = &boundaries;
 						tparams[tid].cur = &cur;
 						tparams[tid].mutex = &mutex;
-#ifdef WITH_TBB
-						tbb_grp.run(VSorting_worker<TStr>(((void*)&tparams[tid])));
-					}
-					tbb_grp.wait();
+#if (__cplusplus >= 201103L)
+						threads[tid] = new std::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
 #else
-					threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
+						threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
+#endif
 					}
 					for (int tid = 0; tid < nthreads; tid++) {
 						threads[tid]->join();
 					}
-#endif
 				}
 			}
 			if(this->sanityCheck()) {

@@ -39,9 +39,9 @@
 #endif
 
 static int FNAME_SIZE;
-#ifdef WITH_TBB
-#include <tbb/compat/thread>
-static tbb::atomic<int> thread_counter;
+#if (__cplusplus >= 201103L)
+#include <thread>
+static std::atomic<int> thread_counter;
 #else
 static int thread_counter;
 static MUTEX_T thread_counter_mutex;
@@ -1014,8 +1014,8 @@ createSinkFactory(HitSink& _sink, size_t threadId) {
 }
 
 void increment_thread_counter() {
-#ifdef WITH_TBB
-	thread_counter.fetch_and_increment();
+#if (__cplusplus >= 201103)
+	thread_counter.fetch_add(1);
 #else
 	ThreadSafe ts(&thread_counter_mutex);
 	thread_counter++;
@@ -1023,8 +1023,8 @@ void increment_thread_counter() {
 }
 
 void decrement_thread_counter() {
-#ifdef WITH_TBB
-	thread_counter.fetch_and_decrement();
+#if (__cplusplus >= 201103)
+	thread_counter.fetch_sub(1);
 #else
 	ThreadSafe ts(&thread_counter_mutex);
 	thread_counter--;
@@ -1113,12 +1113,12 @@ static bool steal_thread(int pid, int orig_nthreads) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static PatternComposer*		exactSearch_patsrc;
-static HitSink*			exactSearch_sink;
-static Ebwt*			exactSearch_ebwt;
-static vector<BTRefString >*	exactSearch_os;
-static BitPairReference*	exactSearch_refs;
-#ifdef WITH_TBB
+static PatternComposer*   exactSearch_patsrc;
+static HitSink*               exactSearch_sink;
+static Ebwt*                  exactSearch_ebwt;
+static vector<BTRefString>*   exactSearch_os;
+static BitPairReference*      exactSearch_refs;
+#if (__cplusplus >= 201103L)
 //void exactSearchWorker::operator()() const {
 static void exactSearchWorker(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -1134,7 +1134,6 @@ static void exactSearchWorker(void *vp) {
 	HitSink&		_sink   = *exactSearch_sink;
 	Ebwt&			ebwt    = *exactSearch_ebwt;
 	vector<BTRefString >&	os	= *exactSearch_os;
-	const BitPairReference* refs	= exactSearch_refs;
 
 	// Per-thread initialization
 	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
@@ -1203,8 +1202,8 @@ static void exactSearchWorker(void *vp) {
 		std::cout << ss.str();
 	}
 #endif
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	WORKER_EXIT();
 }
@@ -1212,7 +1211,7 @@ static void exactSearchWorker(void *vp) {
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void exactSearchWorkerStateful::operator()() const {
 static void exactSearchWorkerStateful(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -1303,8 +1302,8 @@ static void exactSearchWorkerStateful(void *vp) {
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	return;
 }
@@ -1353,7 +1352,7 @@ static void exactSearch(PatternComposer& _patsrc,
 	}
 	exactSearch_refs   = refs;
 	int tids[max(nthreads, thread_ceiling)];
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
 	tps.reserve(max(nthreads, thread_ceiling));
@@ -1361,8 +1360,8 @@ static void exactSearch(PatternComposer& _patsrc,
 	vector<tthread::thread*> threads;
 #endif
 
-#ifdef WITH_TBB
-	tbb::atomic<int> all_threads_done;
+#if (__cplusplus >= 201103L)
+	std::atomic<int> all_threads_done;
 	all_threads_done = 0;
 #endif
 	CHUD_START();
@@ -1380,7 +1379,7 @@ static void exactSearch(PatternComposer& _patsrc,
 
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 			tps[i].tid = i;
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
@@ -1427,7 +1426,7 @@ static void exactSearch(PatternComposer& _patsrc,
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 					tids[nthreads-1] = nthreads;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 					tps[nthreads-1].tid = nthreads - 1;
 					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
@@ -1454,7 +1453,7 @@ static void exactSearch(PatternComposer& _patsrc,
 		}
 #endif
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
@@ -1500,7 +1499,7 @@ static BitPairReference*        mismatchSearch_refs;
 /**
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void mismatchSearchWorkerFullStateful::operator()() const {
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -1588,8 +1587,8 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	if(thread_stealing) {
 		decrement_thread_counter();
 	}
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 
 	delete patsrcFact;
@@ -1597,7 +1596,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	delete pool;
 	return;
 }
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void mismatchSearchWorkerFull::operator()() const {
 static void mismatchSearchWorkerFull(void *vp){
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -1614,7 +1613,6 @@ static void mismatchSearchWorkerFull(void *vp){
 	Ebwt&			ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt&			ebwtBw  = *mismatchSearch_ebwtBw;
 	vector<BTRefString >& os      = *mismatchSearch_os;
-	const BitPairReference* refs    = mismatchSearch_refs;
 
 	// Per-thread initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
@@ -1687,8 +1685,8 @@ static void mismatchSearchWorkerFull(void *vp){
 		std::cout << ss.str();
 	}
 #endif
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
     	WORKER_EXIT();
 }
@@ -1734,7 +1732,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	mismatchSearch_refs = refs;
 
 	int tids[max(nthreads, thread_ceiling)];
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
 	tps.reserve(max(nthreads, thread_ceiling));
@@ -1742,8 +1740,8 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	vector<tthread::thread*> threads;
 #endif
 
-#ifdef WITH_TBB
-	tbb::atomic<int> all_threads_done;
+#if (__cplusplus >= 201103L)
+	std::atomic<int> all_threads_done;
 	all_threads_done = 0;
 #endif
 
@@ -1762,7 +1760,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 			tps[i].tid = i;
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
@@ -1809,7 +1807,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 					tids[nthreads-1] = nthreads;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 					tps[nthreads-1].tid = nthreads - 1;
 					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
@@ -1836,7 +1834,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		}
 #endif
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
@@ -1947,7 +1945,7 @@ static BitPairReference*        twoOrThreeMismatchSearch_refs;
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -2035,8 +2033,8 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	if(thread_stealing) {
 		decrement_thread_counter();
@@ -2048,7 +2046,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	return;
 }
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void twoOrThreeMismatchSearchWorkerFull::operator()() const {
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -2076,7 +2074,6 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        true);       /* index is forward */
 	Ebwt& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
 	GreedyDFSRangeSource btr1(
 	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh
@@ -2184,8 +2181,8 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		std::cout << ss.str();
 	}
 #endif
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	// Threads join at end of Phase 1
 	WORKER_EXIT();
@@ -2231,7 +2228,7 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 	int tids[max(nthreads, thread_ceiling)];
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
 	tps.reserve(max(nthreads, thread_ceiling));
@@ -2239,8 +2236,8 @@ static void twoOrThreeMismatchSearchFull(
 	vector<tthread::thread*> threads;
 #endif
 
-#ifdef WITH_TBB
-	tbb::atomic<int> all_threads_done;
+#if (__cplusplus >= 201103L)
+	std::atomic<int> all_threads_done;
 	all_threads_done = 0;
 #endif
 
@@ -2259,7 +2256,7 @@ static void twoOrThreeMismatchSearchFull(
 
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 			tps[i].tid = i;
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
@@ -2306,7 +2303,7 @@ static void twoOrThreeMismatchSearchFull(
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 					tids[nthreads-1] = nthreads;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 					tps[nthreads-1].tid = nthreads - 1;
 					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
@@ -2333,7 +2330,7 @@ static void twoOrThreeMismatchSearchFull(
 		}
 #endif
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
@@ -2371,7 +2368,7 @@ static PartialAlignmentManager* seededQualSearch_pamRc;
 static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void seededQualSearchWorkerFull::operator()() const {
 static void seededQualSearchWorkerFull(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -2406,7 +2403,6 @@ static void seededQualSearchWorkerFull(void *vp) {
 		pamFw = new PartialAlignmentManager(64);
 	}
 	vector<PartialAlignment> pals;
-	const BitPairReference* refs = seededQualSearch_refs;
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
@@ -2598,12 +2594,12 @@ static void seededQualSearchWorkerFull(void *vp) {
 		std::cout << ss.str();
 	}
 #endif
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	WORKER_EXIT();
 }
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 //void seededQualSearchWorkerFullStateful::operator()() const {
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	thread_tracking_pair *p = (thread_tracking_pair*) vp;
@@ -2707,8 +2703,8 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 		delete metrics;
 	}
 
-#ifdef WITH_TBB
-	p->done->fetch_and_add(1);
+#if (__cplusplus >= 201103L)
+	p->done->fetch_add(1);
 #endif
 	if(thread_stealing) {
 		decrement_thread_counter();
@@ -2770,7 +2766,7 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_refs = refs;
 
 	int tids[max(nthreads, thread_ceiling)];
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 	vector<std::thread*> threads;
 	vector<thread_tracking_pair> tps;
 	tps.reserve(max(nthreads, thread_ceiling));
@@ -2778,8 +2774,8 @@ static void seededQualCutoffSearchFull(
 	vector<tthread::thread*> threads;
 #endif
 
-#ifdef WITH_TBB
-	tbb::atomic<int> all_threads_done;
+#if (__cplusplus >= 201103L)
+	std::atomic<int> all_threads_done;
 	all_threads_done = 0;
 #endif
 
@@ -2806,7 +2802,7 @@ static void seededQualCutoffSearchFull(
 
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 			tps[i].tid = i;
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
@@ -2853,7 +2849,7 @@ static void seededQualCutoffSearchFull(
 				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 					tids[nthreads-1] = nthreads - 1;
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 					tps[nthreads-1].tid = nthreads - 1;
 					tps[nthreads-1].done = &all_threads_done;
 					if(stateful) {
@@ -2880,7 +2876,7 @@ static void seededQualCutoffSearchFull(
 		}
 #endif
 
-#ifdef WITH_TBB
+#if (__cplusplus >= 201103L)
 		while(all_threads_done < nthreads) {
 			SLEEP(10);
 		}
@@ -3307,7 +3303,7 @@ extern "C" {
  */
 int bowtie(int argc, const char **argv) {
 	try {
-  #ifdef WITH_TBB
+  #if (__cplusplus >= 201103L)
   #ifdef WITH_AFFINITY
     //CWILKS: adjust this depending on # of hyperthreads per core
     pinning_observer pinner( 2 /* the number of hyper threads on each core */ );
@@ -3436,7 +3432,7 @@ int bowtie(int argc, const char **argv) {
 #ifdef CHUD_PROFILING
 		chudReleaseRemoteAccess();
 #endif
-  #ifdef WITH_TBB
+  #if (__cplusplus >= 201103L)
   #ifdef WITH_AFFINITY
     // Always disable observation before observers destruction
         //tracker.observe( false );

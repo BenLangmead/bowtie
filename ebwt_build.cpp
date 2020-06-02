@@ -190,7 +190,7 @@ static struct option long_options[] = {
 template<typename T>
 static int parseNumber(T lower, const char *errmsg) {
 	char *endPtr= NULL;
-	T t = (T)strtoll(optarg, &endPtr, 10);
+	T t = (T)strtol(optarg, &endPtr, 10);
 	if (endPtr != NULL) {
 		if (t < lower) {
 			cerr << errmsg << endl;

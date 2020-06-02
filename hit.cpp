@@ -44,7 +44,7 @@ void VerboseHitSink::reportMaxed(
 				if(strat == bestStratum) {
 					if(num == r) {
 						hs[i].oms = hs[i+1].oms = (uint32_t)(hs.size()/2);
-						reportHits(NULL, &hs, i, i+2, threadId, 0, 0, true, p.rdid());
+						reportHits(NULL, &hs, i, i+2, threadId, 0, 0, true, p);
 						break;
 					}
 					num++;
@@ -61,7 +61,7 @@ void VerboseHitSink::reportMaxed(
 			uint32_t r = rand.nextU32() % num;
 			Hit& h = hs[r];
 			h.oms = (uint32_t)hs.size();
-			reportHits(&h, NULL, 0, 1, threadId, 0, 0, true, p.rdid());
+			reportHits(&h, NULL, 0, 1, threadId, 0, 0, true, p);
 		}
 	}
 }

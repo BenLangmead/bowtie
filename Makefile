@@ -57,7 +57,7 @@ LINUX =
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
     override EXTRA_FLAGS += -Wl,--hash-style=both
-endif
+ endif
 
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
@@ -71,11 +71,6 @@ PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
 
-#if we're not using TBB, then we can't use queuing locks
-ifeq (1,$(NO_TBB))
-	NO_QUEUELOCK=1
-endif
-
 ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
 	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
@@ -87,13 +82,8 @@ ifeq (1,$(NO_SPINLOCK))
 	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
-ifneq (1,$(NO_TBB))
-	LIBS += $(PTHREAD_LIB) -ltbb
-	LIBS += -ltbbmalloc$(if $(RELEASE_BUILD),,_proxy)
-	override EXTRA_FLAGS += -DWITH_TBB
-else
-	LIBS += $(PTHREAD_LIB)
-endif
+
+LIBS += $(PTHREAD_LIB)
 
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
@@ -118,11 +108,15 @@ ifeq (1,$(WITH_THREAD_PROFILING))
 	override EXTRA_FLAGS += -DPER_THREAD_TIMING=1
 endif
 
-ifeq (1,$(WITH_AFFINITY))
-	override EXTRA_FLAGS += -DWITH_AFFINITY=1
+OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
+             edit.cpp ebwt.cpp
+
+ifneq (1, $(NO_SPINLOCK))
+	OTHER_CPPS += spin_lock.cpp
 endif
 
 ifeq (1,$(WITH_QUEUELOCK))
+	OTHER_CPPS += mcs_lock.cpp
 	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
 endif
 
@@ -130,17 +124,12 @@ ifeq (1,$(WITH_FINE_TIMER))
 	override EXTRA_FLAGS += -DUSE_FINE_TIMER=1
 endif
 
-OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
-             edit.cpp ebwt.cpp
-
 ifeq (1,$(WITH_COHORTLOCK))
 	override EXTRA_FLAGS += -DWITH_COHORTLOCK=1
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
 
-ifeq (1,$(NO_TBB))
-	OTHER_CPPS += tinythread.cpp
-endif
+OTHER_CPPS += tinythread.cpp
 
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp sam.cpp \
