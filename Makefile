@@ -84,6 +84,9 @@ endif
 
 
 LIBS += $(PTHREAD_LIB)
+ifeq (1, $(WITH_TBBMALLOC))
+	LIBS += -ltbbmalloc
+endif
 
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
