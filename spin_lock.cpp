@@ -1,3 +1,4 @@
+#if (__cplusplus >= 201103L)
 #include <atomic>
 
 class spin_lock {
@@ -13,3 +14,4 @@ public:
 		flag.clear(std::memory_order_release);
 	}
 };
+#endif
