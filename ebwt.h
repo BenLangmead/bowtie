@@ -2795,13 +2795,11 @@ void Ebwt::checkOrigs(const vector<BTRefString >& os, bool mirror) const
 	}
 	while(i < os.size()) {
 		size_t olen = os[i].length();
-		int lastorig = -1;
 		for(; j < olen; j++) {
 			size_t joff = j;
 			if(mirror) joff = olen - j - 1;
 			if((int)os[i][joff] == 4) {
 				// Skip over Ns
-				lastorig = -1;
 				if(!mirror) {
 					while(j < olen && (int)os[i][j] == 4) j++;
 				} else {
@@ -2812,7 +2810,6 @@ void Ebwt::checkOrigs(const vector<BTRefString >& os, bool mirror) const
 			}
 
 			assert_eq(os[i][joff], rest[restOff]);
-			lastorig = (int)os[i][joff];
 			restOff++;
 		}
 		if(j == os[i].length()) {

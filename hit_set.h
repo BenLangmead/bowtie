@@ -8,8 +8,10 @@
 #ifndef HIT_SET_H_
 #define HIT_SET_H_
 
-#include <vector>
 #include <algorithm>
+#include <limits.h>
+#include <vector>
+
 #include "assert_helpers.h"
 #include "filebuf.h"
 #include "edit.h"

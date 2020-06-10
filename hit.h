@@ -590,7 +590,7 @@ protected:
 	size_t nthreads_;
 	std::vector<BTString> ptBufs_;
 	std::vector<size_t> ptCounts_;
-	int perThreadBufSize_;
+	size_t perThreadBufSize_;
 
 	size_t next_batch_to_flush_;
 	bool reorder_;
