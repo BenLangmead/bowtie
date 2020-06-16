@@ -6,7 +6,7 @@ using namespace std;
  * Print a hit along with information about the backtracking
  * regions constraining the hit.
  */
-void printHit(const vector<BTRefString >& os,
+void printHit(const EList<BTRefString >& os,
               const Hit& h,
               const BTDnaString& qry,
               size_t qlen,

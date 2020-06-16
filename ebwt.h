@@ -17,7 +17,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <vector>
 
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -467,9 +466,9 @@ public:
 	     TIndexOffU bmaxSqrtMult,
 	     TIndexOffU bmaxDivN,
 	     int dcv,
-	     vector<FileBuf*>& is,
-	     vector<RefRecord>& szs,
-	     vector<uint32_t>& plens,
+	     EList<FileBuf*>& is,
+	     EList<RefRecord>& szs,
+	     EList<uint32_t>& plens,
 	     TIndexOffU sztot,
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
@@ -579,7 +578,7 @@ public:
 	/**
 	 * Write the rstarts array given the szs array for the reference.
 	 */
-	void szsToDisk(const vector<RefRecord>& szs, ostream& os, int reverse) {
+	void szsToDisk(const EList<RefRecord>& szs, ostream& os, int reverse) {
 		TIndexOffU seq = 0;
 		TIndexOffU off = 0;
 		TIndexOffU totlen = 0;
@@ -622,9 +621,9 @@ public:
 	 */
 	template<typename TStr>
 	void initFromVector(
-		vector<FileBuf*>& is,
-		vector<RefRecord>& szs,
-		vector<uint32_t>& plens,
+		EList<FileBuf*>& is,
+		EList<RefRecord>& szs,
+		EList<uint32_t>& plens,
 		TIndexOffU sztot,
 		const RefReadInParams& refparams,
 		ofstream& out1,
@@ -656,7 +655,7 @@ public:
 					joinToDisk(is, szs, plens, sztot, refparams, s, out1, out2, seed);
 				} {
 					Timer timer(cout, "  Time to reverse reference sequence: ", _verbose);
-					vector<RefRecord> tmp;
+					EList<RefRecord> tmp;
 					s.reverse();
 					reverseRefRecords(szs, tmp, false, false);
 					szsToDisk(tmp, out1, refparams.reverse);
@@ -822,7 +821,7 @@ public:
 	 * fragments correspond to input sequences - it just cares about
 	 * the lengths of the fragments.
 	 */
-	TIndexOffU joinedLen(vector<RefRecord>& szs) {
+	TIndexOffU joinedLen(EList<RefRecord>& szs) {
 		TIndexOffU ret = 0;
 		for(unsigned int i = 0; i < szs.size(); i++) {
 			ret += szs[i].len;
@@ -880,7 +879,7 @@ public:
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
-	vector<string>& refnames()       { return _refnames; }
+	EList<string>& refnames()       { return _refnames; }
 	bool        fw() const           { return _fw; }
 #ifdef POPCNT_CAPABILITY
     bool _usePOPCNTinstruction;
@@ -1121,9 +1120,9 @@ public:
 	}
 
 	// Building
-	template <typename TStr> static TStr join(vector<TStr>& l, uint32_t seed);
-	template <typename TStr> static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, TIndexOffU sztot, const RefReadInParams& refparams, uint32_t seed);
-	template <typename TStr> void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, TIndexOffU sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed = 0);
+	template <typename TStr> static TStr join(EList<TStr>& l, uint32_t seed);
+	template <typename TStr> static TStr join(EList<FileBuf*>& l, EList<RefRecord>& szs, TIndexOffU sztot, const RefReadInParams& refparams, uint32_t seed);
+	template <typename TStr> void joinToDisk(EList<FileBuf*>& l, EList<RefRecord>& szs, EList<uint32_t>& plens, TIndexOffU sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed = 0);
 	template <typename TStr> void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -1137,12 +1136,12 @@ public:
 	void sanityCheckUpToSide(TIndexOff upToSide) const;
 	void sanityCheckAll(int reverse) const;
 	void restore(BTRefString& s) const;
-	void checkOrigs(const vector<BTRefString >& os, bool mirror) const;
+	void checkOrigs(const EList<BTRefString >& os, bool mirror) const;
 
 	// Searching and reporting
 	void joinedToTextOff(TIndexOffU qlen, TIndexOffU off, TIndexOffU& tidx, TIndexOffU& textoff, TIndexOffU& tlen) const;
-	inline bool report(const BTDnaString& query, BTString* quals, BTString* name, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU off, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams& params) const;
-	inline bool reportChaseOne(const BTDnaString& query, BTString* quals, BTString* name, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams& params, SideLocus *l = NULL) const;
+	inline bool report(const BTDnaString& query, BTString* quals, BTString* name, const EList<TIndexOffU>& mmui32, const EList<uint8_t>& refcs, size_t numMms, TIndexOffU off, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams& params) const;
+	inline bool reportChaseOne(const BTDnaString& query, BTString* quals, BTString* name, const EList<TIndexOffU>& mmui32, const EList<uint8_t>& refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline TIndexOffU countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, TIndexOffU* pairs) const;
@@ -1228,7 +1227,7 @@ public:
 	uint8_t*   _ebwt;
 	bool       _useMm;        /// use memory-mapped files to hold the index
 	bool       useShmem_;     /// use shared memory to hold large parts of the index
-	vector<string> _refnames; /// names of the reference sequences
+	EList<string> _refnames; /// names of the reference sequences
 	char *mmFile1_;
 	char *mmFile2_;
 	EbwtParams _eh;
@@ -1269,7 +1268,7 @@ private:
 class EbwtSearchParams {
 public:
 	EbwtSearchParams(HitSinkPerThread& sink,
-	                 const vector<BTRefString >& texts,
+	                 const EList<BTRefString >& texts,
 	                 bool fw = true,
 	                 bool ebwtFw = true) :
 		_sink(sink),
@@ -1289,8 +1288,8 @@ public:
 	               BTString* quals, // read quality values
 	               BTString* name,  // read name
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
-	               const std::vector<TIndexOffU>& mmui32, // mismatch list
-	               const std::vector<uint8_t>& refcs,  // reference characters
+	               const EList<TIndexOffU>& mmui32, // mismatch list
+	               const EList<uint8_t>& refcs,  // reference characters
 	               size_t numMms,      // # mismatches
 	               UPair h,          // ref coords
 	               UPair mh,         // mate's ref coords
@@ -1334,7 +1333,8 @@ public:
 		}
 		// Turn the mmui32 and refcs arrays into the mm FixedBitset and
 		// the refc vector
-		hit.refcs.resize(qlen, 0);
+		hit.refcs.resize(qlen);
+		hit.refcs.fillZero();
 		for(size_t i = 0; i < numMms; i++) {
 			if (ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
@@ -1404,7 +1404,7 @@ public:
 	}
 private:
 	HitSinkPerThread& _sink;
-	const vector<BTRefString >& _texts; // original texts, if available (if not
+	const EList<BTRefString >& _texts; // original texts, if available (if not
 	                            // available, _texts.size() == 0)
 	uint32_t _patid;      // id of current read
 	bool _fw;             // current read is forward-oriented
@@ -2634,8 +2634,8 @@ void Ebwt::joinedToTextOff(TIndexOffU qlen, TIndexOffU off,
 inline bool Ebwt::report(const BTDnaString& query,
 			 BTString* quals,
 			 BTString* name,
-			 const std::vector<TIndexOffU>& mmui32,
-			 const std::vector<uint8_t>& refcs,
+			 const EList<TIndexOffU>& mmui32,
+			 const EList<uint8_t>& refcs,
 			 size_t numMms,
 			 TIndexOffU off,
 			 TIndexOffU top,
@@ -2692,8 +2692,8 @@ inline bool Ebwt::report(const BTDnaString& query,
 inline bool Ebwt::reportChaseOne(const BTDnaString& query,
                                        BTString* quals,
                                        BTString* name,
-                                       const std::vector<TIndexOffU>& mmui32,
-                                       const std::vector<uint8_t>& refcs,
+                                       const EList<TIndexOffU>& mmui32,
+                                       const EList<uint8_t>& refcs,
                                        size_t numMms,
                                        TIndexOffU i,
                                        TIndexOffU top,
@@ -2783,7 +2783,7 @@ void Ebwt::restore(BTRefString& s) const {
  * Check that this Ebwt, when restored via restore(), matches up with
  * the given array of reference sequences.  For sanity checking.
  */
-void Ebwt::checkOrigs(const vector<BTRefString >& os, bool mirror) const
+void Ebwt::checkOrigs(const EList<BTRefString >& os, bool mirror) const
 {
 	BTRefString rest;
 	restore(rest);
@@ -3449,7 +3449,7 @@ void Ebwt::readIntoMemory(
  * TODO: revisit this function
  */
 static inline void
-readEbwtRefnames(FILE* fin, vector<string>& refnames) {
+readEbwtRefnames(FILE* fin, EList<string>& refnames) {
 	// _in1 must already be open with the get cursor at the
 	// beginning and no error flags set.
 	assert(fin != NULL);
@@ -3536,7 +3536,7 @@ readEbwtRefnames(FILE* fin, vector<string>& refnames) {
  * them in 'refnames'.
  */
 static inline void
-readEbwtRefnames(const string& instr, vector<string>& refnames) {
+readEbwtRefnames(const string& instr, EList<string>& refnames) {
     FILE* fin;
 	// Initialize our primary and secondary input-stream fields
     fin = fopen((instr + ".1." + gEbwt_ext).c_str(),"rb");
@@ -3745,7 +3745,7 @@ void Ebwt::writeFromMemory(bool justHeader,
  * and the original text strings.
  */
 template <typename TStr>
-TStr Ebwt::join(vector<TStr>& l, uint32_t seed) {
+TStr Ebwt::join(EList<TStr>& l, uint32_t seed) {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);
 	TStr ret;
@@ -3771,8 +3771,8 @@ TStr Ebwt::join(vector<TStr>& l, uint32_t seed) {
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt::join(vector<FileBuf*>& l,
-		vector<RefRecord>& szs,
+TStr Ebwt::join(EList<FileBuf*>& l,
+		EList<RefRecord>& szs,
 		TIndexOffU sztot,
 		const RefReadInParams& refparams,
 		uint32_t seed)
@@ -3822,9 +3822,9 @@ TStr Ebwt::join(vector<FileBuf*>& l,
  */
 template<typename TStr>
 void Ebwt::joinToDisk(
-	vector<FileBuf*>& l,
-	vector<RefRecord>& szs,
-	vector<uint32_t>& plens,
+	EList<FileBuf*>& l,
+	EList<RefRecord>& szs,
+	EList<uint32_t>& plens,
 	TIndexOffU sztot,
 	const RefReadInParams& refparams,
 	TStr& ret,

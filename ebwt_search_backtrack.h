@@ -2,14 +2,14 @@
 #define EBWT_SEARCH_BACKTRACK_H_
 
 #include <stdexcept>
-#include <vector>
 
+#include "aligner_metrics.h"
+#include "ds.h"
+#include "ebwt_search_util.h"
 #include "pat.h"
 #include "qual.h"
-#include "ebwt_search_util.h"
 #include "range.h"
 #include "range_source.h"
-#include "aligner_metrics.h"
 #include "search_globals.h"
 #include "sstring.h"
 
@@ -34,9 +34,9 @@ public:
 			bool reportExacts = true,
 			bool reportRanges = false,
 			PartialAlignmentManager* partials = NULL,
-			std::vector<QueryMutation>* muts = NULL,
+			EList<QueryMutation>* muts = NULL,
 			bool verbose = true,
-			vector<BTRefString >* os = NULL,
+			EList<BTRefString >* os = NULL,
 			bool considerQuals = true,  // whether to consider quality values when making backtracking decisions
 			bool halfAndHalf = false, // hacky way of supporting separate revisitable regions
 			bool maqPenalty = true) :
@@ -143,7 +143,7 @@ public:
 	 * Apply a batch of mutations to this read, possibly displacing a
 	 * previous batch of mutations.
 	 */
-	void setMuts(std::vector<QueryMutation>* muts) {
+	void setMuts(EList<QueryMutation>* muts) {
 		if(_muts != NULL) {
 			// Undo previous mutations
 			assert_gt(_muts->size(), 0);
@@ -1116,7 +1116,7 @@ protected:
 	 * true.
 	 */
 	bool hhCheck(uint32_t stackDepth, uint32_t depth,
-	             const std::vector<uint32_t>& mms, bool empty)
+	             const EList<uint32_t>& mms, bool empty)
 	{
 		ASSERT_ONLY(uint32_t lim = (_3revOff == _2revOff)? 2 : 3);
 		if((depth == (_5depth-1)) && !empty) {
@@ -1161,7 +1161,7 @@ protected:
 	 * currently under consideration.  Stratum is equal to the number
 	 * of mismatches in the seed portion of the alignment.
 	 */
-	int calcStratum(const std::vector<TIndexOffU>& mms, uint32_t stackDepth) {
+	int calcStratum(const EList<TIndexOffU>& mms, uint32_t stackDepth) {
 		int stratum = 0;
 		for(size_t i = 0; i < stackDepth; i++) {
 			if(mms[i] >= (_qlen - _3revOff)) {
@@ -1200,7 +1200,7 @@ protected:
 	bool hhCheckTop(uint32_t stackDepth,
 	                uint32_t d,
 	                uint32_t iham,
-	                const std::vector<TIndexOffU>& mms,
+	                const EList<TIndexOffU>& mms,
 	                uint64_t prehits = 0xffffffffffffffffllu)
 	{
 		assert_eq(0, _reportPartials);
@@ -1714,8 +1714,8 @@ protected:
 	uint8_t            *_elims;  // which ranges have been
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
-	std::vector<TIndexOffU> _mms;  // array for holding mismatches
-	std::vector<uint8_t> _refcs;  // array for holding mismatches
+	EList<TIndexOffU> _mms;  // array for holding mismatches
+	EList<uint8_t> _refcs;  // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
@@ -1729,9 +1729,9 @@ protected:
 	/// Append partial alignments here
 	PartialAlignmentManager *_partials;
 	/// Set of mutations that apply for a partial alignment
-	std::vector<QueryMutation> *_muts;
+	EList<QueryMutation> *_muts;
 	/// Reference texts (NULL if they are unavailable
-	vector<BTRefString >* _os;
+	EList<BTRefString >* _os;
 	/// Whether to use the _os array together with a naive matching
 	/// algorithm to double-check reported alignments (or the lack
 	/// thereof)
@@ -1768,7 +1768,7 @@ protected:
 	bool                _verbose;
 	uint64_t            _ihits;
 	// Holding area for partial alignments
-	vector<PartialAlignment> _partialsBuf;
+	EList<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
 	uint32_t            _patid;
@@ -2686,7 +2686,7 @@ public:
 			SearchConstraintExtent rev1Off,
 			SearchConstraintExtent rev2Off,
 			SearchConstraintExtent rev3Off,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool verbose,
 			bool quiet,
 			bool mate1,
@@ -2860,7 +2860,7 @@ public:
 			SearchConstraintExtent rev1Off,
 			SearchConstraintExtent rev2Off,
 			SearchConstraintExtent rev3Off,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool verbose,
 			bool quiet,
 			bool mate1,
@@ -2919,7 +2919,7 @@ protected:
 	SearchConstraintExtent rev1Off_;
 	SearchConstraintExtent rev2Off_;
 	SearchConstraintExtent rev3Off_;
-	vector<BTRefString >& os_;
+	EList<BTRefString >& os_;
 	bool verbose_;
 	bool quiet_;
 	bool mate1_;

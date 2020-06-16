@@ -2,17 +2,17 @@
 #define REFERENCE_H_
 
 #include <stdexcept>
-#include <vector>
 
 #include "btypes.h"
+#include "ds.h"
 #include "endian_swap.h"
 #include "mm.h"
 #include "ref_read.h"
-#include "shmem.h"
 #include "sequence_io.h"
+#include "shmem.h"
+#include "sstring.h"
 #include "timer.h"
 #include "word_io.h"
-#include "sstring.h"
 
 /**
  * Concrete reference representation that bulk-loads the reference from
@@ -40,8 +40,8 @@ public:
 	 */
 	BitPairReference(const string& in,
 	                 bool sanity,
-	                 std::vector<string>* infiles,
-	                 std::vector<BTRefString >* origs,
+	                 EList<string>* infiles,
+	                 EList<BTRefString >* origs,
 	                 bool infilesSeq,
 	                 bool loadSequence, // as opposed to just records
 	                 bool useMm,
@@ -311,8 +311,8 @@ public:
 		if(sanity_) {
 			// Compare the sequence we just read from the compact index
 			// file to the true reference sequence.
-			std::vector<BTRefString > *os; // for holding references
-			std::vector<BTRefString > osv; // for holding references
+			EList<BTRefString > *os; // for holding references
+			EList<BTRefString > osv; // for holding references
 			if(infiles != NULL) {
 				if(infilesSeq) {
 					for(size_t i = 0; i < infiles->size(); i++) {
@@ -691,22 +691,22 @@ public:
 	/**
 	 * Return constant reference to the RefRecord list.
 	 */
-	const std::vector<RefRecord>& refRecords() const { return recs_; }
+	const EList<RefRecord>& refRecords() const { return recs_; }
 
 protected:
 
 	uint32_t byteToU32_[256];
 
-	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
-	std::vector<uint32_t>  refApproxLens_; /// approx lens of ref seqs (excludes trailing ambig chars)
-	std::vector<TIndexOffU>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
-	std::vector<TIndexOffU>  refOffs_;    /// buf_ begin offsets per ref seq
-	std::vector<TIndexOffU>  cumUnambig_;    /// # unambig ref chars up to each record
-	std::vector<TIndexOffU>  cumRefOff_;    /// # ref chars up to each record
-	std::vector<TIndexOffU>  refRecOffs_; /// record begin/end offsets per ref seq
-	std::vector<uint32_t>  expandIdx_; /// map from small idxs (e.g. w/r/t plen) to large ones (w/r/t refnames)
-	std::vector<uint32_t>  shrinkIdx_; /// map from large idxs to small
-	std::vector<bool>      isGaps_;    /// ref i is all gaps?
+	EList<RefRecord> recs_;       /// records describing unambiguous stretches
+	EList<uint32_t>  refApproxLens_; /// approx lens of ref seqs (excludes trailing ambig chars)
+	EList<TIndexOffU>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
+	EList<TIndexOffU>  refOffs_;    /// buf_ begin offsets per ref seq
+	EList<TIndexOffU>  cumUnambig_;    /// # unambig ref chars up to each record
+	EList<TIndexOffU>  cumRefOff_;    /// # ref chars up to each record
+	EList<TIndexOffU>  refRecOffs_; /// record begin/end offsets per ref seq
+	EList<uint32_t>  expandIdx_; /// map from small idxs (e.g. w/r/t plen) to large ones (w/r/t refnames)
+	EList<uint32_t>  shrinkIdx_; /// map from large idxs to small
+	EList<bool>      isGaps_;    /// ref i is all gaps?
 	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
 	uint8_t *sanityBuf_;/// for sanity-checking buf_
 	TIndexOffU bufSz_;    /// size of buf_

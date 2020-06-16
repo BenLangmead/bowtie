@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <queue>
 #include <vector>
+
+#include "ds.h"
 #include "ebwt.h"
 #include "range.h"
 #include "pool.h"
@@ -1720,7 +1722,7 @@ public:
 		bool fw,
 		HitSink& sink,
 		HitSinkPerThread* sinkPt,
-		vector<BTRefString >& os,
+		EList<BTRefString >& os,
 		bool verbose,
 		bool quiet,
 		bool mate1,
@@ -1888,7 +1890,7 @@ protected:
 template<typename TRangeSource>
 class StubRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
+	typedef EList<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
 
@@ -1936,7 +1938,7 @@ public:
 template<typename TRangeSource>
 class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
-	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
+	typedef EList<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
 
@@ -2031,7 +2033,7 @@ template<typename TRangeSource>
 class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef RangeSourceDriver<TRangeSource>* TRangeSrcDrPtr;
-	typedef std::vector<TRangeSrcDrPtr> TRangeSrcDrPtrVec;
+	typedef EList<TRangeSrcDrPtr> TRangeSrcDrPtrVec;
 
 public:
 
@@ -2372,7 +2374,7 @@ protected:
 		for(size_t i = 0; i < sz;) {
 			// Remove elements that we're done with
 			if(vec[i]->done && !vec[i]->foundRange) {
-				vec.erase(vec.begin() + i);
+				vec.erase(i);
 				if(sz == 0) break;
 				else sz--;
 				continue;

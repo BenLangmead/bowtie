@@ -6,8 +6,9 @@
  */
 
 #include <iostream>
-#include <vector>
+
 #include "alphabet.h"
+#include "ds.h"
 #include "hit_set.h"
 #include "sstring.h"
 
@@ -56,9 +57,7 @@ ostream& operator << (ostream& os, const HitSetEnt& hs) {
 
 ostream& operator << (ostream& os, const HitSet& hs) {
 	os << hs.name << ":" << hs.seq << ":" << hs.qual << endl;
-	vector<HitSetEnt>::const_iterator it;
-	for(it = hs.ents.begin(); it != hs.ents.end(); it++) {
-		os << (*it);
-	}
+	for (size_t i = 0; i < hs.ents.size(); i++)
+		os << hs.ents[i];
 	return os;
 }

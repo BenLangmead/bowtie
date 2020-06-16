@@ -8,6 +8,7 @@
 #ifndef SAM_H_
 #define SAM_H_
 
+#include "ds.h"
 #include "hit.h"
 #include "pat.h"
 #include "random_source.h"
@@ -47,7 +48,7 @@ public:
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		std::vector<std::string>* refnames,
+		EList<std::string>* refnames,
 		size_t nthreads,
 		int perThreadBufSize,
 		bool reorder) :
@@ -78,7 +79,7 @@ public:
 	void appendHeaders(
 		OutFileBuf& os,
 		size_t numRefs,
-		const vector<string>& refnames,
+		const EList<string>& refnames,
 		bool nosq,
 		const TIndexOffU* plen,
 		bool fullRef,
@@ -93,7 +94,7 @@ protected:
 	 */
 	void reportUnOrMax(
 		PatternSourcePerThread& p,
-		vector<Hit>* hs, // could be NULL
+		EList<Hit>* hs, // could be NULL
 		size_t threadId,
 		bool un);
 
@@ -101,7 +102,7 @@ protected:
 	 * See sam.cpp
 	 */
 	virtual void reportMaxed(
-		vector<Hit>& hs,
+		EList<Hit>& hs,
 		size_t threadId,
 		PatternSourcePerThread& p);
 

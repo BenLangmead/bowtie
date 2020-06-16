@@ -1,10 +1,9 @@
 #ifndef ZBOX_H_
 #define ZBOX_H_
 
-#include <vector>
-
 #include "assert_helpers.h"
 #include "btypes.h"
+#include "ds.h"
 /**
  * Fill z with Z-box information for s.  String z will not be resized
  * and will only be filled up to its size cap.  This is the linear-time
@@ -14,7 +13,7 @@
 template<typename T>
 void calcZ(const T& s,
 		TIndexOffU off,
-	   std::vector<TIndexOffU>& z,
+	   EList<TIndexOffU>& z,
            bool verbose = false,
            bool sanityCheck = false)
 {

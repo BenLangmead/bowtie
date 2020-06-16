@@ -1,10 +1,10 @@
 #include <string>
-#include <vector>
 #include <iostream>
 #include <getopt.h>
 #include <stdexcept>
 
 #include "assert_helpers.h"
+#include "ds.h"
 #include "endian_swap.h"
 #include "ebwt.h"
 #include "reference.h"
@@ -219,7 +219,7 @@ void print_ref_sequence(
  */
 void print_ref_sequences(
 	ostream& fout,
-	const vector<string>& refnames,
+	const EList<string>& refnames,
 	const TIndexOffU* plen,
 	const string& adjustedEbwtFileBase)
 {
@@ -274,7 +274,7 @@ void print_index_sequences(
 	Ebwt& ebwt,
 	const BitPairReference& refs)
 {
-	vector<string>* refnames = &(ebwt.refnames());
+	EList<string>* refnames = &(ebwt.refnames());
 
 	TStr cat_ref;
 	ebwt.restore(cat_ref);
@@ -337,7 +337,7 @@ static char *argv0 = NULL;
 
 void print_index_sequence_names(const string& fname, ostream& fout)
 {
-	vector<string> p_refnames;
+	EList<string> p_refnames;
 	readEbwtRefnames(fname, p_refnames);
 	for(size_t i = 0; i < p_refnames.size(); i++) {
 		cout << p_refnames[i] << endl;
@@ -372,7 +372,7 @@ void print_index_summary(
 		verbose,              // be talkative at startup?
 		false,                // pass up memory exceptions?
 		false);               // sanity check?
-	vector<string> p_refnames;
+	EList<string> p_refnames;
 	readEbwtRefnames(fname, p_refnames);
 	if(extra) {
 		cout << "Flags" << '\t' << (-flags) << endl;
@@ -449,7 +449,7 @@ static void driver(
 			ebwt.loadIntoMemory(-1, true, false);
 			print_index_sequences<BTRefString >(cout, ebwt, refs);
 		} else {
-			vector<string> refnames;
+			EList<string> refnames;
 			readEbwtRefnames(adjustedEbwtFileBase, refnames);
 			print_ref_sequences(
 				cout,
@@ -471,7 +471,7 @@ int main(int argc, char **argv) {
 	try {
 		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
-		vector<string> queries;
+		EList<string> queries;
 		string outfile; // write query results to this file
 		argv0 = argv[0];
 		parseOptions(argc, argv);

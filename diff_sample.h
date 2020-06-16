@@ -6,7 +6,6 @@
 #endif
 
 #include <stdint.h>
-#include <vector>
 
 #include "assert_helpers.h"
 #include "btypes.h"
@@ -60,7 +59,7 @@ static bool clDCs_calced = false; /// have clDCs been calculated?
  * differences for a periodicity of v.
  */
 template<typename T>
-static bool dcRepOk(T v, std::vector<T>& ds) {
+static bool dcRepOk(T v, EList<T>& ds) {
 	// diffs[] records all the differences observed
 	bool *covered = new bool[v];
 	for(T i = 1; i < v; i++) {
@@ -403,12 +402,12 @@ static uint32_t dc0to64[65][10] = {
  * Get a difference cover for the requested periodicity v.
  */
 template <typename T>
-static std::vector<T> getDiffCover(T v,
+static EList<T> getDiffCover(T v,
                               bool verbose = false,
                               bool sanityCheck = false)
 {
 	assert_gt(v, 2);
-	std::vector<T> ret;
+	EList<T> ret;
 
 	// Can we look it up in our hardcoded array?
 	if(v <= 64 && dc0to64[v][0] == 0xffffffff) {
@@ -438,7 +437,7 @@ static std::vector<T> getDiffCover(T v,
 					for(size_t k = 0; k < ret.size(); k++) {
 						if(s == ret[k]) break;
 						if(s < ret[k]) {
-							ret.insert(ret.begin() + k, s);
+							ret.insert(s, k);
 							break;
 						}
 					}
@@ -459,11 +458,12 @@ static std::vector<T> getDiffCover(T v,
  * and periodicity v.
  */
 template <typename T>
-static std::vector<T> getDeltaMap(T v, const std::vector<T>& dc) {
+static EList<T> getDeltaMap(T v, const EList<T>& dc) {
 	// Declare anchor-map-related items
-	std::vector<T> amap(v);
+	EList<T> amap;
 	size_t amapEnts = 1;
-	amap.assign(amap.size(), 0xffffffff);
+	amap.resizeExact((size_t)v);
+	amap.fill(0xffffffff);
 	amap[0] = 0;
 	// Print out difference cover (and optionally calculate
 	// anchor map)
@@ -543,8 +543,8 @@ public:
 		assert_gt(_d, 0);
 		assert_eq(1, popCount(_v)); // must be power of 2
 		// Build map from d's to idx's
-		_dInv.resize(_v);
-		_dInv.assign(_dInv.size(), 0xffffffff);
+		_dInv.resizeExact((size_t)_v);
+		_dInv.fill(0xffffffff);
 		uint32_t lim = (uint32_t)_ds.size();
 		for(uint32_t i = 0; i < lim; i++) {
 			_dInv[_ds[i]] = i;
@@ -558,7 +558,7 @@ public:
 	 * the approximate number of bytes the Cover takes at all times.
 	 */
 	static size_t simulateAllocs(const TStr& text, uint32_t v) {
-		std::vector<uint32_t> ds = getDiffCover(v, false /*verbose*/, false /*sanity*/);
+		EList<uint32_t> ds = getDiffCover(v, false /*verbose*/, false /*sanity*/);
 		size_t len = text.length();
 		size_t sPrimeSz = (len / v) * ds.size();
 		// sPrime, sPrimeOrder, _isaPrime all exist in memory at
@@ -576,8 +576,8 @@ public:
 	bool verbose() const                 { return _verbose; }
 	bool sanityCheck() const             { return _sanity; }
 	const TStr& text() const             { return _text; }
-	const std::vector<uint32_t>& ds() const   { return _ds; }
-	const std::vector<uint32_t>& dmap() const { return _dmap; }
+	const EList<uint32_t>& ds() const   { return _ds; }
+	const EList<uint32_t>& dmap() const { return _dmap; }
 	ostream& log() const                 { return _logger; }
 
 	void     build(int nthreads);
@@ -607,7 +607,7 @@ public:
 private:
 
 	void doBuiltSanityCheck() const;
-	void buildSPrime(std::vector<TIndexOffU>& sPrime, size_t padding);
+	void buildSPrime(EList<TIndexOffU>& sPrime, size_t padding);
 
 	bool built() const {
 		return _isaPrime.size() > 0;
@@ -624,12 +624,12 @@ private:
 	uint32_t         _v;        // periodicity of sample
 	bool             _verbose;  //
 	bool             _sanity;   //
-	std::vector<uint32_t> _ds;       // samples: idx -> d
-	std::vector<uint32_t> _dmap;     // delta map
+	EList<uint32_t> _ds;       // samples: idx -> d
+	EList<uint32_t> _dmap;     // delta map
 	uint32_t         _d;        // |D| - size of sample
-	std::vector<TIndexOffU> _doffs;    // offsets into sPrime/isaPrime for each d idx
-	std::vector<TIndexOffU> _isaPrime; // ISA' array
-	std::vector<uint32_t> _dInv;     // Map from d -> idx
+	EList<TIndexOffU> _doffs;    // offsets into sPrime/isaPrime for each d idx
+	EList<TIndexOffU> _isaPrime; // ISA' array
+	EList<uint32_t> _dInv;     // Map from d -> idx
 	uint32_t         _log2v;
 	TIndexOffU         _vmask;
 	ostream&         _logger;
@@ -667,7 +667,7 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
 	assert(built());
 	VMSG_NL("  Doing sanity check");
 	TIndexOffU added = 0;
-	std::vector<TIndexOffU> sorted(_isaPrime.size(), OFF_MASK);
+	EList<TIndexOffU> sorted(_isaPrime.size());
 	for(size_t di = 0; di < this->d(); di++) {
 		uint32_t d = _ds[di];
 		size_t i = 0;
@@ -694,11 +694,11 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
  */
 template <typename TStr>
 void DifferenceCoverSample<TStr>::buildSPrime(
-	std::vector<TIndexOffU>& sPrime,
+	EList<TIndexOffU>& sPrime,
 	size_t padding)
 {
 	const TStr& t = this->text();
-	const std::vector<uint32_t>& ds = this->ds();
+	const EList<uint32_t>& ds = this->ds();
 	TIndexOffU tlen = (TIndexOffU)t.length();
 	uint32_t v = this->v();
 	uint32_t d = this->d();
@@ -729,8 +729,8 @@ void DifferenceCoverSample<TStr>::buildSPrime(
 #endif
 	assert_eq(_doffs.size(), d+1);
 	// Size sPrime appropriately
-	sPrime.resize(sPrimeSz + padding);
-	sPrime.assign(sPrime.size(), OFF_MASK);
+	sPrime.resizeExact((size_t)sPrimeSz + padding);
+	sPrime.fill(OFF_MASK);
 	// Slot suffixes from text into sPrime according to the mu
 	// mapping; where the mapping would leave a blank, insert a 0
 	TIndexOffU added = 0;
@@ -779,7 +779,7 @@ struct VSortingParam {
         size_t                       sPrimeSz;
         TIndexOffU*                  sPrimeOrderArr;
         size_t                       depth;
-        const std::vector<size_t>*   boundaries;
+        const EList<size_t>*   boundaries;
         size_t*                      cur;
         MUTEX_T*                     mutex;
 };
@@ -832,7 +832,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	assert_gt(v, 2);
 	// Build s'
 	size_t padding = 1;
-	std::vector<TIndexOffU> sPrime;
+	EList<TIndexOffU> sPrime;
 	VMSG_NL("  Building sPrime");
 	buildSPrime(sPrime, padding);
 	size_t sPrimeSz = sPrime.size() - padding;
@@ -841,7 +841,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	TIndexOffU nextRank = 0;
 	{
 		VMSG_NL("  Building sPrimeOrder");
-		std::vector<TIndexOffU> sPrimeOrder(sPrime.size());
+		EList<TIndexOffU> sPrimeOrder;
+		sPrimeOrder.resizeExact(sPrimeSz);
 		for(TIndexOffU i = 0; i < (TIndexOffU)sPrimeOrder.size(); i++) {
 			sPrimeOrder[i] = i;
 		}
@@ -852,12 +853,13 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			// Extract backing-store array from sPrime and sPrimeOrder;
 			// the mkeyQSortSuf2 routine works on the array for maximum
 			// efficiency
-			TIndexOffU *sPrimeArr = (TIndexOffU*)&sPrime[0];
+			TIndexOffU *sPrimeArr = (TIndexOffU*)sPrime.ptr();
 			assert_eq(sPrimeArr[0], sPrime[0]);
 			assert_eq(sPrimeArr[sPrimeSz-1], sPrime[sPrimeSz-1]);
-			TIndexOffU *sPrimeOrderArr = (TIndexOffU*)&sPrimeOrder[0];
+			TIndexOffU *sPrimeOrderArr = (TIndexOffU*)sPrimeOrder.ptr();
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
 			assert_eq(sPrimeOrderArr[sPrimeSz-1], sPrimeOrder[sPrimeSz-1]);
+
 			TIndexOffU *sOrig = NULL;
 			if(this->sanityCheck()) {
 				sOrig = new TIndexOffU[sPrimeSz];
@@ -881,7 +883,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					query_depth++;
 					tmp_nthreads >>= 1;
 				}
-				std::vector<size_t> boundaries; // bucket boundaries for parallelization
+				EList<size_t> boundaries; // bucket boundaries for parallelization
 				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
 				              this->verbose(), false, query_depth, &boundaries);
 				if(boundaries.size() > 0) {
@@ -890,7 +892,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 #else
 					AutoArray<tthread::thread*> threads(nthreads);
 #endif
-					std::vector<VSortingParam<TStr> > tparams;
+					EList<VSortingParam<TStr> > tparams;
 					tparams.resize(nthreads);
 					size_t cur = 0;
 					MUTEX_T mutex;
@@ -934,7 +936,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 		// arrays back into sPrime.
 		VMSG_NL("  Allocating rank array");
 		_isaPrime.resize(sPrime.size());
-		_isaPrime.assign(_isaPrime.size(), OFF_MASK);
+		_isaPrime.resizeExact(sPrime.size());
+		ASSERT_ONLY(_isaPrime.fill(OFF_MASK));
 		assert_gt(_isaPrime.size(), 0);
 		{
 			Timer timer(cout, "  Ranking v-sort output time: ", this->verbose());
@@ -1064,7 +1067,7 @@ int64_t DifferenceCoverSample<TStr>::breakTie(TIndexOffU i, TIndexOffU j) const 
 template <typename TStr>
 uint32_t DifferenceCoverSample<TStr>::tieBreakOff(TIndexOffU i, TIndexOffU j) const {
 	const TStr& t = this->text();
-	const std::vector<uint32_t>& dmap = this->dmap();
+	const EList<uint32_t>& dmap = this->dmap();
 	assert(built());
 	// It's actually convenient to allow this, but we're permitted to
 	// return nonsense in that case

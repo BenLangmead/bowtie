@@ -9,11 +9,11 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <string>
-#include <vector>
 
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "bitset.h"
+#include "ds.h"
 #include "edit.h"
 #include "filebuf.h"
 #include "formats.h"
@@ -64,8 +64,8 @@ public:
 	BTDnaString         patSeq;  /// read sequence
 	BTString            quals;   /// read qualities
 	FixedBitset<1024>   mms;     /// nucleotide mismatch mask
-	vector<char>        refcs;   /// reference characters for mms
-	vector<char>        crefcs;  /// reference characters for cmms
+	EList<char>        refcs;   /// reference characters for mms
+	EList<char>        crefcs;  /// reference characters for cmms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
 	bool                mfw;     /// orientation of mate in alignment
@@ -145,7 +145,7 @@ public:
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		vector<string>* refnames,
+		EList<string>* refnames,
 		size_t nthreads,
 		size_t perThreadBufSize,
 		bool reorder) :
@@ -174,7 +174,8 @@ public:
 		ptNumUnaligned_ = ptNumReportedPaired_ + nthreads_;
 		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		ptBufs_.resize(nthreads_);
-		ptCounts_.resize(nthreads_, 0);
+		ptCounts_.resize(nthreads_);
+		ptCounts_.fillZero();
 		initDumps();
 
 		if (reorder_) {
@@ -224,7 +225,7 @@ public:
 	 */
 	virtual void reportHits(
 		const Hit *hptr,
-		vector<Hit> *hsptr,
+		EList<Hit> *hsptr,
 		size_t start,
 		size_t end,
 		size_t threadId,
@@ -487,7 +488,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(
-		vector<Hit>& hs,
+		EList<Hit>& hs,
 		size_t threadId,
 		PatternSourcePerThread& p)
 	{
@@ -583,18 +584,18 @@ protected:
 	};
 
 	OutFileBuf&         out_;        /// the alignment output stream(s)
-	vector<string>*     _refnames;    /// map from reference indexes to names
+	EList<string>*     _refnames;    /// map from reference indexes to names
 	MUTEX_T             mutex_;       /// pthreads mutexes for per-file critical sections
 
 	// used for output read buffer
 	size_t nthreads_;
-	std::vector<BTString> ptBufs_;
-	std::vector<size_t> ptCounts_;
+	EList<BTString> ptBufs_;
+	EList<size_t> ptCounts_;
 	size_t perThreadBufSize_;
 
 	size_t next_batch_to_flush_;
 	bool reorder_;
-	std::vector<PtBufInfo> reorderInfo_;
+	EList<PtBufInfo> reorderInfo_;
 	COND_MUTEX_T reorder_mutex_;
 	COND_VAR_T output_cond;
 
@@ -730,7 +731,7 @@ public:
 	virtual ~HitSinkPerThread() { }
 
 	/// Return the vector of retained hits
-	vector<Hit>& retainedHits()   { return _hits; }
+	EList<Hit>& retainedHits()   { return _hits; }
 
 	/// Finalize current read
 	virtual uint32_t finishRead(PatternSourcePerThread& p, bool report, bool dump) {
@@ -895,9 +896,9 @@ protected:
 	/// # hits reported to this HitSink so far (not all of which were
 	/// necesssary reported to _sink)
 	uint64_t    _numValidHits;
-	vector<Hit> _hits; /// Repository for retained hits
+	EList<Hit> _hits; /// Repository for retained hits
 	/// Buffered hits, to be reported and flushed at end of read-phase
-	vector<Hit> _bufferedHits;
+	EList<Hit> _bufferedHits;
 
 	// Following variables are declared in the parent but maintained in
 	// the concrete subcalsses
@@ -1293,7 +1294,7 @@ public:
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		std::vector<std::string>* refnames,
+		EList<std::string>* refnames,
 		size_t nthreads,
 		size_t perThreadBufSize,
 		int partition = 0) :
@@ -1318,7 +1319,7 @@ public:
 	static void append(
 		BTString& o,
 		const Hit& h,
-		const vector<string>* refnames,
+		const EList<string>* refnames,
 		bool fullRef,
 		int partition,
 		int offBase,
@@ -1338,7 +1339,7 @@ public:
 	 * See hit.cpp
 	 */
 	virtual void reportMaxed(
-		vector<Hit>& hs,
+		EList<Hit>& hs,
 		size_t threadId,
 		PatternSourcePerThread& p);
 

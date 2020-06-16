@@ -141,7 +141,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 }
 
 static void
-printRecords(ostream& os, const vector<RefRecord>& l) {
+printRecords(ostream& os, const EList<RefRecord>& l) {
 	for(size_t i = 0; i < l.size(); i++) {
 		os << l[i].first << ", " << l[i].off << ", " << l[i].len << endl;
 	}
@@ -151,14 +151,14 @@ printRecords(ostream& os, const vector<RefRecord>& l) {
  * Reverse the 'src' list of RefRecords into the 'dst' list.  Don't
  * modify 'src'.
  */
-void reverseRefRecords(const vector<RefRecord>& src,
-					   vector<RefRecord>& dst,
+void reverseRefRecords(const EList<RefRecord>& src,
+					   EList<RefRecord>& dst,
 					   bool recursive,
 					   bool verbose)
 {
 	dst.clear();
 	{
-		vector<RefRecord> cur;
+		EList<RefRecord> cur;
 		for(int64_t i = (int64_t)src.size()-1; i >= 0; i--) {
 			bool first = (i == (int)src.size()-1 || src[i+1].first);
 			if(src[i].len) {
@@ -185,7 +185,7 @@ void reverseRefRecords(const vector<RefRecord>& src,
 	}
 #ifndef NDEBUG
 	if(!recursive) {
-		vector<RefRecord> tmp;
+		EList<RefRecord> tmp;
 		reverseRefRecords(dst, tmp, true);
 		assert_eq(tmp.size(), src.size());
 		for(size_t i = 0; i < src.size(); i++) {
@@ -203,9 +203,9 @@ void reverseRefRecords(const vector<RefRecord>& src,
  * all references combined.  Rewinds each istream before returning.
  */
 std::pair<size_t, size_t>
-fastaRefReadSizes(vector<FileBuf*>& in,
-                  vector<RefRecord>& recs,
-                  vector<uint32_t>& plens,
+fastaRefReadSizes(EList<FileBuf*>& in,
+                  EList<RefRecord>& recs,
+                  EList<uint32_t>& plens,
                   const RefReadInParams& rparms,
                   BitpairOutFileBuf* bpout,
                   TIndexOff& numSeqs)

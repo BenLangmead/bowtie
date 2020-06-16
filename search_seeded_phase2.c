@@ -72,7 +72,7 @@
 		// Find partial alignments for case 4R
 		ASSERT_ONLY(bool done =) btr2.backtrack();
 #ifndef NDEBUG
-		vector<PartialAlignment> partials;
+		EList<PartialAlignment> partials;
 		assert(pamRc != NULL);
 		pamRc->getPartials(patid, partials);
 		if(done) assert_gt(partials.size(), 0);

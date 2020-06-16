@@ -2,11 +2,13 @@
 #define MULTIKEY_QSORT_H_
 
 #include <iostream>
-#include "sequence_io.h"
+
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "diff_sample.h"
 #include "btypes.h"
+#include "diff_sample.h"
+#include "ds.h"
+#include "sequence_io.h"
 
 using namespace std;
 
@@ -487,9 +489,9 @@ void mkeyQSortSuf2(
 	size_t _end,
 	size_t _depth,
 	size_t upto = OFF_MASK,
-	std::vector<size_t>* boundaries = NULL)
+	EList<size_t>* boundaries = NULL)
 {
-	std::vector<std::vector<QSortRange> > block_list;
+	EList<EList<QSortRange> > block_list;
 	while(true) {
 		size_t begin = 0, end = 0, depth = 0;
 		if(block_list.size() == 0) {
@@ -501,7 +503,7 @@ void mkeyQSortSuf2(
 				begin = block_list.back()[0].begin;
 				end = block_list.back()[0].end;
 				depth = block_list.back()[0].depth;
-				block_list.back().erase((block_list.back()).begin());
+				block_list.back().erase(0);
 			} else {
 				block_list.resize(block_list.size() - 1);
 				if(block_list.size() == 0) {
@@ -574,7 +576,7 @@ void mkeyQSortSuf2(
 		r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
 		assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
 		r = b-a; // r <- # of <'s
-		std::vector<QSortRange> tmp1;
+		EList<QSortRange> tmp1;
 		block_list.push_back(tmp1);
 		block_list.back().clear();
 		if(r > 0) { // recurse on <'s
@@ -619,7 +621,7 @@ void mkeyQSortSuf2(
 	bool verbose = false,
 	bool sanityCheck = false,
 	size_t upto = OFF_MASK,
-	std::vector<size_t>* boundaries = NULL)
+	EList<size_t>* boundaries = NULL)
 {
 	size_t hlen = host.length();
 	if(sanityCheck) sanityCheckInputSufs(s, slen);
@@ -999,7 +1001,7 @@ static void bucketSortSufDcU8(
 	for(size_t i = 0; i < 4; i++) {
 	        bkts[i] = new TIndexOffU[4 * 1024 * 1024];
 	}
-	std::vector<std::vector<size_t> > block_list;
+	EList<EList<size_t> > block_list;
 	bool first = true;
 	while(true) {
 	        size_t begin = 0, end = 0;
@@ -1065,7 +1067,7 @@ static void bucketSortSufDcU8(
 		// This frame is now totally finished with bkts[][], so recursive
 		// callees can safely clobber it; we're not done with cnts[], but
 		// that's local to the stack frame.
-		std::vector<size_t> tmp;
+		EList<size_t> tmp;
 		block_list.push_back(tmp);
 		block_list.back().clear();
 		block_list.back().push_back(begin);

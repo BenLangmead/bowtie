@@ -9,7 +9,8 @@
 #include <fstream>
 #include <string.h>
 #include <stdlib.h>
-#include <vector>
+
+#include "ds.h"
 #include "tokenize.h"
 
 using namespace std;
@@ -35,7 +36,7 @@ int main(int argc, const char **argv) {
 		char buf[4096];
 		int lastret = -1;
 		while(in.getline(buf, 4095)) {
-			vector<string> args;
+			EList<string> args;
 			args.push_back(string(argv[0]));
 			tokenize(buf, " \t", args);
 			const char **myargs = (const char**)malloc(sizeof(char*)*args.size());

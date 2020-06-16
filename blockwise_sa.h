@@ -10,7 +10,6 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include <vector>
 
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -153,7 +152,7 @@ protected:
 	const bool       _sanityCheck; /// whether to perform sanity checks
 	const bool       _passMemExc;  /// true -> pass on memory exceptions
 	const bool       _verbose;     /// be talkative
-	std::vector<TIndexOffU> _itrBucket;   /// current bucket
+	EList<TIndexOffU> _itrBucket;   /// current bucket
 	TIndexOffU         _itrBucketPos;/// offset into current bucket
 	TIndexOffU         _itrPushedBackSuffix; /// temporary slot for lookahead
 	ostream&         _logger;      /// write log messages here
@@ -255,7 +254,7 @@ public:
 				cerr << "Could not open file for writing a reference graph: \"" << fname << "\"" << endl;
 				throw 1;
 			}
-			const std::vector<TIndexOffU>& bucket = sa->_itrBuckets[tid];
+			const EList<TIndexOffU>& bucket = sa->_itrBuckets[tid];
 			writeU<TIndexOffU>(sa_file, (TIndexOffU)bucket.size(), sa->_bigEndian);
 			for(size_t i = 0; i < bucket.size(); i++) {
 				writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
@@ -336,7 +335,7 @@ public:
 	virtual void nextBlock(int cur_block, int tid = 0);
 
 	/// Defined in blockwise_sa.cpp
-	virtual void qsort(std::vector<TIndexOffU>& bucket);
+	virtual void qsort(EList<TIndexOffU>& bucket);
 
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const {
@@ -411,11 +410,11 @@ private:
 			      int64_t& j,
 			      int64_t& k,
 			      bool& kSoft,
-			      const std::vector<TIndexOffU>& z);
+			      const EList<TIndexOffU>& z);
 
 	void buildSamples();
 
-	std::vector<TIndexOffU> _sampleSuffs; /// sample suffixes
+	EList<TIndexOffU> _sampleSuffs; /// sample suffixes
 	int                _nthreads; /// # of threads
 	TIndexOffU         _itrBucketIdx;
 	TIndexOffU         _cur;         /// offset to 1st elt of next block
@@ -427,12 +426,12 @@ private:
 	string                  _base_fname;  /// base file name for storing SA blocks
 	bool                    _bigEndian;   /// bigEndian?
 #if (__cplusplus >= 201103L)
-	std::vector<std::thread*> _threads;    /// thread list
+	EList<std::thread*> _threads;    /// thread list
 #else
-	std::vector<tthread::thread*> _threads;     /// thread list
+	EList<tthread::thread*> _threads;     /// thread list
 #endif
-	std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
-	std::vector<std::vector<TIndexOffU> >     _itrBuckets;  /// buckets
+	EList<pair<KarkkainenBlockwiseSA*, int> > _tparams;
+	EList<EList<TIndexOffU> >     _itrBuckets;  /// buckets
 	volatile bool* _done;        /// is a block processed?
 };
 
@@ -440,7 +439,7 @@ private:
  * Qsort the set of suffixes whose offsets are in 'bucket'.
  */
 template<typename TStr>
-void KarkkainenBlockwiseSA<TStr>::qsort(std::vector<TIndexOffU>& bucket) {
+void KarkkainenBlockwiseSA<TStr>::qsort(EList<TIndexOffU>& bucket) {
 	const TStr& t = this->text();
 	TIndexOffU *s = &bucket[0];
 	TIndexOffU slen = (TIndexOffU)bucket.size();
@@ -469,7 +468,7 @@ void KarkkainenBlockwiseSA<TStr>::qsort(std::vector<TIndexOffU>& bucket) {
  * packed means that the array cannot be sorted directly.
  */
 template<>
-void KarkkainenBlockwiseSA<S2bDnaString>::qsort(std::vector<TIndexOffU>& bucket) {
+void KarkkainenBlockwiseSA<S2bDnaString>::qsort(EList<TIndexOffU>& bucket) {
 	const S2bDnaString& t = this->text();
 	TIndexOffU *s = &bucket[0];
 	TIndexOffU slen = (TIndexOffU)bucket.size();
@@ -493,9 +492,9 @@ void KarkkainenBlockwiseSA<S2bDnaString>::qsort(std::vector<TIndexOffU>& bucket)
 template<typename TStr>
 struct BinarySortingParam {
 	const TStr*              t;
-	const std::vector<TIndexOffU>* sampleSuffs;
-	std::vector<TIndexOffU>        bucketSzs;
-	std::vector<TIndexOffU>        bucketReps;
+	const EList<TIndexOffU>* sampleSuffs;
+	EList<TIndexOffU>        bucketSzs;
+	EList<TIndexOffU>        bucketReps;
 	size_t                   begin;
 	size_t                   end;
 };
@@ -506,9 +505,9 @@ static void BinarySorting_worker(void *vp)
 	BinarySortingParam<TStr>* param = (BinarySortingParam<TStr>*)vp;
 	const TStr& t = *(param->t);
 	size_t len = t.length();
-	const std::vector<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
-	std::vector<TIndexOffU>& bucketSzs = param->bucketSzs;
-	std::vector<TIndexOffU>& bucketReps = param->bucketReps;
+	const EList<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
+	EList<TIndexOffU>& bucketSzs = param->bucketSzs;
+	EList<TIndexOffU>& bucketReps = param->bucketReps;
 	ASSERT_ONLY(size_t numBuckets = bucketSzs.size());
 	size_t begin = param->begin;
 	size_t end = param->end;
@@ -590,12 +589,11 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	{
 		Timer timer(cout, "QSorting sample offsets, eliminating duplicates time: ", this->verbose());
 		VMSG_NL("QSorting " << _sampleSuffs.size() << " sample offsets, eliminating duplicates");
-		std::sort(_sampleSuffs.begin(), _sampleSuffs.end());
+		_sampleSuffs.sort();
 		size_t sslen = _sampleSuffs.size();
 		for (size_t i = 0; i < sslen-1; i++) {
 			if (_sampleSuffs[i] == _sampleSuffs[i+1]) {
-				_sampleSuffs.erase(_sampleSuffs.begin() + i);
-				i--;
+				_sampleSuffs.erase(i--);
 				sslen--;
 			}
 		}
@@ -613,11 +611,11 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	while(--limit >= 0) {
 		TIndexOffU numBuckets = (TIndexOffU)_sampleSuffs.size()+1;
 #if (__cplusplus >= 201103l)
-		std::vector<std::thread*> threads(this->_nthreads);
+		EList<std::thread*> threads(this->_nthreads);
 #else
 		AutoArray<tthread::thread*> threads(this->_nthreads);
 #endif
-		std::vector<BinarySortingParam<TStr> > tparams;
+		EList<BinarySortingParam<TStr> > tparams;
 		tparams.resize(this->_nthreads);
 		for(int tid = 0; tid < this->_nthreads; tid++) {
 			// Calculate bucket sizes by doing a binary search for each
@@ -662,8 +660,8 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		}
 
 
-		std::vector<TIndexOffU>& bucketSzs = tparams[0].bucketSzs;
-		std::vector<TIndexOffU>& bucketReps = tparams[0].bucketReps;
+		EList<TIndexOffU>& bucketSzs = tparams[0].bucketSzs;
+		EList<TIndexOffU>& bucketReps = tparams[0].bucketReps;
 		for(int tid = 1; tid < this->_nthreads; tid++) {
 			for(size_t j = 0; j < numBuckets; j++) {
 				bucketSzs[j] += tparams[tid].bucketSzs[j];
@@ -708,7 +706,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 					// Add an additional sample from the bucketReps[]
 					// set accumulated in the binarySASearch loop; this
 					// effectively splits the bucket
-					_sampleSuffs.insert(_sampleSuffs.begin() + TIndexOffU(i + (added++)), bucketReps[i]);
+					_sampleSuffs.insert(bucketReps[(size_t)i], (TIndexOffU)(i + (added++)));
 				}
 			}
 		}
@@ -799,7 +797,7 @@ static TIndexOffU lookupSuffixZ(
 	const T& t,
 	TIndexOffU zOff,
 	TIndexOffU off,
-	const std::vector<TIndexOffU>& z)
+	const EList<TIndexOffU>& z)
 {
 	if(zOff < z.size()) {
 		TIndexOffU ret = z[zOff];
@@ -821,7 +819,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(
 	int64_t& j,
 	int64_t& k,
 	bool& kSoft,
-	const std::vector<TIndexOffU>& z)
+	const EList<TIndexOffU>& z)
 {
 	const TStr& t = this->text();
 	TIndexOffU len = TIndexOffU(t.length());
@@ -943,7 +941,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 		assert_lt((size_t)tid, this->_itrBuckets.size());
 	}
 #endif
-	std::vector<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);
+	EList<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);
 	{
 		ThreadSafe ts(&_mutex);
 		VMSG_NL("Getting block " << (cur_block+1) << " of " << _sampleSuffs.size()+1);
@@ -966,7 +964,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 		assert_eq(0, cur_block);
 		try {
 			if(bucket.capacity() < this->bucketSz()) {
-				bucket.reserve(len+1);
+				bucket.reserveExact(len+1);
 			}
 			bucket.resize(len);
 			for(TIndexOffU i = 0; i < len; i++) {
@@ -991,7 +989,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 			// BTL: Add a +100 fudge factor; there seem to be instances
 			// where a bucket ends up having one more elt than bucketSz()
 			if(bucket.size() < this->bucketSz()+100) {
-				bucket.reserve(this->bucketSz()+100);
+				bucket.reserveExact(this->bucketSz()+100);
 			}
 		} catch(bad_alloc &e) {
 			if(this->_passMemExc) {
@@ -1008,7 +1006,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 		// for both.  Be careful about first/last buckets.
 
 		//String<TIndexOffU> zLo(EBWTB_CAT), zHi(EBWTB_CAT);
-		std::vector<TIndexOffU> zLo, zHi;
+		EList<TIndexOffU> zLo, zHi;
 		assert_geq(cur_block, 0);
 		assert_leq((size_t)cur_block, _sampleSuffs.size());
 		bool first = (cur_block == 0);
@@ -1023,8 +1021,8 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 				// Not the last bucket
 				assert_lt((size_t)cur_block, _sampleSuffs.size());
 				hi = _sampleSuffs[cur_block];
-				zHi.resize(_dcV);
-				zHi.assign(zHi.size(), 0);
+				zHi.resizeExact(_dcV);
+				zHi.fillZero();
 				assert_eq(zHi[0], 0);
 				calcZ(t, hi, zHi, this->verbose(), this->sanityCheck());
 			}
@@ -1033,10 +1031,8 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 				assert_gt(cur_block, 0);
 				assert_leq((size_t)cur_block, _sampleSuffs.size());
 				lo = _sampleSuffs[cur_block-1];
-				//zLo.resizeExact(_dcV);
-				//zLo.fillZero();
-				zLo.resize(_dcV);
-				zLo.assign(zLo.size(), 0);
+				zLo.resizeExact(_dcV);
+				zLo.fillZero();
 				assert_gt(_dcV, 3);
 				assert_eq(zLo[0], 0);
 				calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());

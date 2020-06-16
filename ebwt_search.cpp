@@ -14,26 +14,27 @@
 #include <signal.h>
 #endif
 
-#include "alphabet.h"
-#include "assert_helpers.h"
-#include "endian_swap.h"
-#include "ebwt.h"
-#include "formats.h"
-#include "sequence_io.h"
-#include "tokenize.h"
-#include "hit.h"
-#include "pat.h"
-#include "bitset.h"
-#include "threading.h"
-#include "range_cache.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
 #include "aligner_23mm.h"
-#include "aligner_seed_mm.h"
 #include "aligner_metrics.h"
-#include "sam.h"
+#include "aligner_seed_mm.h"
+#include "alphabet.h"
+#include "assert_helpers.h"
+#include "bitset.h"
+#include "ds.h"
+#include "ebwt.h"
 #include "ebwt_search.h"
+#include "endian_swap.h"
+#include "formats.h"
+#include "hit.h"
+#include "pat.h"
+#include "range_cache.h"
+#include "sam.h"
+#include "sequence_io.h"
+#include "threading.h"
+#include "tokenize.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -49,9 +50,9 @@ static MUTEX_T thread_counter_mutex;
 
 using namespace std;
 
-static vector<string> mates1;  // mated reads (first mate)
-static vector<string> mates2;  // mated reads (second mate)
-static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
+static EList<string> mates1;  // mated reads (first mate)
+static EList<string> mates2;  // mated reads (second mate)
+static EList<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase;
 static bool verbose;      // be talkative
 static bool startVerbose; // be talkative at startup
@@ -140,9 +141,9 @@ static bool sampleMax; // whether to report a random alignment when maxed-out vi
 static int defaultMapq; // default mapping quality to print in SAM mode
 static bool printCost; // true -> print stratum and cost
 bool showSeed;
-static vector<string> qualities;
-static vector<string> qualities1;
-static vector<string> qualities2;
+static EList<string> qualities;
+static EList<string> qualities1;
+static EList<string> qualities2;
 static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
 bool noUnal; // don't print unaligned reads
@@ -596,7 +597,7 @@ T parse(const char *s) {
 template<typename T>
 pair<T, T> parsePair(const char *str, char delim) {
 	string s(str);
-	vector<string> ss;
+	EList<string> ss;
 	tokenize(s, delim, ss);
 	pair<T, T> ret;
 	ret.first = parse<T>(ss[0].c_str());
@@ -650,7 +651,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_SHOWSEED: showSeed = true; break;
 			case ARG_ALLOW_CONTAIN: gAllowMateContainment = true; break;
 			case ARG_SUPPRESS_FIELDS: {
-				vector<string> supp;
+				EList<string> supp;
 				tokenize(optarg, ",", supp);
 				for(size_t i = 0; i < supp.size(); i++) {
 					int ii = parseInt(1, "--suppress arg must be at least 1", supp[i].c_str());
@@ -1116,7 +1117,7 @@ static bool steal_thread(int pid, int orig_nthreads) {
 static PatternComposer*   exactSearch_patsrc;
 static HitSink*               exactSearch_sink;
 static Ebwt*                  exactSearch_ebwt;
-static vector<BTRefString>*   exactSearch_os;
+static EList<BTRefString>*   exactSearch_os;
 static BitPairReference*      exactSearch_refs;
 #if (__cplusplus >= 201103L)
 //void exactSearchWorker::operator()() const {
@@ -1133,7 +1134,7 @@ static void exactSearchWorker(void *vp) {
 	PatternComposer&	_patsrc = *exactSearch_patsrc;
 	HitSink&		_sink   = *exactSearch_sink;
 	Ebwt&			ebwt    = *exactSearch_ebwt;
-	vector<BTRefString >&	os	= *exactSearch_os;
+	EList<BTRefString >&	os	= *exactSearch_os;
 
 	// Per-thread initialization
 	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
@@ -1226,7 +1227,7 @@ static void exactSearchWorkerStateful(void *vp) {
 	PatternComposer&	_patsrc = *exactSearch_patsrc;
 	HitSink&		_sink   = *exactSearch_sink;
 	Ebwt&			ebwt    = *exactSearch_ebwt;
-	vector<BTRefString >&	os	= *exactSearch_os;
+	EList<BTRefString >&	os	= *exactSearch_os;
 	BitPairReference*	refs    = exactSearch_refs;
 
 	// Global initialization
@@ -1328,7 +1329,7 @@ static void exactSearchWorkerStateful(void *vp) {
 static void exactSearch(PatternComposer& _patsrc,
                         HitSink& _sink,
                         Ebwt& ebwt,
-                        vector<BTRefString >& os)
+                        EList<BTRefString >& os)
 {
 	exactSearch_patsrc = &_patsrc;
 	exactSearch_sink   = &_sink;
@@ -1353,11 +1354,11 @@ static void exactSearch(PatternComposer& _patsrc,
 	exactSearch_refs   = refs;
 	int tids[max(nthreads, thread_ceiling)];
 #if (__cplusplus >= 201103L)
-	vector<std::thread*> threads;
-	vector<thread_tracking_pair> tps;
-	tps.reserve(max(nthreads, thread_ceiling));
+	EList<std::thread*> threads;
+	EList<thread_tracking_pair> tps;
+	tps.resizeExact(max(nthreads, thread_ceiling));
 #else
-	vector<tthread::thread*> threads;
+	EList<tthread::thread*> threads;
 #endif
 
 #if (__cplusplus >= 201103L)
@@ -1491,7 +1492,7 @@ static PatternComposer*         mismatchSearch_patsrc;
 static HitSink*                 mismatchSearch_sink;
 static Ebwt*			mismatchSearch_ebwtFw;
 static Ebwt*			mismatchSearch_ebwtBw;
-static vector<BTRefString >*    mismatchSearch_os;
+static EList<BTRefString >*    mismatchSearch_os;
 static SyncBitset*              mismatchSearch_doneMask;
 static SyncBitset*              mismatchSearch_hitMask;
 static BitPairReference*        mismatchSearch_refs;
@@ -1515,7 +1516,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	HitSink&		_sink   = *mismatchSearch_sink;
 	Ebwt&			ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt&			ebwtBw  = *mismatchSearch_ebwtBw;
-	vector<BTRefString >& os      = *mismatchSearch_os;
+	EList<BTRefString >& os      = *mismatchSearch_os;
 	BitPairReference*	refs    = mismatchSearch_refs;
 
 	// Global initialization
@@ -1612,7 +1613,7 @@ static void mismatchSearchWorkerFull(void *vp){
 	HitSink&		_sink   = *mismatchSearch_sink;
 	Ebwt&			ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt&			ebwtBw  = *mismatchSearch_ebwtBw;
-	vector<BTRefString >& os      = *mismatchSearch_os;
+	EList<BTRefString >& os      = *mismatchSearch_os;
 
 	// Per-thread initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
@@ -1699,7 +1700,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
                                HitSink& _sink,
                                Ebwt& ebwtFw,
                                Ebwt& ebwtBw,
-                               vector<BTRefString >& os)
+                               EList<BTRefString >& os)
 {
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
@@ -1733,11 +1734,11 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 
 	int tids[max(nthreads, thread_ceiling)];
 #if (__cplusplus >= 201103L)
-	vector<std::thread*> threads;
-	vector<thread_tracking_pair> tps;
-	tps.reserve(max(nthreads, thread_ceiling));
+	EList<std::thread*> threads;
+	EList<thread_tracking_pair> tps;
+	tps.resizeExact(max(nthreads, thread_ceiling));
 #else
-	vector<tthread::thread*> threads;
+	EList<tthread::thread*> threads;
 #endif
 
 #if (__cplusplus >= 201103L)
@@ -1887,7 +1888,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 
 #define ASSERT_NO_HITS_FW(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
-		vector<Hit> hits; \
+		EList<Hit> hits; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -1910,7 +1911,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 
 #define ASSERT_NO_HITS_RC(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
-		vector<Hit> hits; \
+		EList<Hit> hits; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -1935,7 +1936,7 @@ static PatternComposer*         twoOrThreeMismatchSearch_patsrc;
 static HitSink*                 twoOrThreeMismatchSearch_sink;
 static Ebwt*			twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt*			twoOrThreeMismatchSearch_ebwtBw;
-static vector<BTRefString >*  twoOrThreeMismatchSearch_os;
+static EList<BTRefString >*  twoOrThreeMismatchSearch_os;
 static SyncBitset*              twoOrThreeMismatchSearch_doneMask;
 static SyncBitset*              twoOrThreeMismatchSearch_hitMask;
 static bool                     twoOrThreeMismatchSearch_two;
@@ -1961,7 +1962,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	HitSink&		_sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt&			ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt&			ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
-	vector<BTRefString >& os      = *twoOrThreeMismatchSearch_os;
+	EList<BTRefString >& os      = *twoOrThreeMismatchSearch_os;
 	BitPairReference*	refs    = twoOrThreeMismatchSearch_refs;
 	static bool		two     = twoOrThreeMismatchSearch_two;
 
@@ -2060,7 +2061,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	}
 	PatternComposer&		_patsrc	   = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&			_sink	   = *twoOrThreeMismatchSearch_sink;
-	vector<BTRefString >&         os	   = *twoOrThreeMismatchSearch_os;
+	EList<BTRefString >&         os	   = *twoOrThreeMismatchSearch_os;
 	bool				two	   = twoOrThreeMismatchSearch_two;
 	PatternSourcePerThreadFactory*	patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread*		patsrc	   = patsrcFact->create();
@@ -2193,7 +2194,7 @@ static void twoOrThreeMismatchSearchFull(
 		HitSink& _sink,                 /// hit sink
 		Ebwt& ebwtFw,             /// index of original text
 		Ebwt& ebwtBw,             /// index of mirror text
-		vector<BTRefString >& os,      /// text strings, if available (empty otherwise)
+		EList<BTRefString >& os,      /// text strings, if available (empty otherwise)
 		bool two = true)                /// true -> 2, false -> 3
 {
 	// Global initialization
@@ -2229,11 +2230,11 @@ static void twoOrThreeMismatchSearchFull(
 
 	int tids[max(nthreads, thread_ceiling)];
 #if (__cplusplus >= 201103L)
-	vector<std::thread*> threads;
-	vector<thread_tracking_pair> tps;
-	tps.reserve(max(nthreads, thread_ceiling));
+	EList<std::thread*> threads;
+	EList<thread_tracking_pair> tps;
+	tps.resizeExact(max(nthreads, thread_ceiling));
 #else
-	vector<tthread::thread*> threads;
+	EList<tthread::thread*> threads;
 #endif
 
 #if (__cplusplus >= 201103L)
@@ -2360,7 +2361,7 @@ static PatternComposer*		seededQualSearch_patsrc;
 static HitSink*                 seededQualSearch_sink;
 static Ebwt*			seededQualSearch_ebwtFw;
 static Ebwt*			seededQualSearch_ebwtBw;
-static vector<BTRefString >*  seededQualSearch_os;
+static EList<BTRefString >*  seededQualSearch_os;
 static SyncBitset*              seededQualSearch_doneMask;
 static SyncBitset*              seededQualSearch_hitMask;
 static PartialAlignmentManager* seededQualSearch_pamFw;
@@ -2382,7 +2383,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	}
 	PatternComposer&		_patsrc    = *seededQualSearch_patsrc;
 	HitSink&			_sink      = *seededQualSearch_sink;
-	vector<BTRefString >&		os         = *seededQualSearch_os;
+	EList<BTRefString >&		os         = *seededQualSearch_os;
 	int				qualCutoff = seededQualSearch_qualCutoff;
 	PatternSourcePerThreadFactory*	patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread*		patsrc	   = patsrcFact->create();
@@ -2402,7 +2403,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 		pamRc = new PartialAlignmentManager(64);
 		pamFw = new PartialAlignmentManager(64);
 	}
-	vector<PartialAlignment> pals;
+	EList<PartialAlignment> pals;
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
@@ -2532,7 +2533,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        true,    // considerQuals
 	        true,    // halfAndHalf
 	        !noMaqRound);
-	std::vector<QueryMutation> muts;
+	EList<QueryMutation> muts;
 	bool skipped = false;
 	pair<bool, bool> get_read_ret = make_pair(false, false);
 #ifdef PER_THREAD_TIMING
@@ -2615,7 +2616,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	HitSink&                _sink      = *seededQualSearch_sink;
 	Ebwt&			ebwtFw     = *seededQualSearch_ebwtFw;
 	Ebwt&			ebwtBw     = *seededQualSearch_ebwtBw;
-	vector<BTRefString >& os         = *seededQualSearch_os;
+	EList<BTRefString >& os         = *seededQualSearch_os;
 	int                     qualCutoff = seededQualSearch_qualCutoff;
 	BitPairReference*       refs       = seededQualSearch_refs;
 
@@ -2739,7 +2740,7 @@ static void seededQualCutoffSearchFull(
         HitSink& _sink,                 /// hit sink
         Ebwt& ebwtFw,             /// index of original text
         Ebwt& ebwtBw,             /// index of mirror text
-        std::vector<BTRefString >& os)      /// text strings, if available (empty otherwise)
+        EList<BTRefString >& os)      /// text strings, if available (empty otherwise)
 {
 	// Global intialization
 	assert_leq(seedMms, 3);
@@ -2767,11 +2768,11 @@ static void seededQualCutoffSearchFull(
 
 	int tids[max(nthreads, thread_ceiling)];
 #if (__cplusplus >= 201103L)
-	vector<std::thread*> threads;
-	vector<thread_tracking_pair> tps;
-	tps.reserve(max(nthreads, thread_ceiling));
+	EList<std::thread*> threads;
+	EList<thread_tracking_pair> tps;
+	tps.resizeExact(max(nthreads, thread_ceiling));
 #else
-	vector<tthread::thread*> threads;
+	EList<tthread::thread*> threads;
 #endif
 
 #if (__cplusplus >= 201103L)
@@ -2913,8 +2914,8 @@ static void seededQualCutoffSearchFull(
  */
 static PatternSource*
 patsrcFromStrings(int format,
-                  const vector<string>& reads,
-                  const vector<string>* quals)
+                  const EList<string>& reads,
+                  const EList<string>* quals)
 {
 	switch(format) {
 		case FASTA:
@@ -2952,15 +2953,15 @@ static string argstr;
 static void driver(const char * type,
                    const string& ebwtFileBase,
                    const string& query,
-                   const vector<string>& queries,
-                   const vector<string>& qualities,
+                   const EList<string>& queries,
+                   const EList<string>& qualities,
                    const string& outfile)
 {
 	if(verbose || startVerbose)  {
 		cerr << "Entered driver(): "; logTime(cerr, true);
 	}
 	// Vector of the reference sequences; used for sanity-checking
-	vector<BTRefString> os;
+	EList<BTRefString> os;
 	// Read reference sequences from the command-line or from a FASTA file
 	if(!origString.empty()) {
 		// Determine if it's a file by looking at whether it has a FASTA-like
@@ -2973,7 +2974,7 @@ static void driver(const char * type,
 		   (len >= 3 && origString.substr(len-3) == ".fa"))
 		{
 			// Read fasta file
-			vector<string> origFiles;
+			EList<string> origFiles;
 			tokenize(origString, ",", origFiles);
 			readSequenceFiles(origFiles, os);
 		} else {
@@ -2989,9 +2990,9 @@ static void driver(const char * type,
 	}
 
 
-	vector<PatternSource*> patsrcs_a;
-	vector<PatternSource*> patsrcs_b;
-	vector<PatternSource*> patsrcs_ab;
+	EList<PatternSource*> patsrcs_a;
+	EList<PatternSource*> patsrcs_b;
+	EList<PatternSource*> patsrcs_ab;
 
 	// If there were any first-mates specified, we will operate in
 	// stateful mode
@@ -3004,8 +3005,8 @@ static void driver(const char * type,
 		cerr << "Creating paired-end patsrcs: "; logTime(cerr, true);
 	}
 	for(size_t i = 0; i < mates12.size(); i++) {
-		const vector<string>* qs = &mates12;
-		vector<string> tmp;
+		const EList<string>* qs = &mates12;
+		EList<string> tmp;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
 			qs = &tmp;
@@ -3020,10 +3021,10 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
-		const vector<string>* qs = &mates1;
-		const vector<string>* quals = &qualities1;
-		vector<string> tmpSeq;
-		vector<string> tmpQual;
+		const EList<string>* qs = &mates1;
+		const EList<string>* quals = &qualities1;
+		EList<string> tmpSeq;
+		EList<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
 			qs = &tmpSeq;
@@ -3041,10 +3042,10 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates2.size(); i++) {
-		const vector<string>* qs = &mates2;
-		const vector<string>* quals = &qualities2;
-		vector<string> tmpSeq;
-		vector<string> tmpQual;
+		const EList<string>* qs = &mates2;
+		const EList<string>* quals = &qualities2;
+		EList<string> tmpSeq;
+		EList<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
 			qs = &tmpSeq;
@@ -3067,11 +3068,11 @@ static void driver(const char * type,
 		cerr << "Creating single-end patsrcs: "; logTime(cerr, true);
 	}
 	for(size_t i = 0; i < queries.size(); i++) {
-		const vector<string>* qs = &queries;
-		const vector<string>* quals = &qualities;
+		const EList<string>* qs = &queries;
+		const EList<string>* quals = &qualities;
 		PatternSource* patsrc = NULL;
-		vector<string> tmpSeq;
-		vector<string> tmpQual;
+		EList<string> tmpSeq;
+		EList<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
 			qs = &tmpSeq;
@@ -3164,8 +3165,7 @@ static void driver(const char * type,
 				}
 			}
 			if(longestStretch < 1) {
-				os.erase(os.begin() + i);
-				i--;
+				os.erase(i--);
 			}
 		}
 	}
@@ -3189,7 +3189,7 @@ static void driver(const char * type,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
-		vector<string>* refnames = &ebwt.refnames();
+		EList<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
 		if(outType == OUTPUT_FULL) {
 			sink = new VerboseHitSink(
@@ -3217,7 +3217,7 @@ static void driver(const char * type,
 				outBatchSz,
 				reorder);
 			if(!samNoHead) {
-				vector<string> refnames;
+				EList<string> refnames;
 				if(!samNoSQ) {
 					readEbwtRefnames(adjustedEbwtFileBase, refnames);
 				}
@@ -3319,7 +3319,7 @@ int bowtie(int argc, const char **argv) {
 		}
 		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
-		vector<string> queries;
+		EList<string> queries;
 		string outfile; // write query results to this file
 		if(startVerbose) { cerr << "Entered main(): "; logTime(cerr, true); }
 		parseOptions(argc, argv);

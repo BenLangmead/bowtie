@@ -2,9 +2,10 @@
 #define EBWT_SEARCH_UTIL_H_
 
 #include <iostream>
-#include <vector>
 #include <map>
 #include <stdint.h>
+
+#include "ds.h"
 #include "hit.h"
 #include "qual.h"
 #include "sstring.h"
@@ -150,7 +151,7 @@ static bool validPartialAlignment(PartialAlignment pa) {
 #endif
 
 extern
-void printHit(const vector<BTRefString >& os,
+void printHit(const EList<BTRefString >& os,
 			  const Hit& h,
 			  const BTDnaString& qry,
 			  size_t qlen,
@@ -168,7 +169,7 @@ class PartialAlignmentManager {
 public:
 	PartialAlignmentManager(size_t listSz = 10 * 1024 * 1024) {
 		// Reserve space for 10M partialsList entries = 40 MB
-		_partialsList.reserve(listSz);
+		_partialsList.reserveExact(listSz);
 	}
 
 	~PartialAlignmentManager() { }
@@ -179,7 +180,7 @@ public:
 	 * and so is safe to call if there are potential readers or
 	 * writers currently running.
 	 */
-	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
+	void addPartials(uint32_t patid, const EList<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
 		ThreadSafe _ts(&mutex_m);
 		size_t origPlSz = _partialsList.size();
@@ -236,7 +237,7 @@ public:
 	 * Get a set of partial alignments for a particular patid out of
 	 * the partial-alignment database.
 	 */
-	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
+	void getPartials(uint32_t patid, EList<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
 		ThreadSafe _ts(&mutex_m);
 		getPartialsUnsync(patid, ps);
@@ -249,7 +250,7 @@ public:
 	 * version, but is unsafe if there are other threads that may be
 	 * writing to the database.
 	 */
-	void getPartialsUnsync(uint32_t patid, vector<PartialAlignment>& ps) {
+	void getPartialsUnsync(uint32_t patid, EList<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
 		if(_partialsMap.find(patid) == _partialsMap.end()) {
 			return;
@@ -309,10 +310,10 @@ public:
 	static uint8_t toMutsString(const PartialAlignment& pal,
 	                            const BTDnaString& seq,
 	                            const BTString& quals,
-	                            std::vector<QueryMutation>& muts,
+	                            EList<QueryMutation>& muts,
 	                            bool maqPenalty = true)
 	{
-		muts.reserve(4);
+		muts.reserveExact(4);
 		assert_eq(0, muts.size());
 		uint32_t plen = (uint32_t)seq.length();
 		assert_gt(plen, 0);
@@ -363,7 +364,7 @@ private:
 	/// Maps patids to partial alignments for that patid
 	map<uint32_t, PartialAlignment> _partialsMap;
 	/// Overflow for when a patid has more than 1 partial alignment
-	vector<PartialAlignment> _partialsList;
+	EList<PartialAlignment> _partialsList;
 	/// Lock for 'partialsMap' and 'partialsList'; necessary because
 	/// search threads will be reading and writing them
 	MUTEX_T mutex_m;

@@ -10,13 +10,13 @@
 
 #include <algorithm>
 #include <limits.h>
-#include <vector>
 
-#include "assert_helpers.h"
-#include "filebuf.h"
-#include "edit.h"
 #include "alphabet.h"
+#include "assert_helpers.h"
 #include "btypes.h"
+#include "ds.h"
+#include "edit.h"
+#include "filebuf.h"
 #include "sstring.h"
 
 /**
@@ -44,10 +44,8 @@ struct HitSetEnt {
 		fb.writeChars((const char*)&oms, 4);
 		uint32_t sz = (uint32_t)edits.size();
 		fb.writeChars((const char*)&sz, 4);
-		std::vector<Edit>::const_iterator it;
-		for(it = edits.begin(); it != edits.end(); it++) {
-			it->serialize(fb);
-		}
+                for (size_t i = 0; i < edits.size(); i++)
+                        edits[i].serialize(fb);
 		fb.writeChars((const char*)&sz, 4);
 	}
 
@@ -169,7 +167,7 @@ struct HitSetEnt {
 	 * Sort edits by position
 	 */
 	void sort() {
-		if(edits.size() > 1) std::sort(edits.begin(), edits.end());
+		if(edits.size() > 1) edits.sort();
 	}
 
 	/**
@@ -193,7 +191,7 @@ struct HitSetEnt {
 	int8_t stratum; // stratum
 	uint16_t cost; // cost, including stratum
 	uint32_t oms; // # others
-	std::vector<Edit> edits; // edits to get from reference to subject
+	EList<Edit> edits; // edits to get from reference to subject
 };
 
 /**
@@ -202,8 +200,7 @@ struct HitSetEnt {
  */
 struct HitSet {
 
-	typedef std::vector<HitSetEnt> EntVec;
-	typedef EntVec::const_iterator Iter;
+	typedef EList<HitSetEnt> EntVec;
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 
 	HitSet() {
@@ -233,10 +230,8 @@ struct HitSet {
 		fb.writeChars(qual.buf(), i);
 		i = (uint32_t)ents.size();
 		fb.writeChars((const char*)&i, 4);
-		std::vector<HitSetEnt>::const_iterator it;
-		for(it = ents.begin(); it != ents.end(); it++) {
-			it->serialize(fb);
-		}
+                for (size_t i = 0; i < ents.size(); i++)
+                        ents[i].serialize(fb);
 		fb.write(maxedStratum);
 	}
 
@@ -305,14 +300,6 @@ struct HitSet {
 		ents.clear();
 	}
 
-	Iter begin() const {
-		return ents.begin();
-	}
-
-	Iter end() const {
-		return ents.end();
-	}
-
 	/**
 	 * Return the front entry.
 	 */
@@ -346,7 +333,7 @@ struct HitSet {
 	 * Sort hits by stratum/penalty.
 	 */
 	void sort() {
-		if(ents.size() > 1) std::sort(ents.begin(), ents.end());
+		if(ents.size() > 1) ents.sort();
 	}
 
 	/**
@@ -365,7 +352,7 @@ struct HitSet {
 	 * up by one.
 	 */
 	void remove(size_t i) {
-		ents.erase(ents.begin() + i);
+                ents.erase(i);
 	}
 
 	/**
@@ -444,7 +431,7 @@ struct HitSet {
 	BTDnaString seq;
 	BTString qual;
 	int8_t maxedStratum;
-	std::vector<HitSetEnt> ents;
+	EList<HitSetEnt> ents;
 };
 
 #endif /* HIT_SET_H_ */

@@ -1,3 +1,4 @@
+#include "ds.h""
 #include "hit.h"
 #include "hit_set.h"
 #include "search_globals.h"
@@ -13,7 +14,7 @@ bool operator< (const Hit& a, const Hit& b) {
  * Report a maxed-out read.
  */
 void VerboseHitSink::reportMaxed(
-	vector<Hit>& hs,
+	EList<Hit>& hs,
 	size_t threadId,
 	PatternSourcePerThread& p)
 {
@@ -72,7 +73,7 @@ void VerboseHitSink::reportMaxed(
 void VerboseHitSink::append(
 	BTString& o,
 	const Hit& h,
-	const vector<string>* refnames,
+	const EList<string>* refnames,
 	bool fullRef,
 	int partition,
 	int offBase,

@@ -7,23 +7,23 @@
 #include <zlib.h>
 #include <sys/stat.h>
 #include <stdexcept>
-#include <vector>
 #include <string>
 #include <cstring>
 #include <ctype.h>
 #include <fstream>
 
-#include "read.h"
-#include "sstring.h"
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "ds.h"
-#include "tokenize.h"
-#include "random_source.h"
-#include "threading.h"
+#include "ds.h"
 #include "filebuf.h"
 #include "qual.h"
+#include "random_source.h"
+#include "read.h"
 #include "search_globals.h"
+#include "sstring.h"
+#include "threading.h"
+#include "tokenize.h"
 #include "util.h"
 
 #ifdef _WIN32
@@ -258,7 +258,7 @@ extern void tooManySeqChars(const BTString& read_name);
 class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(
-		const vector<string>& v,
+		const EList<string>& v,
 		int trim3 = 0,
 		int trim5 = 0);
 
@@ -297,8 +297,8 @@ private:
 
 	size_t cur_;                      // index for first read of next batch
 	bool paired_;                     // whether reads are paired
-	std::vector<std::string> tokbuf_; // buffer for storing parsed tokens
-	std::vector<std::string> bufs_;   // per-read buffers
+	EList<std::string> tokbuf_; // buffer for storing parsed tokens
+	EList<std::string> bufs_;   // per-read buffers
 	char nametmp_[20];                // temp buffer for constructing name
 };
 
@@ -311,8 +311,8 @@ private:
 class CFilePatternSource : public TrimmingPatternSource {
 public:
 	CFilePatternSource(
-		const vector<string>& infiles,
-		const vector<string>* qinfiles,
+		const EList<string>& infiles,
+		const EList<string>* qinfiles,
 		int trim3 = 0,
 	    int trim5 = 0) :
 		TrimmingPatternSource( trim3, trim5),
@@ -327,7 +327,8 @@ public:
 		qinfiles_.clear();
 		if(qinfiles != NULL) qinfiles_ = *qinfiles;
 		assert_gt(infiles.size(), 0);
-		errs_.resize(infiles_.size(), false);
+		errs_.resize(infiles_.size());
+		errs_.fill(0, infiles_.size(), false);
 		if(qinfiles_.size() > 0 &&
 		   qinfiles_.size() != infiles_.size())
 		{
@@ -429,9 +430,9 @@ protected:
 		return false;
 	}
 
-	vector<string> infiles_; /// filenames for read files
-	vector<string> qinfiles_; /// filenames for quality files
-	vector<bool> errs_; /// whether we've already printed an error for each file
+	EList<string> infiles_; /// filenames for read files
+	EList<string> qinfiles_; /// filenames for quality files
+	EList<bool> errs_; /// whether we've already printed an error for each file
 	size_t filecur_;   /// index into infiles_ of next file to read
 	FILE *fp_; /// read file currently being read from
 	FILE *qfp_; /// quality file currently being read from
@@ -458,8 +459,8 @@ class FastaPatternSource : public CFilePatternSource {
 public:
 
 	FastaPatternSource(
-		const vector<string>& infiles,
-		const vector<string>* qinfiles,
+		const EList<string>& infiles,
+		const EList<string>* qinfiles,
 		int trim3 = 0,
 		int trim5 = 0,
 		bool solexa64 = false,
@@ -526,7 +527,7 @@ private:
 /**
  * Tokenize a line of space-separated integer quality values.
  */
-static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, vector<string>& toks) {
+static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, EList<string>& toks) {
 	size_t rd = filebuf.gets(buf, buflen);
 	if(rd == 0) return false;
 	assert(NULL == strrchr(buf, '\n'));
@@ -542,7 +543,7 @@ static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, 
 class TabbedPatternSource : public CFilePatternSource {
 public:
 	TabbedPatternSource(
-		const vector<string>& infiles,
+		const EList<string>& infiles,
 		bool secondName,  // whether it's --12/--tab5 or --tab6
 		int trim3 = 0,
 		int trim5 = 0,
@@ -600,7 +601,7 @@ protected:
 class FastaContinuousPatternSource : public CFilePatternSource {
 public:
 	FastaContinuousPatternSource(
-			const vector<string>& infiles,
+			const EList<string>& infiles,
 			size_t length,
 			size_t freq) :
 		CFilePatternSource(
@@ -678,7 +679,7 @@ private:
 class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(
-		const vector<string>& infiles,
+		const EList<string>& infiles,
 		int trim3 = 0,
 		int trim5 = 0,
 		bool solexa_quals = false,
@@ -752,7 +753,7 @@ class RawPatternSource : public CFilePatternSource {
 public:
 
 	RawPatternSource(
-		const vector<string>& infiles,
+		const EList<string>& infiles,
 		int trim3 = 0,
 		int trim5 = 0) :
 		CFilePatternSource(
@@ -822,7 +823,7 @@ public:
 	 */
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) = 0;
 
-	virtual void free_pmembers( const vector<PatternSource*> &elist) {
+	virtual void free_pmembers( const EList<PatternSource*> &elist) {
     		for (size_t i = 0; i < elist.size(); i++) {
         		if (elist[i] != NULL)
             			delete elist[i];
@@ -842,7 +843,7 @@ class SoloPatternComposer : public PatternComposer {
 
 public:
 
-	SoloPatternComposer(const vector<PatternSource*>& src) :
+	SoloPatternComposer(const EList<PatternSource*>& src) :
 		PatternComposer(),
 		cur_(0),
 		src_(src)
@@ -880,7 +881,7 @@ public:
 protected:
 
 	volatile uint32_t cur_; // current element in parallel srca_, srcb_ vectors
-	vector<PatternSource*> src_; /// PatternSources for paired-end reads
+	EList<PatternSource*> src_; /// PatternSources for paired-end reads
 };
 
 /**
@@ -891,8 +892,8 @@ class DualPatternComposer : public PatternComposer {
 
 public:
 
-	DualPatternComposer(const vector<PatternSource*>& srca,
-	                        const vector<PatternSource*>& srcb) :
+	DualPatternComposer(const EList<PatternSource*>& srca,
+	                        const EList<PatternSource*>& srcb) :
 		PatternComposer(),
 		cur_(0),
 		srca_(srca),
@@ -943,8 +944,8 @@ public:
 protected:
 
 	volatile uint32_t cur_; // current element in parallel srca_, srcb_ vectors
-	vector<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
-	vector<PatternSource*> srcb_; /// PatternSources for 2nd mates
+	EList<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
+	EList<PatternSource*> srcb_; /// PatternSources for 2nd mates
 };
 
 /**
@@ -1067,8 +1068,8 @@ public:
 	 * Create a new heap-allocated vector of heap-allocated
 	 * PatternSourcePerThreads.
 	 */
-	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
-		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+	virtual EList<PatternSourcePerThread*>* create(uint32_t n) const {
+		EList<PatternSourcePerThread*>* v = new EList<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
 			v->push_back(new PatternSourcePerThread(composer_, max_buf_, skip_, seed_));
 			assert(v->back() != NULL);
@@ -1084,7 +1085,7 @@ public:
 	}
 
 	/// Free memory associated with a pattern source list
-	virtual void destroy(std::vector<PatternSourcePerThread*>* composers) const {
+	virtual void destroy(EList<PatternSourcePerThread*>* composers) const {
 		assert(composers != NULL);
 		// Free all of the PatternSourcePerThreads
 		for(size_t i = 0; i < composers->size(); i++) {

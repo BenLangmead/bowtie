@@ -1,15 +1,16 @@
 #ifndef SEQUENCE_IO_H_
 #define SEQUENCE_IO_H_
 
-#include <string>
-#include <vector>
-#include <stdexcept>
 #include <fstream>
+#include <stdexcept>
 #include <stdio.h>
+#include <string>
+
 #include "assert_helpers.h"
+#include "ds.h"
+#include "filebuf.h"
 #include "pat.h"
 #include "sstring.h"
-#include "filebuf.h"
 
 /**
  * Parse the fasta file 'infile'.  Store 
@@ -17,8 +18,8 @@
 template<typename TFnStr>
 static void parseFastaLens(
 	const TFnStr&  infile,   // filename
-	std::vector<size_t>& namelens, // destination for fasta name lengths
-	std::vector<size_t>& seqlens)  // destination for fasta sequence lengths
+	EList<size_t>& namelens, // destination for fasta name lengths
+	EList<size_t>& seqlens)  // destination for fasta sequence lengths
 {
 	FILE *in = fopen(sstr_to_cstr(infile), "r");
 	if(in == NULL) {
@@ -49,7 +50,7 @@ static void parseFastaLens(
  */
 template <typename TStr>
 static void readSequenceFile(const std::string& infile,
-                             std::vector<TStr>& ss,
+                             EList<TStr>& ss,
                              int64_t& baseCutoff, // limit for total bases
                              int seqCutoff = -1,  // limit for sequences
                              bool reverse = false)
@@ -57,8 +58,8 @@ static void readSequenceFile(const std::string& infile,
 	// static char buf[256 * 1024]; // fairly large input buffer
 	if(baseCutoff <= 0) return;
 	// Read entries using SeqAn
-	std::vector<size_t> namelens;
-	std::vector<size_t> seqlens;
+	EList<size_t> namelens;
+	EList<size_t> seqlens;
 	parseFastaLens(infile, namelens, seqlens);
 	FILE *in = fopen(sstr_to_cstr(infile), "r");
 	if(in == NULL) {
@@ -120,8 +121,8 @@ static void readSequenceFile(const std::string& infile,
  * Store all of the extracted sequences in vector ss.
  */
 template <typename TStr>
-static void readSequenceFiles(const std::vector<std::string>& infiles,
-                              std::vector<TStr>& ss,
+static void readSequenceFiles(const EList<std::string>& infiles,
+                              EList<TStr>& ss,
                               int64_t& baseCutoff,
                               int seqCutoff = -1,
                               bool reverse = false)
@@ -137,8 +138,8 @@ static void readSequenceFiles(const std::vector<std::string>& infiles,
  * Store all of the extracted sequences in vector ss.
  */
 template <typename TStr>
-static void readSequenceFiles(const std::vector<std::string>& infiles,
-                              std::vector<TStr>& ss,
+static void readSequenceFiles(const EList<std::string>& infiles,
+                              EList<TStr>& ss,
                               int seqCutoff = -1,
                               bool reverse = false)
 {
@@ -151,7 +152,7 @@ static void readSequenceFiles(const std::vector<std::string>& infiles,
  */
 template <typename T>
 void readSequenceString(const std::string& s,
-                        std::vector<T>& ss,
+                        EList<T>& ss,
                         int64_t& baseCutoff,
                         int seqCutoff = -1,
                         bool reverse = false)
@@ -193,7 +194,7 @@ void readSequenceString(const std::string& s,
  */
 template <typename T>
 void readSequenceString(const std::string& s,
-                        std::vector<T>& ss,
+                        EList<T>& ss,
                         int seqCutoff = -1,
                         bool reverse = false)
 {

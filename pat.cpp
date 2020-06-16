@@ -357,7 +357,7 @@ void CFilePatternSource::open() {
  * option.
  */
 VectorPatternSource::VectorPatternSource(
-	const vector<string>& seqs,
+	const EList<string>& seqs,
 	int trim3,
 	int trim5) :
 	TrimmingPatternSource(trim3, trim5),

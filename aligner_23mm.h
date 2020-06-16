@@ -6,8 +6,9 @@
 #define ALIGNER_23MM_H_
 
 #include <utility>
-#include <vector>
+
 #include "aligner.h"
+#include "ds.h"
 #include "hit.h"
 #include "range_source.h"
 #include "row_chaser.h"
@@ -20,7 +21,7 @@
 class Unpaired23mmAlignerV1Factory : public AlignerFactory {
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
-	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
+	typedef EList<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Unpaired23mmAlignerV1Factory(
 			Ebwt& ebwtFw,
@@ -35,7 +36,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool maqPenalty,
 			bool qualOrder,
 			bool strandFix,
@@ -232,7 +233,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference *refs_;
-	vector<BTRefString >& os_;
+	EList<BTRefString >& os_;
 	const bool maqPenalty_;
 	const bool qualOrder_;
 	const bool strandFix_;
@@ -248,7 +249,7 @@ class Paired23mmAlignerV1Factory : public AlignerFactory {
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef ListRangeSourceDriver<EbwtRangeSource> TListRangeSrcDr;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
-	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
+	typedef EList<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Paired23mmAlignerV1Factory(
 			Ebwt& ebwtFw,
@@ -272,7 +273,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool reportSe,
 			bool maqPenalty,
 			bool qualOrder,
@@ -671,7 +672,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference* refs_;
-	vector<BTRefString >& os_;
+	EList<BTRefString >& os_;
 	const bool reportSe_;
 	const bool maqPenalty_;
 	const bool qualOrder_;

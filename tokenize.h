@@ -10,8 +10,9 @@
 
 #include <string>
 #include <sstream>
-#include <vector>
 #include <limits>
+
+#include "ds.h"
 
 using namespace std;
 
@@ -22,7 +23,7 @@ using namespace std;
 static inline void tokenize(
 	const string& s,
 	const string& delims,
-	vector<string>& ss,
+	EList<string>& ss,
 	size_t max = std::numeric_limits<size_t>::max())
 {
 	string::size_type lastPos = s.find_first_not_of(delims, 0);
@@ -40,7 +41,7 @@ static inline void tokenize(
 static inline void tokenize(
 	const std::string& s,
     char delim,
-    std::vector<std::string>& ss)
+    EList<std::string>& ss)
 {
 	std::string token;
 	std::istringstream iss(s);

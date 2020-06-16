@@ -6,8 +6,9 @@
 #define ALIGNER_SEED_MM_H_
 
 #include <utility>
-#include <vector>
+
 #include "aligner.h"
+#include "ds.h"
 #include "hit.h"
 #include "row_chaser.h"
 #include "range_chaser.h"
@@ -19,7 +20,7 @@
 class UnpairedSeedAlignerFactory : public AlignerFactory {
 
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
-	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
+	typedef EList<TRangeSrcDr*> TRangeSrcDrPtrVec;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 
 public:
@@ -39,7 +40,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool maqPenalty,
 			bool qualOrder,
 			bool strandFix,
@@ -555,7 +556,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference *refs_;
-	vector<BTRefString >& os_;
+	EList<BTRefString >& os_;
 	bool strandFix_;
 	bool maqPenalty_;
 	bool qualOrder_;
@@ -570,7 +571,7 @@ private:
  */
 class PairedSeedAlignerFactory : public AlignerFactory {
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
-	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
+	typedef EList<TRangeSrcDr*> TRangeSrcDrPtrVec;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 public:
 	PairedSeedAlignerFactory(
@@ -598,7 +599,7 @@ public:
 			uint32_t cacheLimit,
 			ChunkPool *pool,
 			BitPairReference* refs,
-			vector<BTRefString >& os,
+			EList<BTRefString >& os,
 			bool reportSe,
 			bool maqPenalty,
 			bool qualOrder,
@@ -1373,7 +1374,7 @@ private:
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
 	BitPairReference* refs_;
-	vector<BTRefString >& os_;
+	EList<BTRefString >& os_;
 	const bool reportSe_;
 	const bool maqPenalty_;
 	const bool qualOrder_;

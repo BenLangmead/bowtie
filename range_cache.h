@@ -7,11 +7,13 @@
 #ifndef RANGE_CACHE_H_
 #define RANGE_CACHE_H_
 
+#include <iostream>
+#include <map>
+#include <stdexcept>
 #include <stdint.h>
 #include <utility>
-#include <iostream>
-#include <stdexcept>
-#include <map>
+
+#include "ds.h"
 #include "ebwt.h"
 #include "row_chaser.h"
 
@@ -338,7 +340,7 @@ private:
  *
  */
 class RangeCache {
-	typedef std::vector<TIndexOffU> TUVec;
+	typedef EList<TIndexOffU> TUVec;
 	typedef std::map<TIndexOffU, TIndexOffU> TMap;
 	typedef std::map<TIndexOffU, TIndexOffU>::iterator TMapItr;
 

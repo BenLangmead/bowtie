@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include <iostream>
 #include <limits>
-#include <vector>
 
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "btypes.h"
+#include "ds.h"
 #include "sstring.h"
 
 /**
@@ -29,7 +29,7 @@
 template<typename TStr, typename TSufElt> inline
 TIndexOffU binarySASearch(const TStr& host,
 			  TIndexOffU qry,
-			  const std::vector<TSufElt>& sa)
+			  const EList<TSufElt>& sa)
 {
 	TIndexOffU lLcp = 0, rLcp = 0; // greatest observed LCPs on left and right
 	TIndexOffU l = 0, r = (TIndexOffU)sa.size()+1; // binary-search window

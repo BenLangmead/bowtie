@@ -32,8 +32,8 @@ int main(void) {
 	{
 		typedef int T;
 		const char *t = "banana";
-		std::vector<T> sa;
-		std::vector<T> isa;
+		EList<T> sa;
+		EList<T> isa;
 		for(size_t i = 0; i < strlen(t); i++) {
 			isa.push_back(t[i]);
 		}
@@ -54,8 +54,8 @@ int main(void) {
 	{
 		typedef uint32_t T;
 		const char *t = "banana";
-		std::vector<T> sa;
-		std::vector<T> isa;
+		EList<T> sa;
+		EList<T> isa;
 		for(size_t i = 0; i < strlen(t); i++) {
 			isa.push_back(t[i]);
 		}
@@ -82,8 +82,8 @@ int main(void) {
 		{
 		typedef int T;
 		const char *t = "aaa";
-		std::vector<T> sa;
-		std::vector<T> isa;
+		EList<T> sa;
+		EList<T> isa;
 		for(size_t i = 0; i < strlen(t); i++) {
 			isa.push_back(t[i]);
 		}
@@ -100,8 +100,8 @@ int main(void) {
 		{
 		typedef int T;
 		const char *t = "aaa";
-		std::vector<T> sa;
-		std::vector<T> isa;
+		EList<T> sa;
+		EList<T> isa;
 		for(size_t i = 0; i < strlen(t); i++) {
 			isa.push_back(t[i]);
 		}
@@ -118,8 +118,8 @@ int main(void) {
 		{
 		typedef int T;
 		const char *t = "aaa";
-		std::vector<T> sa;
-		std::vector<T> isa;
+		EList<T> sa;
+		EList<T> isa;
 		for(size_t i = 0; i < strlen(t); i++) {
 			isa.push_back(t[i]);
 		}

@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 
+#include "ds.h"
 #include "filebuf.h"
 #include "hit_set.h"
 #include "sstring.h"
@@ -335,7 +336,7 @@ struct FmString {
 	}
 
 	TAlScore pen;          // current penalty
-	std::vector<FmStringOp> ops; // op string
+	EList<FmStringOp> ops; // op string
 };
 
 /**

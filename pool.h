@@ -6,14 +6,15 @@
 #define POOL_H_
 
 #include <iostream>
-#include <vector>
 #include <stdexcept>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include "bitset.h"
+#include "ds.h"
 #include "log.h"
-#include "search_globals.h"
 #include "read.h"
+#include "search_globals.h"
 
 /**
  * Very simple allocator for fixed-size chunks of memory.  Chunk size
@@ -387,9 +388,9 @@ protected:
 
 	ChunkPool*      pool_;
 	const char     *name_;
-	std::vector<T*> pools_; /// the memory pools
+	EList<T*> pools_; /// the memory pools
 	uint32_t        curPool_; /// pool we're current allocating from
-	std::vector<uint32_t> lastCurInPool_;
+	EList<uint32_t> lastCurInPool_;
 	uint32_t        lim_;  /// # elements held in pool_
 	uint32_t        cur_;  /// index of next free element of pool_
 };

@@ -120,7 +120,7 @@
 	// for case 4F
 	btf3.backtrack();
 #ifndef NDEBUG
-	vector<PartialAlignment> partials;
+	EList<PartialAlignment> partials;
 	pamFw->getPartials(patid, partials);
 	for(size_t i = 0; i < partials.size(); i++) {
 		uint32_t pos0 = partials[i].entry.pos0;

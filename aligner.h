@@ -14,6 +14,7 @@
 
 #include "aligner_metrics.h"
 #include "assert_helpers.h"
+#include "ds.h"
 #include "ebwt.h"
 #include "pat.h"
 #include "range.h"
@@ -94,8 +95,8 @@ public:
 	 * Allocate a vector of n Aligners; use destroy(std::vector...) to
 	 * free the memory.
 	 */
-	virtual std::vector<Aligner*>* create(uint32_t n) const {
-		std::vector<Aligner*>* v = new std::vector<Aligner*>;
+	virtual EList<Aligner*>* create(uint32_t n) const {
+		EList<Aligner*>* v = new EList<Aligner*>;
 		for(uint32_t i = 0; i < n; i++) {
 			v->push_back(create());
 			assert(v->back() != NULL);
@@ -111,7 +112,7 @@ public:
 	}
 
 	/// Free memory associated with an aligner list
-	virtual void destroy(std::vector<Aligner*>* als) const {
+	virtual void destroy(EList<Aligner*>* als) const {
 		assert(als != NULL);
 		// Free all of the Aligners
 		for(size_t i = 0; i < als->size(); i++) {
@@ -185,8 +186,8 @@ protected:
 	uint32_t qUpto_; /// Number of reads to align before stopping
 	const AlignerFactory&                  alignFact_;
 	const PatternSourcePerThreadFactory&   patsrcFact_;
-	std::vector<Aligner *>*                aligners_;
-	std::vector<PatternSourcePerThread *>* patsrcs_;
+	EList<Aligner *>*                aligners_;
+	EList<PatternSourcePerThread *>* patsrcs_;
 };
 
 /**
@@ -365,10 +366,10 @@ protected:
 	const AlignerFactory&                  alignSEFact_;
 	const AlignerFactory&                  alignPEFact_;
 	const PatternSourcePerThreadFactory&   patsrcFact_;
-	std::vector<Aligner *>*                alignersSE_;
-	std::vector<Aligner *>*                alignersPE_;
+	EList<Aligner *>*                alignersSE_;
+	EList<Aligner *>*                alignersPE_;
 	bool *                                 seOrPe_;
-	std::vector<PatternSourcePerThread *>* patsrcs_;
+	EList<PatternSourcePerThread *>* patsrcs_;
 };
 
 /**
@@ -387,7 +388,7 @@ public:
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
-		vector<BTRefString >& os, // TODO: remove this, not used
+		EList<BTRefString >& os, // TODO: remove this, not used
 		BitPairReference *refs,
 		bool rangeMode,
 		bool verbose,
@@ -605,8 +606,8 @@ template<typename TRangeSource>
 class PairedBWAlignerV1 : public Aligner {
 
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
-	typedef std::vector<UPair> UPairVec;
-	typedef std::vector<Range> TRangeVec;
+	typedef EList<UPair> UPairVec;
+	typedef EList<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
@@ -1050,8 +1051,8 @@ protected:
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
-		std::vector<Range> ranges;
-		std::vector<TIndexOffU> offs;
+		EList<Range> ranges;
+		EList<TIndexOffU> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, doneFw_ ? &pairs_rc_ : &pairs_fw_,
 		                  toff, fw);
@@ -1482,8 +1483,8 @@ template<typename TRangeSource>
 class PairedBWAlignerV2 : public Aligner {
 
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
-	typedef std::vector<UPair> UPairVec;
-	typedef std::vector<Range> TRangeVec;
+	typedef EList<UPair> UPairVec;
+	typedef EList<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
@@ -1964,8 +1965,8 @@ protected:
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
-		std::vector<Range> ranges;
-		std::vector<TIndexOffU> offs;
+		EList<Range> ranges;
+		EList<TIndexOffU> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, pairFw ? &pairs_fw_ : &pairs_rc_,
 		                  toff, fw);

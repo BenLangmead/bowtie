@@ -5,13 +5,12 @@
  *      Author: Ben Langmead
  */
 
-#include <vector>
-#include <string>
-#include <iostream>
-#include "pat.h"
 #include "hit.h"
+#include "pat.h"
 #include "sam.h"
 #include "search_globals.h"
+#include <iostream>
+#include <string>
 
 using namespace std;
 
@@ -21,7 +20,7 @@ using namespace std;
 void SAMHitSink::appendHeaders(
 	OutFileBuf& os,
 	size_t numRefs,
-	const vector<string>& refnames,
+	const EList<string>& refnames,
 	bool nosq,
 	const TIndexOffU* plen,
 	bool fullRef,
@@ -57,7 +56,7 @@ void SAMHitSink::appendHeaders(
  */
 void SAMHitSink::reportUnOrMax(
 	PatternSourcePerThread& p,
-	vector<Hit>* hs,
+	EList<Hit>* hs,
 	size_t threadId,
 	bool un)
 {
@@ -217,7 +216,7 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
 	o << "\tMD:Z:";
 	const FixedBitset<1024> *mms = &h.mms;
 	ASSERT_ONLY(const BTDnaString* pat = &h.patSeq);
-	const vector<char>* refcs = &h.refcs;
+	const EList<char>* refcs = &h.refcs;
 	if(h.fw) {
 		for (int i = 0; i < (int)len; ++ i) {
 			if(mms->test(i)) {
@@ -263,7 +262,7 @@ void SAMHitSink::append(BTString& o, const Hit& h, int mapq, int xms) {
  * at random.
  */
 void SAMHitSink::reportMaxed(
-	vector<Hit>& hs,
+	EList<Hit>& hs,
 	size_t threadId,
 	PatternSourcePerThread& p)
 {

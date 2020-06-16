@@ -8,9 +8,10 @@
 #include <stdint.h>
 #include <iostream>
 #include <set>
-#include <vector>
 #include <stdexcept>
+
 #include "alphabet.h"
+#include "ds.h"
 #include "qual.h"
 #include "range.h"
 #include "reference.h"
@@ -29,8 +30,8 @@ const static int REF_ALIGNER_BUFSZ = 16 * 1024;
  */
 class RefAligner {
 
-	typedef std::vector<uint32_t> TU32Vec;
-	typedef std::vector<Range> TRangeVec;
+	typedef EList<uint32_t> TU32Vec;
+	typedef EList<Range> TRangeVec;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
 
@@ -67,7 +68,7 @@ public:
 	                  TIndexOffU begin,
 	                  TIndexOffU end,
 	                  TRangeVec& ranges,
-	                  std::vector<TIndexOffU>& results,
+	                  EList<TIndexOffU>& results,
 	                  TSetPairs* pairs = NULL,
 	                  TIndexOffU aoff = OFF_MASK,
 	                  bool seedOnLeft = false)
@@ -109,7 +110,7 @@ public:
 				  TIndexOffU begin,
 				  TIndexOffU end,
 				  TRangeVec& ranges,
-				  std::vector<TIndexOffU>& results,
+				  EList<TIndexOffU>& results,
 				  TSetPairs* pairs = NULL,
 				  TIndexOffU aoff = OFF_MASK,
 				  bool seedOnLeft = false) const = 0;
@@ -161,8 +162,8 @@ protected:
  */
 class ExactRefAligner : public RefAligner {
 
-	typedef std::vector<uint32_t> TU32Vec;
-	typedef std::vector<Range> TRangeVec;
+	typedef EList<uint32_t> TU32Vec;
+	typedef EList<Range> TRangeVec;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
 
@@ -186,7 +187,7 @@ protected:
 	               TIndexOffU begin,
 	               TIndexOffU end,
 	               TRangeVec& ranges,
-	               std::vector<TIndexOffU>& results,
+	               EList<TIndexOffU>& results,
 	               TSetPairs* pairs,
 	               TIndexOffU aoff,
 	               bool seedOnLeft) const
@@ -271,7 +272,7 @@ protected:
 				  TIndexOffU begin,
 				  TIndexOffU end,
 				  TRangeVec& ranges,
-				  std::vector<TIndexOffU>& results,
+				  EList<TIndexOffU>& results,
 				  TSetPairs* pairs,
 				  TIndexOffU aoff, // offset of anchor mate
 				  bool seedOnLeft) const
@@ -286,7 +287,7 @@ protected:
 			assert_gt(qlen, 0);
 #ifndef NDEBUG
 			// Get all naive hits
-			TRangeVec r2; std::vector<TIndexOffU> re2;
+			TRangeVec r2; EList<TIndexOffU> re2;
 			naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -492,8 +493,8 @@ extern unsigned char u8toMms[];
  */
 class OneMMRefAligner : public RefAligner {
 
-	typedef std::vector<Range> TRangeVec;
-	typedef std::vector<uint32_t> TU32Vec;
+	typedef EList<Range> TRangeVec;
+	typedef EList<uint32_t> TU32Vec;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
 
@@ -517,7 +518,7 @@ protected:
 		       TIndexOffU begin,
 		       TIndexOffU end,
 	               TRangeVec& ranges,
-	               std::vector<TIndexOffU>& results,
+	               EList<TIndexOffU>& results,
 	               TSetPairs* pairs,
 	               TIndexOffU aoff,
 	               bool seedOnLeft) const
@@ -612,7 +613,7 @@ protected:
 						  TIndexOffU begin,
 						  TIndexOffU end,
 						  TRangeVec& ranges,
-						  std::vector<TIndexOffU>& results,
+						  EList<TIndexOffU>& results,
 						  TSetPairs* pairs = NULL,
 						  TIndexOffU aoff = OFF_MASK,
 						  bool seedOnLeft = false) const
@@ -627,7 +628,7 @@ protected:
 				assert_gt(qlen, 0);
 #ifndef NDEBUG
 				// Get results from the naive matcher for sanity-checking
-				TRangeVec r2; std::vector<TIndexOffU> re2;
+				TRangeVec r2; EList<TIndexOffU> re2;
 				naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 					  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -893,8 +894,8 @@ protected:
  */
 	class TwoMMRefAligner : public RefAligner {
 
-		typedef std::vector<Range> TRangeVec;
-		typedef std::vector<uint32_t> TU32Vec;
+		typedef EList<Range> TRangeVec;
+		typedef EList<uint32_t> TU32Vec;
 		typedef std::pair<uint64_t, uint64_t> TU64Pair;
 		typedef std::set<TU64Pair> TSetPairs;
 
@@ -918,7 +919,7 @@ protected:
 			       TIndexOffU begin,
 			       TIndexOffU end,
 			       TRangeVec& ranges,
-			       std::vector<TIndexOffU>& results,
+			       EList<TIndexOffU>& results,
 			       TSetPairs* pairs,
 			       TIndexOffU aoff,
 			       bool seedOnLeft) const
@@ -1028,7 +1029,7 @@ protected:
 							  TIndexOffU begin,
 							  TIndexOffU end,
 							  TRangeVec& ranges,
-							  std::vector<TIndexOffU>& results,
+							  EList<TIndexOffU>& results,
 							  TSetPairs* pairs = NULL,
 							  TIndexOffU aoff = OFF_MASK,
 							  bool seedOnLeft = false) const
@@ -1043,7 +1044,7 @@ protected:
 					assert_gt(qlen, 0);
 #ifndef NDEBUG
 					// Get results from the naive matcher for sanity-checking
-					TRangeVec r2; std::vector<TIndexOffU> re2;
+					TRangeVec r2; EList<TIndexOffU> re2;
 					naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 						  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -1368,8 +1369,8 @@ protected:
  */
 		class ThreeMMRefAligner : public RefAligner {
 
-			typedef std::vector<Range> TRangeVec;
-			typedef std::vector<uint32_t> TU32Vec;
+			typedef EList<Range> TRangeVec;
+			typedef EList<uint32_t> TU32Vec;
 			typedef std::pair<uint64_t, uint64_t> TU64Pair;
 			typedef std::set<TU64Pair> TSetPairs;
 
@@ -1393,7 +1394,7 @@ protected:
 				       TIndexOffU begin,
 				       TIndexOffU end,
 				       TRangeVec& ranges,
-				       std::vector<TIndexOffU>& results,
+				       EList<TIndexOffU>& results,
 				       TSetPairs* pairs,
 				       TIndexOffU aoff,
 				       bool seedOnLeft) const
@@ -1515,7 +1516,7 @@ protected:
 								  TIndexOffU begin,
 								  TIndexOffU end,
 								  TRangeVec& ranges,
-								  std::vector<TIndexOffU>& results,
+								  EList<TIndexOffU>& results,
 								  TSetPairs* pairs = NULL,
 								  TIndexOffU aoff = OFF_MASK,
 								  bool seedOnLeft = false) const
@@ -1530,7 +1531,7 @@ protected:
 						assert_gt(qlen, 0);
 #ifndef NDEBUG
 						// Get results from the naive matcher for sanity-checking
-						TRangeVec r2; std::vector<TIndexOffU> re2;
+						TRangeVec r2; EList<TIndexOffU> re2;
 						naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 							  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -1918,8 +1919,8 @@ protected:
  */
 			class Seed0RefAligner : public RefAligner {
 
-				typedef std::vector<Range> TRangeVec;
-				typedef std::vector<uint32_t> TU32Vec;
+				typedef EList<Range> TRangeVec;
+				typedef EList<uint32_t> TU32Vec;
 				typedef std::pair<uint64_t, uint64_t> TU64Pair;
 				typedef std::set<TU64Pair> TSetPairs;
 
@@ -1965,7 +1966,7 @@ protected:
 					       TIndexOffU begin,
 					       TIndexOffU end,
 					       TRangeVec& ranges,
-					       std::vector<TIndexOffU>& results,
+					       EList<TIndexOffU>& results,
 					       TSetPairs* pairs,
 					       TIndexOffU aoff,
 					       bool seedOnLeft) const
@@ -1995,8 +1996,8 @@ protected:
 						// we work our way out to the right and to the left).
 						const TIndexOffU halfway = qbegin + (lim >> 1);
 						// Vectors for holding edit information
-						std::vector<uint32_t> nonSeedMms;
-						std::vector<uint8_t> nonSeedRefcs;
+						EList<uint32_t> nonSeedMms;
+						EList<uint8_t> nonSeedRefcs;
 						bool hi = false;
 						for(TIndexOffU i = 1; i <= lim+1; i++) {
 							TIndexOffU ri;  // leftmost position in candidate alignment
@@ -2142,7 +2143,7 @@ protected:
 									  TIndexOffU begin,
 									  TIndexOffU end,
 									  TRangeVec& ranges,
-									  std::vector<TIndexOffU>& results,
+									  EList<TIndexOffU>& results,
 									  TSetPairs* pairs = NULL,
 									  TIndexOffU aoff = OFF_MASK,
 									  bool seedOnLeft = false) const
@@ -2159,7 +2160,7 @@ protected:
 							size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 							// Get results from the naive matcher for sanity-checking
-							TRangeVec r2; std::vector<TIndexOffU> re2;
+							TRangeVec r2; EList<TIndexOffU> re2;
 							naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 								  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -2380,8 +2381,8 @@ protected:
 								// of the read characters; mismatches no longer count
 								// toward the stratum or the 1-mm limit.
 								// Vectors for holding edit information
-								std::vector<uint32_t> nonSeedMms;
-								std::vector<uint8_t> nonSeedRefcs;
+								EList<uint32_t> nonSeedMms;
+								EList<uint8_t> nonSeedRefcs;
 								int mms = 0; // start counting total mismatches
 								if((qlen - slen) > 0) {
 									// Going left-to-right
@@ -2518,8 +2519,8 @@ protected:
  */
 				class Seed1RefAligner : public RefAligner {
 
-					typedef std::vector<Range> TRangeVec;
-					typedef std::vector<uint32_t> TU32Vec;
+					typedef EList<Range> TRangeVec;
+					typedef EList<uint32_t> TU32Vec;
 					typedef std::pair<uint64_t, uint64_t> TU64Pair;
 					typedef std::set<TU64Pair> TSetPairs;
 
@@ -2565,7 +2566,7 @@ protected:
 						       TIndexOffU begin,
 						       TIndexOffU end,
 						       TRangeVec& ranges,
-						       std::vector<TIndexOffU>& results,
+						       EList<TIndexOffU>& results,
 						       TSetPairs* pairs,
 						       TIndexOffU aoff,
 						       bool seedOnLeft) const
@@ -2595,9 +2596,9 @@ protected:
 							// we work our way out to the right and to the left).
 							const TIndexOffU halfway = qbegin + (lim >> 1);
 							// Vectors for holding edit information
-							std::vector<uint32_t> nonSeedMms;
+							EList<uint32_t> nonSeedMms;
 							assert_eq(0, nonSeedMms.size());
-							std::vector<uint8_t> nonSeedRefcs;
+							EList<uint8_t> nonSeedRefcs;
 							assert_eq(0, nonSeedRefcs.size());
 							bool hi = false;
 							for(TIndexOffU i = 1; i <= lim+1; i++) {
@@ -2764,7 +2765,7 @@ protected:
 										  TIndexOffU begin,
 										  TIndexOffU end,
 										  TRangeVec& ranges,
-										  std::vector<TIndexOffU>& results,
+										  EList<TIndexOffU>& results,
 										  TSetPairs* pairs = NULL,
 										  TIndexOffU aoff = OFF_MASK,
 										  bool seedOnLeft = false) const
@@ -2781,7 +2782,7 @@ protected:
 								size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 								// Get results from the naive matcher for sanity-checking
-								TRangeVec r2; std::vector<TIndexOffU> re2;
+								TRangeVec r2; EList<TIndexOffU> re2;
 								naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 									  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -3092,8 +3093,8 @@ protected:
 									// of the read characters; mismatches no longer count
 									// toward the stratum or the 1-mm limit.
 									// Vectors for holding edit information
-									std::vector<uint32_t> nonSeedMms;
-									std::vector<uint8_t> nonSeedRefcs;
+									EList<uint32_t> nonSeedMms;
+									EList<uint8_t> nonSeedRefcs;
 									int mms = diffs; // start counting total mismatches
 									if((qlen - slen) > 0) {
 										// Going left-to-right
@@ -3254,8 +3255,8 @@ protected:
  */
 					class Seed2RefAligner : public RefAligner {
 
-						typedef std::vector<Range> TRangeVec;
-						typedef std::vector<uint32_t> TU32Vec;
+						typedef EList<Range> TRangeVec;
+						typedef EList<uint32_t> TU32Vec;
 						typedef std::pair<uint64_t, uint64_t> TU64Pair;
 						typedef std::set<TU64Pair> TSetPairs;
 
@@ -3301,7 +3302,7 @@ protected:
 							       TIndexOffU begin,
 							       TIndexOffU end,
 							       TRangeVec& ranges,
-							       std::vector<TIndexOffU>& results,
+							       EList<TIndexOffU>& results,
 							       TSetPairs* pairs,
 							       TIndexOffU aoff,
 							       bool seedOnLeft) const
@@ -3331,8 +3332,8 @@ protected:
 								// we work our way out to the right and to the left).
 								const TIndexOffU halfway = qbegin + (lim >> 1);
 								// Vectors for holding edit information
-								std::vector<uint32_t> nonSeedMms;
-								std::vector<uint8_t> nonSeedRefcs;
+								EList<uint32_t> nonSeedMms;
+								EList<uint8_t> nonSeedRefcs;
 								bool hi = false;
 								for(TIndexOffU i = 1; i <= lim+1; i++) {
 									TIndexOffU ri;  // leftmost position in candidate alignment
@@ -3518,7 +3519,7 @@ protected:
 											  TIndexOffU begin,
 											  TIndexOffU end,
 											  TRangeVec& ranges,
-											  std::vector<TIndexOffU>& results,
+											  EList<TIndexOffU>& results,
 											  TSetPairs* pairs = NULL,
 											  TIndexOffU aoff = OFF_MASK,
 											  bool seedOnLeft = false) const
@@ -3535,7 +3536,7 @@ protected:
 									size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 									// Get results from the naive matcher for sanity-checking
-									TRangeVec r2; std::vector<TIndexOffU> re2;
+									TRangeVec r2; EList<TIndexOffU> re2;
 									naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 										  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -3925,8 +3926,8 @@ protected:
 										// of the read characters; mismatches no longer count
 										// toward the stratum or the 1-mm limit.
 										// Vectors for holding edit information
-										std::vector<uint32_t> nonSeedMms;
-										std::vector<uint8_t> nonSeedRefcs;
+										EList<uint32_t> nonSeedMms;
+										EList<uint8_t> nonSeedRefcs;
 										int mms = diffs; // start counting total mismatches
 										if((qlen - slen) > 0) {
 											// Going left-to-right
@@ -4111,8 +4112,8 @@ protected:
  */
 						class Seed3RefAligner : public RefAligner {
 
-							typedef std::vector<Range> TRangeVec;
-							typedef std::vector<uint32_t> TU32Vec;
+							typedef EList<Range> TRangeVec;
+							typedef EList<uint32_t> TU32Vec;
 							typedef std::pair<uint64_t, uint64_t> TU64Pair;
 							typedef std::set<TU64Pair> TSetPairs;
 
@@ -4158,7 +4159,7 @@ protected:
 								       TIndexOffU begin,
 								       TIndexOffU end,
 								       TRangeVec& ranges,
-								       std::vector<TIndexOffU>& results,
+								       EList<TIndexOffU>& results,
 								       TSetPairs* pairs,
 								       TIndexOffU aoff,
 								       bool seedOnLeft) const
@@ -4188,8 +4189,8 @@ protected:
 									// we work our way out to the right and to the left).
 									const TIndexOffU halfway = qbegin + (lim >> 1);
 									// Vectors for holding edit information
-									std::vector<uint32_t> nonSeedMms;
-									std::vector<uint8_t> nonSeedRefcs;
+									EList<uint32_t> nonSeedMms;
+									EList<uint8_t> nonSeedRefcs;
 									bool hi = false;
 									for(TIndexOffU i = 1; i <= lim+1; i++) {
 										TIndexOffU ri;  // leftmost position in candidate alignment
@@ -4395,7 +4396,7 @@ protected:
 												  TIndexOffU begin,
 												  TIndexOffU end,
 												  TRangeVec& ranges,
-												  std::vector<TIndexOffU>& results,
+												  EList<TIndexOffU>& results,
 												  TSetPairs* pairs = NULL,
 												  TIndexOffU aoff = OFF_MASK,
 												  bool seedOnLeft = false) const
@@ -4412,7 +4413,7 @@ protected:
 										uint32_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 										// Get results from the naive matcher for sanity-checking
-										TRangeVec r2; std::vector<TIndexOffU> re2;
+										TRangeVec r2; EList<TIndexOffU> re2;
 										naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 											  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -4880,8 +4881,8 @@ protected:
 											// of the read characters; mismatches no longer count
 											// toward the stratum or the 1-mm limit.
 											// Vectors for holding edit information
-											std::vector<uint32_t> nonSeedMms;
-											std::vector<uint8_t> nonSeedRefcs;
+											EList<uint32_t> nonSeedMms;
+											EList<uint8_t> nonSeedRefcs;
 											int mms = diffs; // start counting total mismatches
 											if((qlen - slen) > 0) {
 												// Going left-to-right

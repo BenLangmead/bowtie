@@ -3,7 +3,9 @@
 #include <string>
 #include <cassert>
 #include <getopt.h>
+
 #include "assert_helpers.h"
+#include "ds.h"
 #include "endian_swap.h"
 #include "ebwt.h"
 #include "formats.h"
@@ -303,11 +305,11 @@ static void parseOptions(int argc, const char **argv) {
  */
 template<typename TStr>
 static void driver(const string& infile,
-                   vector<string>& infiles,
+                   EList<string>& infiles,
                    const string& outfile,
                    bool reverse = false)
 {
-	vector<FileBuf*> is;
+	EList<FileBuf*> is;
 	bool bisulfite = false;
 	RefReadInParams refparams(reverse ? reverseType : REF_READ_FORWARD, nsToAs, bisulfite);
 	assert_gt(infiles.size(), 0);
@@ -354,8 +356,8 @@ static void driver(const string& infile,
 	// Vector for the ordered list of "records" comprising the input
 	// sequences.  A record represents a stretch of unambiguous
 	// characters in one of the input sequences.
-	vector<RefRecord> szs;
-	vector<uint32_t> plens;
+	EList<RefRecord> szs;
+	EList<uint32_t> plens;
 	std::pair<size_t, size_t> sztot;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
@@ -498,7 +500,7 @@ extern "C" {
 		resetOptions();
 
 		string infile;
-		vector<string> infiles;
+		EList<string> infiles;
 		string outfile;
 
 		parseOptions(argc, argv);

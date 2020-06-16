@@ -6,11 +6,13 @@
 #define RANGE_CHASER_H_
 
 #include <stdint.h>
+
+#include "aligner_metrics.h"
+#include "ds.h"
 #include "ebwt.h"
 #include "random_source.h"
-#include "row_chaser.h"
 #include "range_cache.h"
-#include "aligner_metrics.h"
+#include "row_chaser.h"
 
 /**
  * A class that statefully processes a range by picking one row
@@ -20,7 +22,7 @@
 class RangeChaser {
 
 	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
-	typedef std::vector<UPair> UPairVec;
+	typedef EList<UPair> UPairVec;
 
 public:
 	RangeChaser(uint32_t cacheThresh,

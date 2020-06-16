@@ -7,13 +7,14 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 #include "alphabet.h"
 #include "assert_helpers.h"
+#include "ds.h"
 #include "endian_swap.h"
 #include "filebuf.h"
 #include "word_io.h"
+#include "ds.h"
 
 using namespace std;
 
@@ -114,17 +115,17 @@ fastaRefReadSize(
 
 extern std::pair<size_t, size_t>
 fastaRefReadSizes(
-	vector<FileBuf*>& in,
-	vector<RefRecord>& recs,
-	vector<uint32_t>& plens,
+	EList<FileBuf*>& in,
+	EList<RefRecord>& recs,
+	EList<uint32_t>& plens,
 	const RefReadInParams& rparms,
 	BitpairOutFileBuf* bpout,
 	TIndexOff& numSeqs);
 
 extern void
 reverseRefRecords(
-	const vector<RefRecord>& src,
-	vector<RefRecord>& dst,
+	const EList<RefRecord>& src,
+	EList<RefRecord>& dst,
 	bool recursive = false,
 	bool verbose = false);
 
