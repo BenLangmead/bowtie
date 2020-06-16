@@ -2406,7 +2406,7 @@ protected:
 			}
 			i++;
 		}
-		if(delayedRange_ == NULL) {
+		if(delayedRange_ == NULL && sz > 0) {
 			assert_geq(this->minCost, this->minCostAdjustment_);
 			assert_geq(vec[0]->minCost, this->minCost);
 			this->minCost = vec[0]->minCost;

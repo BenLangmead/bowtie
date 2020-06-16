@@ -667,7 +667,9 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
 	assert(built());
 	VMSG_NL("  Doing sanity check");
 	TIndexOffU added = 0;
-	EList<TIndexOffU> sorted(_isaPrime.size());
+	EList<TIndexOffU> sorted;
+	sorted.resizeExact(_isaPrime.size());
+	sorted.fill(OFF_MASK);
 	for(size_t di = 0; di < this->d(); di++) {
 		uint32_t d = _ds[di];
 		size_t i = 0;
