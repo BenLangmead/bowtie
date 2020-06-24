@@ -611,7 +611,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	while(--limit >= 0) {
 		TIndexOffU numBuckets = (TIndexOffU)_sampleSuffs.size()+1;
 #if (__cplusplus >= 201103l)
-		EList<std::thread*> threads(this->_nthreads);
+		AutoArray<std::thread*> threads(this->_nthreads);
 #else
 		AutoArray<tthread::thread*> threads(this->_nthreads);
 #endif

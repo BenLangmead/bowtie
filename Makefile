@@ -115,11 +115,11 @@ OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp
 
 ifneq (1, $(NO_SPINLOCK))
-	OTHER_CPPS += spin_lock.cpp
+	OTHER_CPPS += bt2_locks.cpp
 endif
 
 ifeq (1,$(WITH_QUEUELOCK))
-	OTHER_CPPS += mcs_lock.cpp
+	OTHER_CPPS += bt2_locks.cpp
 	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
 endif
 

@@ -19,8 +19,8 @@
 #ifdef NO_SPINLOCK
 # if (__cplusplus >= 201103L)
 #   ifdef WITH_QUEUELOCK
-        #include "mcs_lock.h"
-#  	define MUTEX_T MCSMutex
+        #include "bt2_locks.h"
+#  	define MUTEX_T mcs_lock
 #   else
 #       define MUTEX_T std::mutex
 #   endif
@@ -29,7 +29,7 @@
 # endif
 #else
 # if (__cplusplus >= 201103L)
-#   include "spin_lock.cpp"
+#   include "bt2_locks.h"
 #   define MUTEX_T spin_lock
 # else
 #   define MUTEX_T tthread::fast_mutex
