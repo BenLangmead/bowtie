@@ -1,6 +1,8 @@
 #ifndef __MCSLOCK_H__
 #define __MCSLOCK_H__
 
+#if (__cplusplus >= 201103L)
+
 #include <atomic>
 #include <sched.h>
 
@@ -60,3 +62,4 @@ private:
         static thread_local mcs_node node;
 };
 #endif
+#endif // __MCS_LOCK_H__
