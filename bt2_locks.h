@@ -4,6 +4,9 @@
 #include <atomic>
 #include <sched.h>
 
+/*
+ * Based on TBB's atomic_backoff: https://github.com/oneapi-src/oneTBB/blob/60b7d0a78f8910976678ba63a19fdaee22c0ef65/include/tbb/tbb_machine.h
+ */
 class cpu_backoff {
 public:
 	cpu_backoff(): count(1) {}
