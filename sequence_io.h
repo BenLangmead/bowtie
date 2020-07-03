@@ -38,7 +38,6 @@ static void parseFastaLens(
 			continue;
 		}
 	}
-	fb.close();
 }
 
 /**
@@ -113,7 +112,6 @@ static void readSequenceFile(const std::string& infile,
 			return;
 		}
 	}
-	fb.close();
 }
 
 /**
