@@ -14,8 +14,13 @@ public:
 	cpu_backoff(): count(1) {}
 	void pause() {
 		if (count <= LOOPS_BEFORE_YIELD) {
-			for (int32_t i = 0; i < count; i++)
+			for (int32_t i = 0; i < count; i++) {
+#ifdef __aarch64__
+				__asm__ __volatile__("yield" ::: "memory");
+#else
 				__asm__ __volatile__("pause;");
+#endif
+			}
 			count *= 2;
 		} else {
 			sched_yield();
