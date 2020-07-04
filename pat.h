@@ -93,6 +93,8 @@ struct PerThreadReadBuf {
 
 	PerThreadReadBuf(size_t max_buf) :
 		max_buf_(max_buf),
+		bufa_(max_buf),
+		bufb_(max_buf),
 		rdid_()
 	{
 		bufa_.resize(max_buf);

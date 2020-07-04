@@ -3492,9 +3492,9 @@ public:
 	virtual const char* toZBuf() const { return this->toZBufXForm(iupacs); }
 };
 
-typedef SStringExpandable<char, 1024, 2> BTString;
-typedef SDnaStringExpandable<1024, 2>    BTDnaString;
-typedef SDnaMaskString<32, 2>            BTDnaMask;
-typedef SString<char>                    BTRefString;
+typedef SStringExpandable<char, 25, 2>	BTString;
+typedef SDnaStringExpandable<25, 2>	BTDnaString;
+typedef SDnaMaskString<32, 2>           BTDnaMask;
+typedef SString<char>                   BTRefString;
 
 #endif /* SSTRING_H_ */

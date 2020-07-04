@@ -41,7 +41,7 @@ struct HitSet;
  */
 struct Read {
 
-	typedef SStringExpandable<char, 1024, 2, 1024> TBuf;
+	typedef SStringExpandable<char, 0, 2, 2048> TBuf;
 
 	Read() { reset(); }
 
