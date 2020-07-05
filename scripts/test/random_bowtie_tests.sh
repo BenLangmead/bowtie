@@ -12,12 +12,24 @@ fi
 MAKE=make
 gmake -v > /dev/null 2>&1
 if [ $? -eq 0 ] ; then
-    $MAKE=gmake
+    MAKE=gmake
 fi
 
 if [ "$1" == "-c" ] ; then
 	$MAKE clean
 	shift
+fi
+
+if [ -z "$BT2_PATH" -a "$USE_BT2_INDEX" == "1" ]; then
+    git clone --recursive "https://github.com/BenLangmead/bowtie2.git"
+    cd bowtie2 && $MAKE bowtie2-build-s-debug bowtie2-build-s \
+                        bowtie2-build-l-debug bowtie2-build-l \
+                        NO_TBB=1
+    if [ $? -ne 0 ]; then
+        echo "Unable to compile bowtie2 build binaries"
+    fi
+    cd ..
+    BT2_PATH="`pwd`/bowtie2"
 fi
 
 $MAKE allall "$@"

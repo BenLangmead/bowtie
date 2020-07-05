@@ -64,6 +64,16 @@ my @policies = (
 	"-v 3", "-v 2", "-v 1", "-v 0"
 );
 
+my $small_idx_ext = ".ebwt";
+my $large_idx_ext = ".ebwtl";
+
+if (defined $ENV{"BT2_PATH"}) {
+    -x $ENV{"BT2_PATH"} || die $ENV{"BT2_PATH"} . " not found.";
+    $bowtie_build = $ENV{"BT2_PATH"} . "/bowtie2-build";
+    $small_idx_ext = ".bt2";
+    $large_idx_ext = ".bt2l";
+}
+
 sub pickPolicy {
 	my $pe = shift;
 	my $r = int(rand($#policies + 1));
@@ -460,9 +470,9 @@ sub build {
 		$out =~ s/Warning: Encountered reference sequence with only gaps//g;
 		$out = trim($out);
 		if($out eq "") {
-			if(run("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
+			if(run("diff .tmp$seed.1" . $small_idx_ext . " .tmp$seed.packed.1" . $small_idx_ext) != 0) {
 				die if $exitOnFail;
-			} elsif(run("diff .tmp$seed.2.ebwt .tmp$seed.packed.2.ebwt") != 0) {
+			} elsif(run("diff .tmp$seed.2" . $small_idx_ext . " .tmp$seed.packed.2" . $small_idx_ext) != 0) {
 				die if $exitOnFail;
 			} else {
 				$ret++;
@@ -479,9 +489,9 @@ sub build {
         $out =~ s/Warning: Encountered reference sequence with only gaps//g;
         $out = trim($out);
         if($out eq "") {
-            if(run("diff .tmp$seed.1.ebwtl .tmp$seed.packed.1.ebwtl") != 0) {
+            if(run("diff .tmp$seed.1" . $large_idx_ext . " .tmp$seed.packed.1" . $large_idx_ext) != 0) {
                 die if $exitOnFail;
-            } elsif(run("diff .tmp$seed.2.ebwtl .tmp$seed.packed.2.ebwtl") != 0) {
+            } elsif(run("diff .tmp$seed.2" . $large_idx_ext . " .tmp$seed.packed.2" . $large_idx_ext) != 0) {
                 die if $exitOnFail;
             } else {
                 $ret++;
