@@ -80,7 +80,7 @@ public:
 				}
 			}
 			// Second thing to try is the chaser
-			chaser_.setRow(row_ - (ebwt_->_eh.isBt2Index() ? 1 : 0), qlen_, ebwt_);
+			chaser_.setRow(row_, qlen_, ebwt_);
 			assert(chaser_.prepped_ || chaser_.done);
 			// It might be done immediately...
 			if(chaser_.done) {
