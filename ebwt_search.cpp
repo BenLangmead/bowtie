@@ -50,209 +50,211 @@ static MUTEX_T thread_counter_mutex;
 
 using namespace std;
 
-static EList<string> mates1;  // mated reads (first mate)
-static EList<string> mates2;  // mated reads (second mate)
-static EList<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
+static EList<string> mates1;		// mated reads (first mate)
+static EList<string> mates2;		// mated reads (second mate)
+static EList<string> mates12;		// mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase;
-static bool verbose;      // be talkative
-static bool startVerbose; // be talkative at startup
-bool quiet;        // print nothing but the alignments
-static int sanityCheck;   // enable expensive sanity checks
-static int format;        // default read format is FASTQ
-static string origString; // reference text, or filename(s)
-static int seed;          // srandom() seed
-static int timing;        // whether to report basic timing data
-static bool allHits;      // for multihits, report just one
-static bool rangeMode;    // report BWT ranges instead of ref locs
-static int showVersion;   // just print version and quit?
-static int ipause;        // pause before maching?
-static uint32_t qUpto;    // max # of queries to read
-static int trim5;         // amount to trim from 5' end
-static int trim3;         // amount to trim from 3' end
-static int reportOpps;    // whether to report # of other mappings
-static int offRate;       // keep default offRate
-static int isaRate;       // keep default isaRate
-static int mismatches;    // allow 0 mismatches by default
-static bool solexaQuals;  // quality strings are solexa quals, not phred, and subtract 64 (not 33)
-static bool phred64Quals; // quality chars are phred, but must subtract 64 (not 33)
-static bool integerQuals; // quality strings are space-separated strings of integers, not ASCII
-static int maqLike;       // do maq-like searching
-static int seedLen;       // seed length (changed in Maq 0.6.4 from 24)
-static int seedMms;       // # mismatches allowed in seed (maq's -n)
-static int qualThresh;    // max qual-weighted hamming dist (maq's -e)
-static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
-static int maxBts;        // max # backtracks allowed in half-and-half mode
-static int nthreads;      // number of pthreads operating concurrently
-static bool reorder;      // reorder SAM output when running multi-threaded
-static int thread_ceiling;// maximum number of threads user wants bowtie to use
-static string thread_stealing_dir; // keep track of pids in this directory
-static bool thread_stealing;// true iff thread stealing is in use
-static output_types outType;  // style of output
-static bool noRefNames;       // true -> print reference indexes; not names
-static string dumpAlBase;     // basename of same-format files to dump aligned reads to
-static string dumpUnalBase;   // basename of same-format files to dump unaligned reads to
-static string dumpMaxBase;    // basename of same-format files to dump reads with more than -m valid alignments to
-static uint32_t khits;  // number of hits per read; >1 is much slower
-static uint32_t mhits;  // don't report any hits if there are > mhits
-static bool better;     // true -> guarantee alignments from best possible stratum
-static bool strata;     // true -> don't stop at stratum boundaries
-static int partitionSz; // output a partitioning key in first field
-static int readsPerBatch; // # reads to read from input file at once
-static size_t outBatchSz; // # alignments to write to output file at once
-static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
-static bool fileParallel; // separate threads read separate input files in parallel
-static bool useShmem;     // use shared memory to hold the index
-static bool useMm;        // use memory-mapped files to hold the index
-static bool mmSweep;      // sweep through memory-mapped files immediately after mapping
-static bool stateful;     // use stateful aligners
-static uint32_t prefetchWidth; // number of reads to process in parallel w/ --stateful
-static uint32_t minInsert;     // minimum insert size (Maq = 0, SOAP = 400)
-static uint32_t maxInsert;     // maximum insert size (Maq = 250, SOAP = 600)
-static bool mate1fw;           // -1 mate aligns in fw orientation on fw strand
-static bool mate2fw;           // -2 mate aligns in rc orientation on fw strand
-static bool mateFwSet;         // true -> user set --ff/--fr/--rf
-static uint32_t mixedThresh;   // threshold for when to switch to paired-end mixed mode (see aligner.h)
-static uint32_t mixedAttemptLim; // number of attempts to make in "mixed mode" before giving up on orientation
-static bool dontReconcileMates;  // suppress pairwise all-versus-all way of resolving mates
-static uint32_t cacheLimit;      // ranges w/ size > limit will be cached
-static uint32_t cacheSize;       // # words per range cache
-static int offBase;              // offsets are 0-based by default, but configurable
-static bool tryHard;             // set very high maxBts, mixedAttemptLim
-static uint32_t skipReads;       // # reads/read pairs to skip
-static bool nofw; // don't align fw orientation of read
-static bool norc; // don't align rc orientation of read
-static bool strandFix;  // attempt to fix strand bias
-static bool stats; // print performance stats
-static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
-static int chunkSz;    // size of single chunk disbursed by ChunkPool
-static bool chunkVerbose; // have chunk allocator output status messages?
+static bool verbose;			// be talkative
+static bool startVerbose;		// be talkative at startup
+bool quiet;				// print nothing but the alignments
+static int sanityCheck;			// enable expensive sanity checks
+static int format;			// default read format is FASTQ
+static string origString;		// reference text, or filename(s)
+static int seed;			// srandom() seed
+static int timing;			// whether to report basic timing data
+static bool allHits;			// for multihits, report just one
+static bool rangeMode;			// report BWT ranges instead of ref locs
+static int showVersion;			// just print version and quit?
+static int ipause;			// pause before maching?
+static uint32_t qUpto;			// max # of queries to read
+static int trim5;			// amount to trim from 5' end
+static int trim3;			// amount to trim from 3' end
+static int reportOpps;			// whether to report # of other mappings
+static int offRate;			// keep default offRate
+static int isaRate;			// keep default isaRate
+static int mismatches;			// allow 0 mismatches by default
+static bool solexaQuals;		// quality strings are solexa quals, not phred, and subtract 64 (not 33)
+static bool phred64Quals;		// quality chars are phred, but must subtract 64 (not 33)
+static bool integerQuals;		// quality strings are space-separated strings of integers, not ASCII
+static int maqLike;			// do maq-like searching
+static int seedLen;			// seed length (changed in Maq 0.6.4 from 24)
+static int seedMms;			// # mismatches allowed in seed (maq's -n)
+static int qualThresh;			// max qual-weighted hamming dist (maq's -e)
+static int maxBtsBetter;		// max # backtracks allowed in half-and-half mode
+static int maxBts;			// max # backtracks allowed in half-and-half mode
+static int nthreads;			// number of pthreads operating concurrently
+static bool reorder;			// reorder SAM output when running multi-threaded
+static int thread_ceiling;		// maximum number of threads user wants bowtie to use
+static string thread_stealing_dir;	// keep track of pids in this directory
+static bool thread_stealing;		// true iff thread stealing is in use
+static output_types outType;		// style of output
+static bool noRefNames;			// true -> print reference indexes; not names
+static string dumpAlBase;		// basename of same-format files to dump aligned reads to
+static string dumpUnalBase;		// basename of same-format files to dump unaligned reads to
+static string dumpMaxBase;		// basename of same-format files to dump reads with more than -m valid alignments to
+static uint32_t khits;			// number of hits per read; >1 is much slower
+static uint32_t mhits;			// don't report any hits if there are > mhits
+static bool better;			// true -> guarantee alignments from best possible stratum
+static bool strata;			// true -> don't stop at stratum boundaries
+static int partitionSz;			// output a partitioning key in first field
+static int readsPerBatch;		// # reads to read from input file at once
+static size_t outBatchSz;		// # alignments to write to output file at once
+static bool noMaqRound;			// true -> don't round quals to nearest 10 like maq
+static bool fileParallel;		// separate threads read separate input files in parallel
+static bool useShmem;			// use shared memory to hold the index
+static bool useMm;			// use memory-mapped files to hold the index
+static bool mmSweep;			// sweep through memory-mapped files immediately after mapping
+static bool stateful;			// use stateful aligners
+static uint32_t prefetchWidth;		// number of reads to process in parallel w/ --stateful
+static uint32_t minInsert;		// minimum insert size (Maq = 0, SOAP = 400)
+static uint32_t maxInsert;		// maximum insert size (Maq = 250, SOAP = 600)
+static bool mate1fw;			// -1 mate aligns in fw orientation on fw strand
+static bool mate2fw;			// -2 mate aligns in rc orientation on fw strand
+static bool mateFwSet;			// true -> user set --ff/--fr/--rf
+static uint32_t mixedThresh;		// threshold for when to switch to paired-end mixed mode (see aligner.h)
+static uint32_t mixedAttemptLim;	// number of attempts to make in "mixed mode" before giving up on orientation
+static bool dontReconcileMates;		// suppress pairwise all-versus-all way of resolving mates
+static uint32_t cacheLimit;		// ranges w/ size > limit will be cached
+static uint32_t cacheSize;		// # words per range cache
+static int offBase;			// offsets are 0-based by default, but configurable
+static bool tryHard;			// set very high maxBts, mixedAttemptLim
+static uint32_t skipReads;		// # reads/read pairs to skip
+static bool nofw;			// don't align fw orientation of read
+static bool norc;			// don't align rc orientation of read
+static bool strandFix;			// attempt to fix strand bias
+static bool stats;			// print performance stats
+static int chunkPoolMegabytes;		// max MB to dedicate to best-first search frames per thread
+static int chunkSz;			// size of single chunk disbursed by ChunkPool
+static bool chunkVerbose;		// have chunk allocator output status messages?
 static bool useV1;
 static bool reportSe;
 static size_t fastaContLen;
 static size_t fastaContFreq;
-static bool hadoopOut; // print Hadoop status and summary messages
+static bool hadoopOut;			// print Hadoop status and summary messages
 static bool fullRef;
-static bool samNoQnameTrunc; // don't truncate QNAME field at first whitespace
-static bool samNoHead; // don't print any header lines in SAM output
-static bool samNoSQ;   // don't print @SQ header lines
-static string rgs; // SAM outputs for @RG header line
-static Bitset suppressOuts(64); // output fields to suppress
-static bool sampleMax; // whether to report a random alignment when maxed-out via -m/-M
-static int defaultMapq; // default mapping quality to print in SAM mode
-static bool printCost; // true -> print stratum and cost
+static bool samNoQnameTrunc;		// don't truncate QNAME field at first whitespace
+static bool samNoHead;			// don't print any header lines in SAM output
+static bool samNoSQ;			// don't print @SQ header lines
+static string rgs;			// SAM outputs for @RG header line
+static Bitset suppressOuts(64);		// output fields to suppress
+static bool sampleMax;			// whether to report a random alignment when maxed-out via -m/-M
+static int defaultMapq;			// default mapping quality to print in SAM mode
+static bool printCost;			// true -> print stratum and cost
 bool showSeed;
 static EList<string> qualities;
 static EList<string> qualities1;
 static EList<string> qualities2;
-static string wrapper; // Type of wrapper script
+static string wrapper;			// Type of wrapper script
 bool gAllowMateContainment;
-bool noUnal; // don't print unaligned reads
+bool noUnal;				// don't print unaligned reads
+string ebwtFile;			// read serialized Ebwt from this file
 MUTEX_T gLock;
 
 static void resetOptions() {
 	mates1.clear();
 	mates2.clear();
 	mates12.clear();
+	ebwtFile		= "";
 	adjustedEbwtFileBase	= "";
-	verbose					= 0;
-	startVerbose			= 0;
-	quiet					= false;
-	sanityCheck				= 0;  // enable expensive sanity checks
-	format					= FASTQ; // default read format is FASTQ
-	origString				= ""; // reference text, or filename(s)
-	seed					= 0; // srandom() seed
-	timing					= 0; // whether to report basic timing data
-	allHits					= false; // for multihits, report just one
-	rangeMode				= false; // report BWT ranges instead of ref locs
-	showVersion				= 0; // just print version and quit?
-	ipause					= 0; // pause before maching?
-	qUpto					= 0xffffffff; // max # of queries to read
-	trim5					= 0; // amount to trim from 5' end
-	trim3					= 0; // amount to trim from 3' end
-	reportOpps				= 0; // whether to report # of other mappings
-	offRate					= -1; // keep default offRate
-	isaRate					= -1; // keep default isaRate
-	mismatches				= 0; // allow 0 mismatches by default
-	solexaQuals				= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
-	phred64Quals			= false; // quality chars are phred, but must subtract 64 (not 33)
-	integerQuals			= false; // quality strings are space-separated strings of integers, not ASCII
-	maqLike					= 1;   // do maq-like searching
-	seedLen					= 28;  // seed length (changed in Maq 0.6.4 from 24)
-	seedMms					= 2;   // # mismatches allowed in seed (maq's -n)
-	qualThresh				= 70;  // max qual-weighted hamming dist (maq's -e)
-	maxBtsBetter			= 125; // max # backtracks allowed in half-and-half mode
-	maxBts					= 800; // max # backtracks allowed in half-and-half mode
-	nthreads				= 1;     // number of pthreads operating concurrently
-    reorder                 = false; // reorder SAM output
-	thread_ceiling			= 0;     // max # threads user asked for
-	thread_stealing_dir		= ""; // keep track of pids in this directory
-	thread_stealing			= false; // true iff thread stealing is in use
-	FNAME_SIZE				= 200;
-	outType					= OUTPUT_FULL;  // style of output
-	noRefNames				= false; // true -> print reference indexes; not names
-	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
-	dumpUnalBase			= "";    // basename of same-format files to dump unaligned reads to
-	dumpMaxBase				= "";    // basename of same-format files to dump reads with more than -m valid alignments to
-	khits					= 1;     // number of hits per read; >1 is much slower
-	mhits					= 0xffffffff; // don't report any hits if there are > mhits
-	better					= false; // true -> guarantee alignments from best possible stratum
-	strata					= false; // true -> don't stop at stratum boundaries
-	partitionSz				= 0;     // output a partitioning key in first field
-	readsPerBatch			= 16;    // # reads to read from input file at once
-	outBatchSz				= 16;    // # alignments to wrote to output file at once
-	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
-	fileParallel			= false; // separate threads read separate input files in parallel
-	useShmem				= false; // use shared memory to hold the index
-	useMm					= false; // use memory-mapped files to hold the index
-	mmSweep					= false; // sweep through memory-mapped files immediately after mapping
-	stateful				= false; // use stateful aligners
-	prefetchWidth			= 1;     // number of reads to process in parallel w/ --stateful
-	minInsert				= 0;     // minimum insert size (Maq = 0, SOAP = 400)
-	maxInsert				= 250;   // maximum insert size (Maq = 250, SOAP = 600)
-	mate1fw					= true;  // -1 mate aligns in fw orientation on fw strand
-	mate2fw					= false; // -2 mate aligns in rc orientation on fw strand
-	mateFwSet				= false; // true -> user set mate1fw/mate2fw with --ff/--fr/--rf
-	mixedThresh				= 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
-	mixedAttemptLim			= 100;   // number of attempts to make in "mixed mode" before giving up on orientation
-	dontReconcileMates		= true;  // suppress pairwise all-versus-all way of resolving mates
-	cacheLimit				= 5;     // ranges w/ size > limit will be cached
-	cacheSize				= 0;     // # words per range cache
-	offBase					= 0;     // offsets are 0-based by default, but configurable
-	tryHard					= false; // set very high maxBts, mixedAttemptLim
-	skipReads				= 0;     // # reads/read pairs to skip
-	nofw					= false; // don't align fw orientation of read
-	norc					= false; // don't align rc orientation of read
-	strandFix				= true;  // attempt to fix strand bias
-	stats					= false; // print performance stats
-	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
-	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
-	chunkVerbose			= false; // have chunk allocator output status messages?
-	useV1					= true;
-	reportSe				= false;
-	fastaContLen			= 0;
-	fastaContFreq			= 0;
-	hadoopOut				= false; // print Hadoop status and summary messages
-	fullRef					= false; // print entire reference name instead of just up to 1st space
-	samNoQnameTrunc         = false; // don't truncate at first whitespace?
-	samNoHead				= false; // don't print any header lines in SAM output
-	samNoSQ					= false; // don't print @SQ header lines
-	rgs						= "";    // SAM outputs for @RG header line
-	suppressOuts.clear();            // output fields to suppress
-	sampleMax				= false;
-	defaultMapq				= 255;
-	printCost				= false; // true -> print cost and stratum
-	showSeed				= false; // true -> print per-read pseudo-random seed
+	verbose			= 0;
+	startVerbose		= 0;
+	quiet			= false;
+	sanityCheck		= 0;		// enable expensive sanity checks
+	format			= FASTQ;	// default read format is FASTQ
+	origString		= "";		// reference text, or filename(s)
+	seed			= 0;		// srandom() seed
+	timing			= 0;		// whether to report basic timing data
+	allHits			= false;	// for multihits, report just one
+	rangeMode		= false;	// report BWT ranges instead of ref locs
+	showVersion		= 0;		// just print version and quit?
+	ipause			= 0;		// pause before maching?
+	qUpto			= 0xffffffff;	// max # of queries to read
+	trim5			= 0;		// amount to trim from 5' end
+	trim3			= 0;		// amount to trim from 3' end
+	reportOpps		= 0;		// whether to report # of other mappings
+	offRate			= -1;		// keep default offRate
+	isaRate			= -1;		// keep default isaRate
+	mismatches		= 0;		// allow 0 mismatches by default
+	solexaQuals		= false;	// quality strings are solexa quals, not phred, and subtract 64 (not 33)
+	phred64Quals		= false;	// quality chars are phred, but must subtract 64 (not 33)
+	integerQuals		= false;	// quality strings are space-separated strings of integers, not ASCII
+	maqLike			= 1;		// do maq-like searching
+	seedLen			= 28;		// seed length (changed in Maq 0.6.4 from 24)
+	seedMms			= 2;		// # mismatches allowed in seed (maq's -n)
+	qualThresh		= 70;		// max qual-weighted hamming dist (maq's -e)
+	maxBtsBetter		= 125;		// max # backtracks allowed in half-and-half mode
+	maxBts			= 800;		// max # backtracks allowed in half-and-half mode
+	nthreads		= 1;		// number of pthreads operating concurrently
+    reorder			= false;	// reorder SAM output
+	thread_ceiling		= 0;		// max # threads user asked for
+	thread_stealing_dir	= "";		// keep track of pids in this directory
+	thread_stealing		= false;	// true iff thread stealing is in use
+	FNAME_SIZE		= 200;
+	outType			= OUTPUT_FULL;  // style of output
+	noRefNames		= false;	// true -> print reference indexes; not names
+	dumpAlBase		= "";		// basename of same-format files to dump aligned reads to
+	dumpUnalBase		= "";		// basename of same-format files to dump unaligned reads to
+	dumpMaxBase		= "";		// basename of same-format files to dump reads with more than -m valid alignments to
+	khits			= 1;		// number of hits per read; >1 is much slower
+	mhits			= 0xffffffff;	// don't report any hits if there are > mhits
+	better			= false;	// true -> guarantee alignments from best possible stratum
+	strata			= false;	// true -> don't stop at stratum boundaries
+	partitionSz		= 0;		// output a partitioning key in first field
+	readsPerBatch		= 16;		// # reads to read from input file at once
+	outBatchSz		= 16;		// # alignments to wrote to output file at once
+	noMaqRound		= false;	// true -> don't round quals to nearest 10 like maq
+	fileParallel		= false;	// separate threads read separate input files in parallel
+	useShmem		= false;	// use shared memory to hold the index
+	useMm			= false;	// use memory-mapped files to hold the index
+	mmSweep			= false;	// sweep through memory-mapped files immediately after mapping
+	stateful		= false;	// use stateful aligners
+	prefetchWidth		= 1;		// number of reads to process in parallel w/ --stateful
+	minInsert		= 0;		// minimum insert size (Maq = 0, SOAP = 400)
+	maxInsert		= 250;		// maximum insert size (Maq = 250, SOAP = 600)
+	mate1fw			= true;		// -1 mate aligns in fw orientation on fw strand
+	mate2fw			= false;	// -2 mate aligns in rc orientation on fw strand
+	mateFwSet		= false;	// true -> user set mate1fw/mate2fw with --ff/--fr/--rf
+	mixedThresh		= 4;		// threshold for when to switch to paired-end mixed mode (see aligner.h)
+	mixedAttemptLim		= 100;		// number of attempts to make in "mixed mode" before giving up on orientation
+	dontReconcileMates	= true;		// suppress pairwise all-versus-all way of resolving mates
+	cacheLimit		= 5;		// ranges w/ size > limit will be cached
+	cacheSize		= 0;		// # words per range cache
+	offBase			= 0;		// offsets are 0-based by default, but configurable
+	tryHard			= false;	// set very high maxBts, mixedAttemptLim
+	skipReads		= 0;		// # reads/read pairs to skip
+	nofw			= false;	// don't align fw orientation of read
+	norc			= false;	// don't align rc orientation of read
+	strandFix		= true;		// attempt to fix strand bias
+	stats			= false;	// print performance stats
+	chunkPoolMegabytes	= 64;		// max MB to dedicate to best-first search frames per thread
+	chunkSz			= 256;		// size of single chunk disbursed by ChunkPool (in KB)
+	chunkVerbose		= false;	// have chunk allocator output status messages?
+	useV1			= true;
+	reportSe		= false;
+	fastaContLen		= 0;
+	fastaContFreq		= 0;
+	hadoopOut		= false;	// print Hadoop status and summary messages
+	fullRef			= false;	// print entire reference name instead of just up to 1st space
+	samNoQnameTrunc         = false;	// don't truncate at first whitespace?
+	samNoHead		= false;	// don't print any header lines in SAM output
+	samNoSQ			= false;	// don't print @SQ header lines
+	rgs			= "";		// SAM outputs for @RG header line
+	suppressOuts.clear();			// output fields to suppress
+	sampleMax		= false;
+	defaultMapq		= 255;
+	printCost		= false;	// true -> print cost and stratum
+	showSeed		= false;	// true -> print per-read pseudo-random seed
 	qualities.clear();
 	qualities1.clear();
 	qualities2.clear();
 	wrapper.clear();
-	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
-	noUnal					= false; // true -> do not report unaligned reads
+	gAllowMateContainment	= false;	// true -> alignments where one mate lies inside the other are valid
+	noUnal			= false;	// true -> do not report unaligned reads
 }
 
 // mating constraints
 
-static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I:X:x:B:ySCQ:";
+static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I:X:x:z:B:ySCQ:";
 
 enum {
 	ARG_ORIG = 256,
@@ -439,8 +441,9 @@ static void printUsage(ostream& out) {
 	}
 
 	out << "Usage: " << endl
-        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]" << endl
+        << tool_name << " [options]* -x <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]" << endl
         << endl
+	    << "  <ebwt>  Index filename prefix (minus trailing .X." + gEbwt_ext + ")." << endl
 	    << "  <m1>    Comma-separated list of files containing upstream mates (or the" << endl
 	    << "          sequences themselves, if -c is set) paired with mates in <m2>" << endl
 	    << "  <m2>    Comma-separated list of files containing downstream mates (or the" << endl
@@ -639,6 +642,9 @@ static void parseOptions(int argc, const char **argv) {
 			case 'X':
 				maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
 				break;
+			case 'x':
+				ebwtFile = optarg;
+				break;
 			case 's':
 				skipReads = (uint32_t)parseInt(0, "-s arg must be positive");
 				break;
@@ -717,7 +723,7 @@ static void parseOptions(int argc, const char **argv) {
 			case 'm':
 				mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
 				break;
-			case 'x':
+			case 'z':
 				mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
 				break;
 			case ARG_MIXED_ATTEMPTS:
@@ -3317,7 +3323,6 @@ int bowtie(int argc, const char **argv) {
 			argstr += argv[i];
 			if(i < argc-1) argstr += " ";
 		}
-		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
 		EList<string> queries;
 		string outfile; // write query results to this file
@@ -3355,12 +3360,17 @@ int bowtie(int argc, const char **argv) {
 			}
 
 			// Get index basename
-			if(optind >= argc) {
-				cerr << "No index, query, or output file specified!" << endl;
-				printUsage(cerr);
-				return 1;
+			if (ebwtFile.empty()) {
+				if(optind >= argc) {
+					cerr << "No index, query, or output file specified!" << endl;
+					printUsage(cerr);
+					return 1;
+				}
+				std::cerr << "Setting the index via positional argument"
+					  << " will be deprecated in a future release."
+					  << " Please use -x option instead." << std::endl;
+				ebwtFile = argv[optind++];
 			}
-			ebwtFile = argv[optind++];
 
 			// Get query filename
 			if(optind >= argc) {
