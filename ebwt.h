@@ -1047,7 +1047,7 @@ public:
 		assert_lt(_zEbwtByteOff, eh._sideBwtSz);
 		_zEbwtBpOff = sideCharOff & 3;
 		assert_lt(_zEbwtBpOff, 4);
-		if((sideNum & 1) == 0) {
+		if(!eh._isBt2Index && (sideNum & 1) == 0) {
 			// This is an even (backward) side
 			_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
 			_zEbwtBpOff = 3 - _zEbwtBpOff;
