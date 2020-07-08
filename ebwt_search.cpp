@@ -1381,7 +1381,7 @@ static void exactSearch(PatternComposer& _patsrc,
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
 #if (__cplusplus >= 201103L)
-			tps[i].tid = i;
+			tps[i].tid = tids[i];
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
@@ -1762,7 +1762,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
 #if (__cplusplus >= 201103L)
-			tps[i].tid = i;
+			tps[i].tid = tids[i];
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
@@ -2258,7 +2258,7 @@ static void twoOrThreeMismatchSearchFull(
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
 #if (__cplusplus >= 201103L)
-			tps[i].tid = i;
+			tps[i].tid = tids[i];
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
@@ -2804,7 +2804,7 @@ static void seededQualCutoffSearchFull(
 		for(int i = 0; i < nthreads; i++) {
 			tids[i] = i;
 #if (__cplusplus >= 201103L)
-			tps[i].tid = i;
+			tps[i].tid = tids[i];
 			tps[i].done = &all_threads_done;
 			if (i == nthreads - 1) {
 				if(stateful) {
@@ -2920,9 +2920,7 @@ patsrcFromStrings(int format,
 	switch(format) {
 		case FASTA:
 			return new FastaPatternSource (reads, quals,
-			                               trim3, trim5,
-			                               solexaQuals, phred64Quals,
-			                               integerQuals);
+			                               trim3, trim5);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
 			                               reads, fastaContLen,

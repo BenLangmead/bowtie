@@ -179,7 +179,8 @@ public:
 			// Get the pointer to the entries themselves
 			ents_ = ents + 1;
 		}
-		assert(sanityCheckEnts());
+		if (sanity_)
+			assert(sanityCheckEnts());
 	}
 
 	/**
@@ -203,7 +204,8 @@ public:
 		// Get the pointer to the entries themselves
 		ents_ = ents + 1;
 		assert_leq(top_ + len_, ebwt_->_eh._len);
-		assert(sanityCheckEnts());
+		if (sanity_)
+			assert(sanityCheckEnts());
 	}
 
 	TIndexOffU len() const   {
@@ -401,7 +403,8 @@ public:
 			}
 			TIndexOffU len = ents[0];
 			assert_leq(top + len, ebwt_->_eh._len);
-			RangeCacheEntry::sanityCheckEnts(len, ents + 1, ebwt_);
+			if (sanity_)
+				RangeCacheEntry::sanityCheckEnts(len, ents + 1, ebwt_);
 		}
 #endif
 		return true;

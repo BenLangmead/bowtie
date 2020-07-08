@@ -464,19 +464,13 @@ public:
 		const EList<string>& infiles,
 		const EList<string>* qinfiles,
 		int trim3 = 0,
-		int trim5 = 0,
-		bool solexa64 = false,
-		bool phred64 = false,
-		bool intQuals = false) :
+		int trim5 = 0) :
 		CFilePatternSource(
 			infiles,
 			qinfiles,
 			trim3,
 			trim5),
-		first_(true),
-		solexa64_(solexa64),
-		phred64_(phred64),
-		intQuals_(intQuals) { }
+		first_(true) { }
 
 	/**
 	 * Reset so that next call to nextBatch* gets the first batch.
@@ -520,9 +514,6 @@ protected:
 private:
 
 	bool first_;
-	bool solexa64_;
-	bool phred64_;
-	bool intQuals_;
 };
 
 

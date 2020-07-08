@@ -487,7 +487,7 @@ public:
 	         isaRate,
 	         ftabChars,
 	         refparams.reverse == REF_READ_REVERSE,
-	         false /* is this a bt2 index? */)
+	         isBt2Index)
 	{
 		_packed = packed;
 	 #ifdef POPCNT_CAPABILITY
