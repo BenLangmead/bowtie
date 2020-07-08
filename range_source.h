@@ -841,7 +841,7 @@ public:
 					ss3 << " " << (char)tolower(edits_.get(editidx).chr);
 					editidx++;
 				} else {
-					ss3 << " " << (char)qry[qlen - i - 1];
+					ss3 << " " << (char)qry.toChar(qlen - i - 1);
 				}
 				printed++;
 			}
@@ -854,7 +854,7 @@ public:
 				ss3 << (char)tolower(edits_.get(editidx).chr) << " ";
 				editidx++;
 			} else {
-				ss3 << (char)qry[qlen - printed - 1] << " ";
+				ss3 << (char)qry.toChar(qlen - printed - 1) << " ";
 			}
 			printed++;
 		}
