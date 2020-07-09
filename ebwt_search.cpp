@@ -1243,7 +1243,6 @@ static void exactSearchWorkerStateful(void *vp) {
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
-			NULL,
 			!nofw,
 			!norc,
 			_sink,
@@ -1263,7 +1262,6 @@ static void exactSearchWorkerStateful(void *vp) {
 			seed);
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
-			NULL,
 			!nofw,
 			!norc,
 			useV1,
@@ -3209,7 +3207,7 @@ static void driver(const char * type,
 					outBatchSz, partitionSz);
 		} else if(outType == OUTPUT_SAM) {
 			SAMHitSink *sam = new SAMHitSink(
-				*fout, 1,
+				*fout,
 				fullRef, samNoQnameTrunc,
 				dumpAlBase,
 				dumpUnalBase,

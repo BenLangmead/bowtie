@@ -40,7 +40,6 @@ public:
 	 */
 	SAMHitSink(
 		OutFileBuf& out,
-		int offBase,
 		bool fullRef,
 		bool noQnameTrunc,
 		const std::string& dumpAl,
@@ -63,7 +62,6 @@ public:
 			nthreads,
 			perThreadBufSize,
 			reorder),
-		offBase_(offBase),
 		fullRef_(fullRef),
 		noQnameTrunc_(noQnameTrunc) { }
 
@@ -117,9 +115,6 @@ protected:
 	}
 
 private:
-	int  offBase_;        /// Add this to reference offsets before outputting.
-	                      /// (An easy way to make things 1-based instead of
-	                      /// 0-based)
 	bool fullRef_;        /// print full reference name, not just up to whitespace
 	bool noQnameTrunc_;   /// true -> don't truncate QNAME at first whitespace
 };

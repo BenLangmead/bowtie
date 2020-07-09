@@ -15,8 +15,7 @@ EXTRA_CFLAGS =
 EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
 CXXFLAGS += $(EXTRA_CXXFLAGS)
-WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder \
-		-Wno-unused-private-field
+WARNING_FLAGS = -Wall -Wno-unused-parameter -Wno-reorder
 
 RELEASE_DEPENDENCIES = $(if $(RELEASE_BUILD),static-libs)
 

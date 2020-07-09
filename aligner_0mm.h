@@ -26,7 +26,6 @@ class UnpairedExactAlignerV1Factory : public AlignerFactory {
 public:
 	UnpairedExactAlignerV1Factory(
 			Ebwt& ebwtFw,
-			Ebwt* ebwtBw,
 			bool doFw,
 			bool doRc,
 			HitSink& sink,
@@ -45,7 +44,6 @@ public:
 			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
-			ebwtBw_(ebwtBw),
 			doFw_(doFw), doRc_(doRc),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -117,7 +115,6 @@ public:
 
 private:
 	Ebwt& ebwtFw_;
-	Ebwt* ebwtBw_;
 	bool doFw_;
 	bool doRc_;
 	HitSink& sink_;
@@ -146,7 +143,6 @@ class PairedExactAlignerV1Factory : public AlignerFactory {
 public:
 	PairedExactAlignerV1Factory(
 			Ebwt& ebwtFw,
-			Ebwt* ebwtBw,
 			bool doFw,
 			bool doRc,
 			bool v1,
@@ -345,7 +341,6 @@ public:
 
 private:
 	Ebwt& ebwtFw_;
-	Ebwt* ebwtBw_;
 	bool doFw_;
 	bool doRc_;
 	bool v1_;
