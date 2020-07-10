@@ -836,9 +836,9 @@ static void parseOptions(int argc, const char **argv) {
 		reorder = false;
 	}
 	if (reorder == true && outType != OUTPUT_SAM) {
-		cerr << "Bowtie will attempt to reorder its output only when outputting SAM." << endl
-			<< "Please specify the `-S` parameter if you intend on using this option." << endl;
-		reorder = false;
+		cerr << "Bowtie will reorder its output only when outputting SAM." << endl
+		     << "Please specify the `-S` parameter if you intend on using this option." << endl;
+		throw 1;
 	}
 	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
