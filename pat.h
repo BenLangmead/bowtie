@@ -962,7 +962,8 @@ public:
 		last_batch_(false),
 		last_batch_size_(0),
 		skip_(skip),
-		seed_(seed) { }
+		seed_(seed),
+		batch_id_(0) { }
 
 	/**
 	 * Get the next paired or unpaired read from the wrapped
@@ -979,6 +980,8 @@ public:
 	const Read& bufb() const { return buf_.read_b(); }
 
 	TReadId rdid() const { return buf_.rdid(); }
+
+	size_t batch_id() const { return batch_id_; }
 
 	/**
 	 * Return true iff the read currently in the buffer is a
@@ -1002,6 +1005,7 @@ private:
 		buf_.reset();
 		std::pair<bool, int> res = composer_.nextBatch(buf_);
 		buf_.init();
+		batch_id_ = (size_t)(buf_.rdid()/buf_.max_buf_);
 		return res;
 	}
 
@@ -1033,6 +1037,7 @@ private:
 	size_t last_batch_size_;  // # reads read in previous batch
 	uint32_t skip_;           // skip reads with rdids less than this
 	uint32_t seed_;           // pseudo-random seed based on read content
+	size_t batch_id_;	  // identify batches of reads for reordering
 };
 
 /**

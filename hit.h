@@ -253,9 +253,8 @@ public:
 			}
 		}
 		ptCounts_[threadId]++;
-		size_t batchId = (size_t)(p.rdid()/perThreadBufSize_);
 		if (reorder_ && reorderInfo_[threadId].flushed) {
-			reorderInfo_[threadId].batchId = batchId;
+			reorderInfo_[threadId].batchId = p.batch_id();
 			reorderInfo_[threadId].flushed = false;
 		}
 		maybeFlush(threadId);
