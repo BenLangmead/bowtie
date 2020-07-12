@@ -81,22 +81,9 @@ directory, and run GNU `make` (usually with the command `make`, but
 sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
-To build Bowtie including support for the `bowtie` [`-p`]  and
-`bowtie-build` [`--threads`](#bowtie-build-options-threads)
-multithreading options, we recommend that you first install the
-[Thread Building Blocks library], also known as TBB, the default
-threading library.  TBB is installed by default on many operating
-systems.
-
-If TBB is not available, then use the `NO_TBB=1` option.  On Linux or
-Mac OS X, this requires the pthreads library, which is installed by
-default.  On Windows, native Windows threads will be used, which require
-no special libraries.
-
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
-[Thread Building Blocks library]: https://www.threadingbuildingblocks.org
 [Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
 The `bowtie` aligner
@@ -635,22 +622,26 @@ Command Line
 
 Usage:
 
-    bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]
+    bowtie [options]* -x <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]
 
 ### Main arguments
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-x">
 
-    <ebwt>
+    -x <ebwt>
 
 </td><td>
 
-The basename of the index to be searched.  The basename is the name of
-any of the index files up to but not including the final `.1.ebwt` /
-`.rev.1.ebwt` / etc.  `bowtie` looks for the specified index first in
-the current directory, then in the `indexes` subdirectory under the
-directory where the `bowtie` executable is located, then looks in the
-directory specified in the `BOWTIE_INDEXES` environment variable.
+The basename of the Bowtie, or Bowtie 2, index to be searched. The
+basename is the name of any of the index files up to but not including
+the final `.1.ebwt` / `.rev.1.ebwt` / `1.bt2` / etc.  `bowtie` looks
+for the specified index first in the current directory, then in the
+`indexes` subdirectory under the directory where the `bowtie`
+executable is located, then looks in the directory specified in the
+`BOWTIE_INDEXES` environment variable. If a Bowtie and Bowtie 2
+index are located in the same directory and share the same basename,
+`bowtie` will use the Bowtie 2 index since there is no parameter
+for choosing between the two.
 
 </td></tr><tr><td>
 
@@ -2347,13 +2338,16 @@ Usage:
 
 </td><td>
 
-The basename of the index to be inspected.  The basename is name of any
-of the index files but with the `.X.ebwt` or `.rev.X.ebwt` suffix
-omitted.  `bowtie-inspect` first looks in the current directory for the
-index files, then looks in the `indexes` subdirectory under the
-directory where the currently-running `bowtie` executable is located,
-then looks in the directory specified in the `BOWTIE_INDEXES`
-environment variable.
+The basename of the Bowtie or Bowtie 2 index to be inspected.  The
+basename is name of any of the index files but with the `.X.ebwt`
+/ `.rev.X.ebwt` / `1.bt2`, etc,  suffix omitted.  `bowtie-inspect`
+first looks in the current directory for the index files, then looks
+in the `indexes` subdirectory under the directory where the
+currently-running `bowtie` executable is located, then looks in the
+directory specified in the `BOWTIE_INDEXES` environment variable.
+If a Bowtie and Bowtie 2 index are located in the same directory
+and share the same basename, `bowtie-inspect` will use the Bowtie
+2 index since there is no parameter for choosing between the two.
 
 </td></tr></table>
 

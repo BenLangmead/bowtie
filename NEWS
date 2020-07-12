@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `LICENSE') and freely
-available to the public for download.  The current version is 1.2.3.
+available to the public for download.  The current version is 1.3.0.
 
 Reporting Issues
 ================
@@ -26,6 +26,24 @@ subscribe to our mailing list:
 
 Version Release History
 =======================
+
+Version 1.3.0 - Jul 12, 2020
+    * Fixed an issue causing `bowtie` to report incorrect results
+      when using a Bowtie 2 index.
+    * Reimplemented `--reorder` functionality for reordering of SAM
+      output
+    * Added `-x` parameter for specifying index. `bowtie` still
+      supports specifying an index via positional parameter, but this
+      behavior will deprecated in the next release.
+    * Migrated all `python` scripts to `python3`.
+    * Fully deprecated colorspace functionality.
+    * Added support for compiling on ARM architectures.
+    * Fixed an issue preventing `bowtie` from outputting newlines
+      in `--max` and `--un` output files.
+    * Fixed an issue causing alignment results to vary based on
+      read names.
+    * Fixed an issue preventing `--no-unal` from suppressing unmapped
+      reads.
 
 Version 1.2.3 - Jul 5, 2019
     * Added support for reading and inspecting Bowtie 2 indexes.
