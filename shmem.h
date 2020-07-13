@@ -102,7 +102,7 @@ bool allocSharedMem(std::string fname,
 			cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
 			throw 1;
 		}
-		if(ds.shm_segsz != (int)shmemLen) {
+		if(ds.shm_segsz != shmemLen) {
 			cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
 				 << ") doesn't match expected size (" << shmemLen << ")" << endl
 				 << "Deleting old shared memory block and trying again." << endl;
