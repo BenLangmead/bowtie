@@ -88,6 +88,9 @@ ifeq (1, $(WITH_TBBMALLOC))
 endif
 
 POPCNT_CAPABILITY ?= 1
+ifeq (aarch64,$(shell uname -m))
+	POPCNT_CAPABILITY=0
+endif
 ifeq (1, $(POPCNT_CAPABILITY))
     override EXTRA_FLAGS += -DPOPCNT_CAPABILITY
     INC += -I third_party
@@ -159,8 +162,8 @@ ifeq (32,$(BITS))
     $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 -m64
-RELEASE_FLAGS = -O3 -m64
+DEBUG_FLAGS = -O0 -g3 -march=native
+RELEASE_FLAGS = -O3 -march=native
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
