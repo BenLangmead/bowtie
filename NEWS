@@ -10,19 +10,16 @@ available to the public for download.  The current version is 1.3.0.
 Reporting Issues
 ================
 
-Please report any issues using the Sourceforge bug tracker:
+Please report any issues on GitHub:
 
-  * https://github.com/BenLangmead/bowtie/issues
-  * https://sourceforge.net/tracker/?group_id=236897&atid=1101606
+    * https://github.com/BenLangmead/bowtie/issues
 
 Announcements
 =============
 
-To receive announcements (including release announcements) about Bowtie
-and related tools (including Crossbow, TopHat, Cufflinks, Myrna)
-subscribe to our mailing list:
+Keep up with our releases on the GitHub releases page:
 
-  https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce
+    * https://github.com/BenLangmead/bowtie/releases
 
 Version Release History
 =======================
@@ -30,20 +27,22 @@ Version Release History
 Version 1.3.0 - Jul 12, 2020
     * Fixed an issue causing `bowtie` to report incorrect results
       when using a Bowtie 2 index.
-    * Reimplemented `--reorder` functionality for reordering of SAM
-      output
+    * New, more efficient implementation of `--reorder` for keeping
+      SAM output lines in same order as input reads
     * Added `-x` parameter for specifying index. `bowtie` still
       supports specifying an index via positional parameter, but this
-      behavior will deprecated in the next release.
-    * Migrated all `python` scripts to `python3`.
-    * Fully deprecated colorspace functionality.
+      behavior will be deprecated.
+    * Migrated `python` scripts to `python3`.
+    * Fully removed colorspace functionality.
     * Added support for compiling on ARM architectures.
-    * Fixed an issue preventing `bowtie` from outputting newlines
-      in `--max` and `--un` output files.
-    * Fixed an issue causing alignment results to vary based on
-      read names.
+    * Fixed an issue preventing `bowtie` from outputting newlines in
+      `--max` and `--un` output files.
+    * Fixed an issue causing alignment results to vary based on read
+      names.
     * Fixed an issue preventing `--no-unal` from suppressing unmapped
       reads.
+    * Removed dependence on some third-party libraries, simplifying
+      the code and improving portability.
 
 Version 1.2.3 - Jul 5, 2019
     * Added support for reading and inspecting Bowtie 2 indexes.
@@ -89,7 +88,7 @@ Version 1.2.1 - Jun 12, 2017
       and improves speed and thread scaling.
     * Added support for interleaved paired-end FASTQ inputs
       (--interleaved)
-    * Fixed issue where first character of some read names was 
+    * Fixed issue where first character of some read names was
       omitted from SAM output when using tabbed input formats
     * Fixed issue that caused Bowtie to hang when aligning FASTA inputs
       with more than one thread
@@ -122,15 +121,15 @@ Version 1.2.0 - Dec 12, 2016
 
 Version 1.1.2 - Jun 23, 2015
    * Fixed the building process for OSX Yosemite.
-   * Added the install target for linux to better aid package building process 
+   * Added the install target for linux to better aid package building process
      and the overall installation process.
    * Added the Intel TBB option which provides in most situations a better performance
-     output. TBB is not present by default in the current build but can be added 
+     output. TBB is not present by default in the current build but can be added
      by compiling the source code with WITH_TBB=1 option.
    * Fixed a minor issue related with managing the number of threads spawned.
    * Fixed a minor issue which may have caused a memory leak after an exception
      was thrown.
-   * Fixed a bug that caused bowtie to crash if a read was trimmed more than the 
+   * Fixed a bug that caused bowtie to crash if a read was trimmed more than the
      read's lenght on 5 prime end.
    * Added some minor corrections/addition to the manual.
    * Fixed a bug that caused the wrapper to incorrectly identify the bowtie binary.
@@ -138,9 +137,9 @@ Version 1.1.2 - Jun 23, 2015
 
 Version 1.1.1 - Oct 1, 2014
    * Fixed a compiling linkage problem related with Mavericks OSX.
-   * Improved performance for cases where the reference contains ambiguous 
+   * Improved performance for cases where the reference contains ambiguous
      or masked nucleobases represented by Ns.
-   * Some minor automatic tests updates. 
+   * Some minor automatic tests updates.
 
 
 Version 1.1.0 - July 19, 2014
@@ -340,7 +339,7 @@ Version 0.12.0-beta1 - December 12, 2009
    * Fixed issue with random number generation that would result in
      non-random selection of alignments in some situations.
    * bowtie -f now supports fasta files with reads split across
-     multiple lines 
+     multiple lines
    * New --suppress option suppresses unwanted columns of output
    * The MANUAL file was converted to markdown format, facilitating
      conversion to various other formats using tools like pandoc
@@ -522,7 +521,7 @@ Version 0.9.9.1 - March 10, 2009
    * Added -s/--skip <int> option to skip over the first <int> reads or
      pairs in the input.
    * --unfq/--unfa/--maxfq/--maxfa modes no longer create empty output
-     files. 
+     files.
    * All Bowtie tools now compile under GCC 4.3.3.
    * Fixed bug whereby bowtie -b would sometimes write garbage into the
      reference offset field.
@@ -577,7 +576,7 @@ Version 0.9.8.1 - January 7, 2009
      alignments every time it is run, though not necessarily in the
      same order.  This does not hold across different versions of
      Bowtie.
-   * Multiple other bug fixes. 
+   * Multiple other bug fixes.
 
 Version 0.9.8 - November 25, 2008
    * --unfa/--unfq <filename> options cause bowtie to dump unaligned
@@ -619,14 +618,14 @@ Version 0.9.7 - November 8, 2008
      output all alignments in one critical section.  This guarantees
      that all alignments for a given read/phase appear in one
      consecutive block of the output, even when multiple threads are
-     operating in parallel. 
+     operating in parallel.
    * Separated the quality-conversion and parsing aspects of the old
      --solexa-quals argument into separate arguments: --solexa-quals
      (quality conversion) and --integer-quals (parsing).
    * bowtie-convert now handles the new (post-0.7.0) Maq alignment
      format.  The new format allows Maq tools to handle reads up to
      127 bases, whereas the old format was limited to 63 bases.  Added
-     a -o option to opt for the old Maq format. 
+     a -o option to opt for the old Maq format.
    * New --refout argument sends alignments to a set of files named
      refXXXXX.map, where XXXXX is the 0-padded index of the reference
      sequence aligned to.  Useful for dealing with large datasets
