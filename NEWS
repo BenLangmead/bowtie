@@ -41,8 +41,8 @@ Version 1.3.0 - Jul 12, 2020
       names.
     * Fixed an issue preventing `--no-unal` from suppressing unmapped
       reads.
-    * Removed dependence on some third-party codes, improving
-      portability.
+    * Removed dependence on some third-party libraries, simplifying
+      the code and improving portability.
 
 Version 1.2.3 - Jul 5, 2019
     * Added support for reading and inspecting Bowtie 2 indexes.
