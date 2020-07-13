@@ -640,8 +640,7 @@ for the specified index first in the current directory, then in the
 executable is located, then looks in the directory specified in the
 `BOWTIE_INDEXES` environment variable. If a Bowtie and Bowtie 2
 index are located in the same directory and share the same basename,
-`bowtie` will use the Bowtie 2 index since there is no parameter
-for choosing between the two.
+`bowtie` will use the Bowtie 2 index.
 
 </td></tr><tr><td>
 
@@ -2347,7 +2346,7 @@ currently-running `bowtie` executable is located, then looks in the
 directory specified in the `BOWTIE_INDEXES` environment variable.
 If a Bowtie and Bowtie 2 index are located in the same directory
 and share the same basename, `bowtie-inspect` will use the Bowtie
-2 index since there is no parameter for choosing between the two.
+2 index.
 
 </td></tr></table>
 
