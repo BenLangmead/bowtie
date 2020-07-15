@@ -5,6 +5,7 @@
 prefix = /usr/local
 bindir = $(prefix)/bin
 
+ARCH = $(shell uname -m)
 INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) -I third_party
 LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
 HEADERS = $(wildcard *.h)
@@ -359,7 +360,7 @@ bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
+bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -DBOWTIE_64BIT_INDEX $(WARNING_FLAGS) \
@@ -379,8 +380,8 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	cp .src.tmp/$@ .
 	rm -rf .src.tmp
 
-bowtie-bin.zip: $(RELEASE_DEPENDENCIES) $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
-	$(eval PKG_DIR=bowtie-$(VERSION)-$(if $(MACOS),macos,$(if $(MINGW),mingw,linux))-x86_64)
+bowtie-bin.zip: $(RELEASE_DEPENDENCIES) $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
+	$(eval PKG_DIR=bowtie-$(VERSION)-$(if $(MACOS),macos,$(if $(MINGW),mingw,linux))-$(ARCH))
 	chmod a+x scripts/*.sh scripts/*.pl
 	rm -rf .bin.tmp
 	mkdir .bin.tmp
