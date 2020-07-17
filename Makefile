@@ -163,8 +163,8 @@ ifeq (32,$(BITS))
     $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 -march=native
-RELEASE_FLAGS = -O3 -march=native
+DEBUG_FLAGS = -O0 -g3
+RELEASE_FLAGS = -O3
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
