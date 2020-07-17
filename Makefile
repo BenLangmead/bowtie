@@ -163,6 +163,11 @@ BITS=32
 ifeq (x86_64,$(shell uname -m))
 	BITS=64
 endif
+
+ifeq (aarch64,$(shell uname -m))
+        BITS=64
+endif 
+
 # msys will always be 32 bit so look at the cpu arch instead.
 ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
 	ifeq (1,$(MINGW))
@@ -180,8 +185,13 @@ ifeq (32,$(BITS))
     $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 -m64
-RELEASE_FLAGS = -O3 -m64
+M64_FLAG := -m64
+ifeq (aarch64,$(shell uname -m))
+        M64_FLAG :=
+endif
+
+DEBUG_FLAGS = -O0 -g3 $(M64_FLAG)
+RELEASE_FLAGS = -O3 $(M64_FLAG)
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
