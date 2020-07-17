@@ -241,10 +241,19 @@ all: $(BIN_LIST)
 
 allall: $(BIN_LIST) $(BIN_LIST_AUX)
 
+
+DATE_FMT = %Y-%m-%dT%H:%M:%S
+ifdef SOURCE_DATE_EPOCH
+    BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "+$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "+$(DATE_FMT)" 2>/dev/null || date -u "+$(DATE_FMT)")
+    BUILD_HOST := reproduciblebuild
+else
+    BUILD_DATE ?= $(shell date "+$(DATE_FMT)")
+    BUILD_HOST ?= `hostname`
+endif
 DEFS=-fno-strict-aliasing \
      -DBOWTIE_VERSION="\"`cat VERSION`\"" \
-     -DBUILD_HOST="\"`hostname`\"" \
-     -DBUILD_TIME="\"`date`\"" \
+     -DBUILD_HOST="\"$(BUILD_HOST)\"" \
+     -DBUILD_TIME="\"$(BUILD_DATE)\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
      $(FILE_FLAGS) \
      $(PTHREAD_DEF) \
