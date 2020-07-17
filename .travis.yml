@@ -60,7 +60,7 @@ matrix:
       arch: s390x
       env:
         - POPCNT_CAPABILITY=0
-    PPC64LE
+    # PPC64LE
     - os: linux
       arch: ppc64le
       env:
