@@ -113,14 +113,12 @@ static void printUsage(ostream& out) {
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl;
-		if(wrapper == "basic-0") {
+	if(wrapper == "basic-0") {
 		out << "    --large-index           force generated index to be 'large', even if ref" << endl
-			<< "                            has fewer than 4 billion nucleotides" << endl;
-		}
-	    out << "    -C/--color              build a colorspace index" << endl
-	    << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
+		    << "                            has fewer than 4 billion nucleotides" << endl;
+	}
+	out << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
 	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
-	    //<< "    -B                      build both letter- and colorspace indexes" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
 	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
@@ -139,16 +137,14 @@ static void printUsage(ostream& out) {
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
 	    << "    --usage                 print this usage message" << endl
-	    << "    --version               print version information and quit" << endl
-	    ;
-		if(wrapper.empty()) {
-			cerr << endl
-			     << "*** Warning ***" << endl
-				 << "'" << tool_name << "' was run directly.  It is recommended "
-				 << "that you run the wrapper script 'bowtie-build' instead."
-				 << endl << endl;
-		}
-		
+	    << "    --version               print version information and quit" << endl;
+	if(wrapper.empty()) {
+		cerr << endl
+		     << "*** Warning ***" << endl
+		     << "'" << tool_name << "' was run directly.  It is recommended "
+		     << "that you run the wrapper script 'bowtie-build' instead."
+		     << endl << endl;
+	}
 }
 
 static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
