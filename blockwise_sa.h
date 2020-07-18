@@ -255,7 +255,6 @@ public:
 				throw 1;
 			}
 			const EList<TIndexOffU>& bucket = sa->_itrBuckets[tid];
-			std::cerr << "Writing " << bucket.size() << " SAs" << std::endl;
 			writeU<TIndexOffU>(sa_file, (TIndexOffU)bucket.size(), sa->_bigEndian);
 			for(size_t i = 0; i < bucket.size(); i++) {
 				writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
@@ -319,7 +318,6 @@ public:
 					throw 1;
 				}
 				size_t numSAs = readU<TIndexOffU>(sa_file, false /* don't endian swap */);
-				std::cerr << "Reading " << numSAs << " SAs" << std::endl;
 				this->_itrBucket.resize(numSAs);
 				for(size_t i = 0; i < numSAs; i++) {
 					this->_itrBucket[i] = readU<TIndexOffU>(sa_file, false);
