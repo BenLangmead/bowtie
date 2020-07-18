@@ -322,7 +322,7 @@ public:
 				std::cerr << "Reading " << numSAs << " SAs" << std::endl;
 				this->_itrBucket.resize(numSAs);
 				for(size_t i = 0; i < numSAs; i++) {
-					this->_itrBucket[i] = readU<TIndexOffU>(sa_file, _bigEndian);
+					this->_itrBucket[i] = readU<TIndexOffU>(sa_file, false);
 				}
 				sa_file.close();
 				std::remove(fname.c_str());
