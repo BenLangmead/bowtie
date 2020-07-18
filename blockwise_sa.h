@@ -318,7 +318,7 @@ public:
 					cerr << "Could not open file for reading a reference graph: \"" << fname << "\"" << endl;
 					throw 1;
 				}
-				size_t numSAs = readU<TIndexOffU>(sa_file, _bigEndian);
+				size_t numSAs = readU<TIndexOffU>(sa_file, false /* don't endian swap */);
 				std::cerr << "Reading " << numSAs << " SAs" << std::endl;
 				this->_itrBucket.resize(numSAs);
 				for(size_t i = 0; i < numSAs; i++) {
