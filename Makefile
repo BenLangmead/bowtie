@@ -372,12 +372,12 @@ bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
 	mkdir .src.tmp
-	mkdir .src.tmp/bowtie-$(VERSION)
+	mkdir .src.tmp/bowtie-$(VERSION)-src
 	zip -r tmp.zip $(SRC_PKG_LIST)
-	mv tmp.zip .src.tmp/bowtie-$(VERSION)
-	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)
-	cp .src.tmp/$@ .
+	mv tmp.zip .src.tmp/bowtie-$(VERSION)-src
+	cd .src.tmp/bowtie-$(VERSION)-src ; unzip tmp.zip ; rm -f tmp.zip
+	cd .src.tmp ; zip -r bowtie-$(VERSION)-src.zip bowtie-$(VERSION)-src
+	cp .src.tmp/bowtie-$(VERSION)-src.zip .
 	rm -rf .src.tmp
 
 bowtie-bin.zip: $(RELEASE_DEPENDENCIES) $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
