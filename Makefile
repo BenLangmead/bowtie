@@ -44,8 +44,6 @@ MACOS =
 ifneq (,$(findstring Darwin,$(shell uname)))
     MACOS = 1
 	ifneq (,$(findstring 13,$(shell uname -r)))
-		CPP = clang++
-		CC = clang
 		override EXTRA_FLAGS += -stdlib=libstdc++
 	endif
 	ifeq (1, $(RELEASE_BUILD))
@@ -431,7 +429,7 @@ random-test: all perl-deps
 .PHONY: perl-deps
 perl-deps:
 	if [ ! -e .perllib.tmp ]; then \
-		DL=$$([ `which wget` ] && echo wget -O- || echo curl -L) ; \
+		DL=$$([ `which wget` ] && echo "wget -O-" || echo "curl -L") ; \
 		mkdir .perllib.tmp ; \
 		$$DL http://cpanmin.us | perl - -l $(CURDIR)/.perllib.tmp App::cpanminus local::lib ; \
 		eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
@@ -439,22 +437,20 @@ perl-deps:
 	fi
 
 static-libs:
-	if [[ ! -d $(CURDIR)/.lib || ! -d $(CURDIR)/.inc ]]; then \
-		mkdir $(CURDIR)/.lib $(CURDIR)/.include ; \
+	if [ ! -d $(CURDIR)/.lib ]; then \
+		mkdir $(CURDIR)/.lib ; \
 	fi ; \
-	if [[ `uname` = "Darwin" ]]; then \
+	if [ ! -d $(CURDIR)/.include ]; then \
+		mkdir $(CURDIR)/.include ; \
+	fi ;
+	if [ `uname` == "Darwin" ]; then \
 		export CFLAGS=-mmacosx-version-min=10.9 ; \
 		export CXXFLAGS=-mmacosx-version-min=10.9 ; \
 	fi ; \
 	DL=$$([ `which wget` ] && echo "wget --no-check-certificate --content-disposition" || echo "curl -LJkO") ; \
 	cd /tmp ; \
 	$$DL https://zlib.net/zlib-1.2.11.tar.gz && tar xzf zlib-1.2.11.tar.gz && cd zlib-1.2.11 ; \
-	$(if $(MINGW), mingw32-make -f win32/Makefile.gcc, ./configure --static && make) && cp libz.a $(CURDIR)/.lib && cp zconf.h zlib.h $(CURDIR)/.include ; \
-	cd .. ; \
-	$$DL https://github.com/01org/tbb/archive/2017_U8.tar.gz && tar xzf tbb-2017_U8.tar.gz && cd tbb-2017_U8; \
-	$(if $(MINGW), mingw32-make compiler=gcc arch=ia64 runtime=mingw, make) extra_inc=big_iron.inc -j4 \
-	&& cp -r include/tbb $(CURDIR)/.include && cp build/*_release/*.a $(CURDIR)/.lib
-
+	$(if $(MINGW), mingw32-make -f win32/Makefile.gcc, ./configure --static && make) && cp libz.a $(CURDIR)/.lib && cp zconf.h zlib.h $(CURDIR)/.include ;
 
 .PHONY: clean
 clean:
@@ -462,6 +458,6 @@ clean:
 	bowtie_prof \
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
-	rm -f core.*
-	rm -f bowtie-align-s-master* bowtie-align-s-no-io* 
+	rm -f *.core
+	rm -f bowtie-align-s-master* bowtie-align-s-no-io*
 	rm -rf .lib .include
