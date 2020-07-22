@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -25,5 +25,6 @@ if __name__ == '__main__':
         for i in range(num_refs):
             gen_genome(fh, 'ref%d' % i, tot_len // num_refs)
     ret = os.system('%s %s %s' % (bt2_build_exe, tmp_fasta, tmp_idx))
-    print("Exitlevel: %d" % ret, file=sys.stderr)
+    # print("Exitlevel: %d" % ret, file=sys.stderr)
+    sys.stderr.write("Exitlevel: %d\n" % ret)
     exit(ret)
