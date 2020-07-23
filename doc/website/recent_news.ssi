@@ -1,3 +1,18 @@
+<h2>1.3.0 - 07/22/2020</h2>
+<ul>
+    <li>Fixed an issue causing <code>bowtie</code> to report incorrect results when using a Bowtie 2 index.</li>
+    <li>New, more efficient implementation of <tt><a href="manual.shtml#bowtie-options-reorder">--reorder</a></tt> for keeping SAM output lines in same order as input reads</li>
+    <li>Added <tt><a href="manual.shtml#bowtie-options-x">-x</a></tt> parameter for specifying index. <code>bowtie</code> still supports specifying an index via positional parameter, but this behavior will be deprecated.</li>
+    <li>Migrated <code>python</code> scripts to <code>python3</code>.</li>
+    <li>Fully removed colorspace functionality.</li>
+    <li>Added support for compiling on ARM architectures.</li>
+    <li>Fixed an issue preventing <code>bowtie</code> from outputting newlines in <tt><a href="manual.shtml#bowtie-options-max">--max</a></tt> and <tt><a href="manual.shtml#bowtie-options-un">--un</a></tt> output files.</li>
+    <li>Fixed an issue causing alignment results to vary based on read names.</li>
+    <li>Fixed an issue preventing <tt><a href="manual.shtml#bowtie-options-no-unal">--no-unal</a></tt> from suppressing unmapped reads.</li>
+    <li>Removed dependence on some third-party libraries, simplifying the code and improving portability.</li>
+    <li>Fix an issue preventing <code>bowtie</code> from running with many threads on big-endian machines.</li>
+</ul>
+
 <h2>1.2.3 - 07/05/2019</h2>
 <ul>
     <li>Added support for reading and inspecting Bowtie 2 indexes. Bowtie 2 indexes can now be used with either Bowtie or Bowtie 2.</li>

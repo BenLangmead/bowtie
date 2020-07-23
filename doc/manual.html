@@ -6,10 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>Bowtie Manual</title>
   <style>
-      code{white-space: pre-wrap;}
-      span.smallcaps{font-variant: small-caps;}
-      span.underline{text-decoration: underline;}
-      div.column{display: inline-block; vertical-align: top; width: 50%;}
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
   </style>
   <link rel="stylesheet" href="style.css" />
   <!--[if lt IE 9]>
@@ -21,18 +23,21 @@
 <header id="title-block-header">
 <h1 class="title">Bowtie Manual</h1>
 </header>
-<nav id="TOC">
+<nav id="TOC" role="doc-toc">
 <ul>
 <li><a href="#what-is-bowtie">What is Bowtie?</a></li>
 <li><a href="#what-isnt-bowtie">What isn’t Bowtie?</a></li>
-<li><a href="#obtaining-bowtie">Obtaining Bowtie</a><ul>
+<li><a href="#obtaining-bowtie">Obtaining Bowtie</a>
+<ul>
 <li><a href="#building-from-source">Building from source</a></li>
 </ul></li>
-<li><a href="#the-bowtie-aligner">The <code>bowtie</code> aligner</a><ul>
+<li><a href="#the-bowtie-aligner">The <code>bowtie</code> aligner</a>
+<ul>
 <li><a href="#the--n-alignment-mode">The <code>-n</code> alignment mode</a></li>
 <li><a href="#the--v-alignment-mode">The <code>-v</code> alignment mode</a></li>
 <li><a href="#strata">Strata</a></li>
-<li><a href="#reporting-modes">Reporting Modes</a><ul>
+<li><a href="#reporting-modes">Reporting Modes</a>
+<ul>
 <li><a href="#example-1--a">Example 1: <code>-a</code></a></li>
 <li><a href="#example-2--k-3">Example 2: <code>-k 3</code></a></li>
 <li><a href="#example-3--k-6">Example 3: <code>-k 6</code></a></li>
@@ -44,30 +49,29 @@
 <li><a href="#example-9--a--m-3---best---strata">Example 9: <code>-a -m 3 --best --strata</code></a></li>
 </ul></li>
 <li><a href="#paired-end-alignment">Paired-end Alignment</a></li>
-<li><a href="#colorspace-alignment">Colorspace Alignment</a><ul>
-<li><a href="#colorspace-reads">Colorspace reads</a></li>
-<li><a href="#building-a-colorspace-index">Building a colorspace index</a></li>
-<li><a href="#decoding-colorspace-alignments">Decoding colorspace alignments</a></li>
-<li><a href="#paired-end-colorspace-alignment">Paired-end colorspace alignment</a></li>
-</ul></li>
 <li><a href="#wrapper-scripts">Wrapper scripts</a></li>
 <li><a href="#small-and-large-indexes">Small and large indexes</a></li>
 <li><a href="#performance-tuning">Performance Tuning</a></li>
-<li><a href="#command-line">Command Line</a><ul>
+<li><a href="#command-line">Command Line</a>
+<ul>
 <li><a href="#main-arguments">Main arguments</a></li>
 <li><a href="#options">Options</a></li>
 </ul></li>
 <li><a href="#default-bowtie-output">Default <code>bowtie</code> output</a></li>
 <li><a href="#sam-bowtie-output">SAM <code>bowtie</code> output</a></li>
 </ul></li>
-<li><a href="#the-bowtie-build-indexer">The <code>bowtie-build</code> indexer</a><ul>
-<li><a href="#command-line-1">Command Line</a><ul>
+<li><a href="#the-bowtie-build-indexer">The <code>bowtie-build</code> indexer</a>
+<ul>
+<li><a href="#command-line-1">Command Line</a>
+<ul>
 <li><a href="#main-arguments-1">Main arguments</a></li>
 <li><a href="#options-1">Options</a></li>
 </ul></li>
 </ul></li>
-<li><a href="#the-bowtie-inspect-index-inspector">The <code>bowtie-inspect</code> index inspector</a><ul>
-<li><a href="#command-line-2">Command Line</a><ul>
+<li><a href="#the-bowtie-inspect-index-inspector">The <code>bowtie-inspect</code> index inspector</a>
+<ul>
+<li><a href="#command-line-2">Command Line</a>
+<ul>
 <li><a href="#main-arguments-2">Main arguments</a></li>
 <li><a href="#options-2">Options</a></li>
 </ul></li>
@@ -80,7 +84,7 @@
  ! HTML.  See 'MANUAL' for a clearer version of this document.
   -->
 <h1 id="what-is-bowtie">What is Bowtie?</h1>
-<p><a href="http://bowtie-bio.sf.net">Bowtie</a> is an ultrafast, memory-efficient short read aligner geared toward quickly aligning large sets of short DNA sequences (reads) to large genomes. It aligns 35-base-pair reads to the human genome at a rate of 25 million reads per hour on a typical workstation. Bowtie indexes the genome with a <a href="http://en.wikipedia.org/wiki/Burrows-Wheeler_transform">Burrows-Wheeler</a> index to keep its memory footprint small: for the human genome, the index is typically about 2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end or colorspace alignment). Multiple processors can be used simultaneously to achieve greater alignment speed. Bowtie can also output alignments in the standard <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format, allowing Bowtie to interoperate with other tools supporting SAM, including the <a href="http://samtools.sourceforge.net/">SAMtools</a> consensus, SNP, and indel callers. Bowtie runs on the command line under Windows, Mac OS X, Linux, and Solaris.</p>
+<p><a href="http://bowtie-bio.sf.net">Bowtie</a> is an ultrafast, memory-efficient short read aligner geared toward quickly aligning large sets of short DNA sequences (reads) to large genomes. It aligns 35-base-pair reads to the human genome at a rate of 25 million reads per hour on a typical workstation. Bowtie indexes the genome with a <a href="http://en.wikipedia.org/wiki/Burrows-Wheeler_transform">Burrows-Wheeler</a> index to keep its memory footprint small: for the human genome, the index is typically about 2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end alignment). Multiple processors can be used simultaneously to achieve greater alignment speed. Bowtie can also output alignments in the standard <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format, allowing Bowtie to interoperate with other tools supporting SAM, including the <a href="http://samtools.sourceforge.net/">SAMtools</a> consensus, SNP, and indel callers. Bowtie runs on the command line under Windows, Mac OS X, Linux, and Solaris.</p>
 <p><a href="http://bowtie-bio.sf.net">Bowtie</a> also forms the basis for other tools, including <a href="http://tophat.cbcb.umd.edu/">TopHat</a>: a fast splice junction mapper for RNA-seq reads, <a href="http://cufflinks.cbcb.umd.edu/">Cufflinks</a>: a tool for transcriptome assembly and isoform quantitiation from RNA-seq reads, <a href="http://bowtie-bio.sf.net/crossbow">Crossbow</a>: a cloud-computing software tool for large-scale resequencing data,and <a href="http://bowtie-bio.sf.net/myrna">Myrna</a>: a cloud computing tool for calculating differential gene expression in large RNA-seq datasets.</p>
 <p>If you use <a href="http://bowtie-bio.sf.net">Bowtie</a> for your published research, please cite the <a href="http://genomebiology.com/2009/10/3/R25">Bowtie paper</a>.</p>
 <h1 id="what-isnt-bowtie">What isn’t Bowtie?</h1>
@@ -91,8 +95,6 @@
 <h2 id="building-from-source">Building from source</h2>
 <p>Building Bowtie from source requires a GNU-like environment that includes GCC, GNU Make and other basics. It should be possible to build Bowtie on a vanilla Linux or Mac installation. Bowtie can also be built on Windows using <a href="http://www.mingw.org/">MinGW</a>. We recommend <a href="http://www.tdragon.net/recentgcc/">TDM’s MinGW Build</a>. You also must also have <a href="http://www.mingw.org/wiki/msys">MSYS</a> installed.</p>
 <p>To build Bowtie, extract the sources, change to the extracted directory, and run GNU <code>make</code> (usually with the command <code>make</code>, but sometimes with <code>gmake</code>) with no arguments. If building with <a href="http://www.mingw.org/">MinGW</a>, run <code>make</code> from the <a href="http://www.mingw.org/wiki/msys">MSYS</a> command line.</p>
-<p>To build Bowtie including support for the <code>bowtie</code> <a href="#bowtie-options-p"><code>-p</code></a> and <code>bowtie-build</code> <a href="#bowtie-build-options-threads"><code>--threads</code></a> multithreading options, we recommend that you first install the <a href="https://www.threadingbuildingblocks.org">Thread Building Blocks library</a>, also known as TBB, the default threading library. TBB is installed by default on many operating systems.</p>
-<p>If TBB is not available, then use the <code>NO_TBB=1</code> option. On Linux or Mac OS X, this requires the pthreads library, which is installed by default. On Windows, native Windows threads will be used, which require no special libraries.</p>
 <h1 id="the-bowtie-aligner">The <code>bowtie</code> aligner</h1>
 <p><code>bowtie</code> takes an index and a set of reads as input and outputs a list of alignments. Alignments are selected according to a combination of the <a href="#bowtie-options-v"><code>-v</code></a>/<a href="#bowtie-options-n"><code>-n</code></a>/<a href="#bowtie-options-e"><code>-e</code></a>/<a href="#bowtie-options-l"><code>-l</code></a> options (plus the <a href="#bowtie-options-I"><code>-I</code></a>/<a href="#bowtie-options-X"><code>-X</code></a>/<a href="#bowtie-options-fr"><code>--fr</code></a>/<a href="#bowtie-options-fr"><code>--rf</code></a>/ <a href="#bowtie-options-fr"><code>--ff</code></a> options for paired-end alignment), which define which alignments are legal, and the <a href="#bowtie-options-k"><code>-k</code></a>/<a href="#bowtie-options-a"><code>-a</code></a>/<a href="#bowtie-options-m"><code>-m</code></a>/<a href="#bowtie-options-m"><code>-M</code></a>/<a href="#bowtie-options-best"><code>--best</code></a>/<a href="#bowtie-options-strata"><code>--strata</code></a> options which define which and how many legal alignments should be reported.</p>
 <p>By default, Bowtie enforces an alignment policy similar to <a href="http://maq.sf.net">Maq</a>’s default quality-aware policy (<a href="#bowtie-options-n"><code>-n</code></a> 2 <a href="#bowtie-options-l"><code>-l</code></a> 28 <a href="#bowtie-options-e"><code>-e</code></a> 70). See <a href="#the--n-alignment-mode">the -n alignment mode</a> section of the manual for details about this mode. But Bowtie can also enforce a simpler end-to-end k-difference policy (e.g. with <a href="#bowtie-options-v"><code>-v</code></a> 2). See <a href="#the--v-alignment-mode">the -v alignment mode</a> section of the manual for details about that mode. <a href="#the--n-alignment-mode">The -n alignment mode</a> and <a href="#the--v-alignment-mode">the -v alignment mode</a> are mutually exclusive.</p>
@@ -185,32 +187,9 @@ No alignments</code></pre>
 <p>A paired-end alignment is reported as a pair of mate alignments, both on a separate line, where the alignment for each mate is formatted the same as an unpaired (singleton) alignment. The alignment for the mate that occurs closest to the beginning of the reference sequence (the “upstream” mate) is always printed before the alignment for the downstream mate. Reads files containing paired-end reads will sometimes name the reads according to whether they are the #1 or #2 mates by appending a <code>/1</code> or <code>/2</code> suffix to the read name. If no such suffix is present in Bowtie’s input, the suffix will be added when Bowtie prints read names in alignments (except in <a href="#bowtie-options-S"><code>-S</code></a> “SAM” mode, where mate information is encoded in the <code>FLAGS</code> field instead).</p>
 <p>Finding a valid paired-end alignment where both mates align to repetitive regions of the reference can be very time-consuming. By default, Bowtie avoids much of this cost by imposing a limit on the number of “tries” it makes to match an alignment for one mate with a nearby alignment for the other. The default limit is 100. This causes <code>bowtie</code> to miss some valid paired-end alignments where both mates lie in repetitive regions, but the user may use the <a href="#bowtie-options-pairtries"><code>--pairtries</code></a> or <a href="#bowtie-options-y"><code>-y</code></a> options to increase Bowtie’s sensitivity as desired.</p>
 <p>Paired-end alignments where one mate’s alignment is entirely contained within the other’s are considered invalid.</p>
-<p>When colospace alignment is enabled via <a href="#bowtie-options-C"><code>-C</code></a>, the default setting for paired-end orientation is <a href="#bowtie-options-fr"><code>--ff</code></a>. This is because most SOLiD datasets have that orientation. When colorspace alignment is not enabled (default), the default setting for orientation is <a href="#bowtie-options-fr"><code>--fr</code></a>, since most Illumina datasets have this orientation. The default can be overriden in either case.</p>
-<p>Because Bowtie uses an in-memory representation of the original reference string when finding paired-end alignments, its memory footprint is larger when aligning paired-end reads. For example, the human index has a memory footprint of about 2.2 GB in single-end mode and 2.9 GB in paired-end mode. Note that paired-end and unpaired alignment incur the same memory footprint in colorspace (e.g. human incurs about 2.9 GB)</p>
-<h2 id="colorspace-alignment">Colorspace Alignment</h2>
-<p>As of version 0.12.0, <code>bowtie</code> can align colorspace reads against a colorspace index when <a href="#bowtie-options-C"><code>-C</code></a> is specified. Colorspace is the characteristic output format of Applied Biosystems’ SOLiD system. In a colorspace read, each character is a color rather than a nucleotide, where a color encodes a class of dinucleotides. E.g. the color blue encodes any of the dinucleotides: AA, CC, GG, TT. Colorspace has the advantage of (often) being able to distinguish sequencing errors from SNPs once the read has been aligned. See ABI’s <a href="http://tinyurl.com/ygnb2gn">Principles of Di-Base Sequencing</a> document for details.</p>
-<h3 id="colorspace-reads">Colorspace reads</h3>
-<p>All input formats (FASTA <a href="#bowtie-options-F"><code>-f</code></a>, FASTQ <a href="#bowtie-options-Q"><code>-q</code></a>, raw <a href="#bowtie-options-r"><code>-r</code></a>, tab-delimited <a href="#command-line"><code>--12</code></a>, command-line <a href="#bowtie-options-C"><code>-c</code></a>) are compatible with colorspace (<a href="#bowtie-options-C"><code>-C</code></a>). When <a href="#bowtie-options-C"><code>-C</code></a> is specified, read sequences are treated as colors. Colors may be encoded either as numbers (<code>0</code>=blue, <code>1</code>=green, <code>2</code>=orange, <code>3</code>=red) or as characters <code>A/C/G/T</code> (<code>A</code>=blue, <code>C</code>=green, <code>G</code>=orange, <code>T</code>=red).</p>
-<p>Some reads include a primer base as the first character; e.g.:</p>
-<pre><code>&gt;1_53_33_F3
-T2213120002010301233221223311331
-&gt;1_53_70_F3
-T2302111203131231130300111123220
-...</code></pre>
-<p>Here, <code>T</code> is the primer base. <code>bowtie</code> detects and handles primer bases properly (i.e., the primer base and the adjacent color are both trimmed away prior to alignment) as long as the rest of the read is encoded as numbers.</p>
-<p><code>bowtie</code> also handles input in the form of parallel <code>.csfasta</code> and <code>_QV.qual</code> files. Use <a href="#bowtie-options-F"><code>-f</code></a> to specify the <code>.csfasta</code> files and <a href="#bowtie-options-Q"><code>-Q</code></a> (for unpaired reads) or <a href="#bowtie-options-Q1"><code>--Q1</code></a>/<a href="#bowtie-options-Q2"><code>--Q2</code></a> (for paired-end reads) to specify the corresponding <code>_QV.qual</code> files. It is not necessary to first convert to FASTQ, though <code>bowtie</code> also handles FASTQ-formatted colorspace reads (with <a href="#bowtie-options-Q"><code>-q</code></a>, the default).</p>
-<h3 id="building-a-colorspace-index">Building a colorspace index</h3>
-<p>A colorspace index is built in the same way as a normal index except that <a href="#bowtie-build-options-C"><code>-C</code></a> must be specified when running <code>bowtie-build</code>. If the user attempts to use <code>bowtie</code> without <a href="#bowtie-options-C"><code>-C</code></a> to align against an index that was built with <a href="#bowtie-options-C"><code>-C</code></a> (or vice versa), <code>bowtie</code> prints an error message and quits.</p>
-<h3 id="decoding-colorspace-alignments">Decoding colorspace alignments</h3>
-<p>Once a colorspace read is aligned, Bowtie decodes the alignment into nucleotides and reports the decoded nucleotide sequence. A principled decoding scheme is necessary because many different possible decodings are usually possible. Finding the true decoding with 100% certainty requires knowing all variants (e.g. SNPs) in the subject’s genome beforehand, which is usually not possible. Instead, <code>bowtie</code> employs the approximate decoding scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754">BWA paper</a>. This scheme attempts to distinguish variants from sequencing errors according to their relative likelihood under a model that considers the quality values of the colors and the (configurable) global likelihood of a SNP.</p>
-<p>Quality values are also “decoded” so that each reported quality value is a function of the two color qualities overlapping it. Bowtie again adopts the scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754">BWA paper</a>, i.e., the decoded nucleotide quality is either the sum of the overlapping color qualities (when both overlapping colors correspond to bases that match in the alignment), the quality of the matching color minus the quality of the mismatching color, or 0 (when both overlapping colors correspond to mismatches).</p>
-<p>For accurate decoding, <a href="#bowtie-options-snpphred"><code>--snpphred</code></a>/<a href="#bowtie-options-snpfrac"><code>--snpfrac</code></a> should be set according to the user’s best guess of the SNP frequency in the subject. The <a href="#bowtie-options-snpphred"><code>--snpphred</code></a> parameter sets the SNP penalty directly (on the <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations">Phred quality</a> scale), whereas <a href="#bowtie-options-snpfrac"><code>--snpfrac</code></a> allows the user to specify the fraction of sites expected to be SNPs; the fraction is then converted to a <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations">Phred quality</a> internally. For the purpose of decoding, the SNP fraction is defined in terms of SNPs per <em>haplotype</em> base. Thus, if the genome is diploid, heterozygous SNPs have half the weight of homozygous SNPs</p>
-<p>Note that in <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> mode, the decoded nucleotide sequence is printed for alignments, but the original color sequence (with <code>A</code>=blue, <code>C</code>=green, <code>G</code>=orange, <code>T</code>=red) is printed for unaligned reads without any reported alignments. As always, the <a href="#bowtie-options-un"><code>--un</code></a>, <a href="#bowtie-options-max"><code>--max</code></a> and <a href="#bowtie-options-al"><code>--al</code></a> parameters print reads exactly as they appeared in the input file.</p>
-<h3 id="paired-end-colorspace-alignment">Paired-end colorspace alignment</h3>
-<p>Like other platforms, SOLiD supports generation of paired-end reads. When colorspace alignment is enabled, the default paired-end orientation setting is <a href="#bowtie-options-fr"><code>--ff</code></a>. This is because most SOLiD datasets have that orientation.</p>
-<p>Note that SOLiD-generated read files can have “orphaned” mates; i.e. mates without a correpsondingly-named mate in the other file. To avoid problems due to orphaned mates, SOLiD paired-end output should first be converted to <code>.csfastq</code> files with unpaired mates omitted. This can be accomplished using, for example, [Galaxy]’s conversion tool (click “NGS: QC and manipulation”, then “SOLiD-to-FASTQ” in the left-hand sidebar).</p>
+<p>Because Bowtie uses an in-memory representation of the original reference string when finding paired-end alignments, its memory footprint is larger when aligning paired-end reads. For example, the human index has a memory footprint of about 2.2 GB in single-end mode and 2.9 GB in paired-end mode.</p>
 <h2 id="wrapper-scripts">Wrapper scripts</h2>
-<p>The <code>bowtie</code>, <code>bowtie-build</code> and <code>bowtie-inspect</code> executables are actually wrapper scripts that call binary programs as appropriate. The wrappers shield users from having to distinguish between “small” and “large” index formats, discussed briefly in the following section. The appropiate index type is selected based on the input size.</p>
+<p>The <code>bowtie</code>, <code>bowtie-build</code> and <code>bowtie-inspect</code> executables are actually wrapper scripts that call binary programs as appropriate. The wrappers shield users from having to distinguish between “small” and “large” index formats, discussed briefly in the following section. The appropriate index type is selected based on the input size.</p>
 <p>It is recommended that you always run the bowtie wrappers and not run the binaries directly.</p>
 <h2 id="small-and-large-indexes">Small and large indexes</h2>
 <p><code>bowtie-build</code> can index reference genomes of any size. For genomes less than about 4 billion nucleotides in length, <code>bowtie-build</code> builds a “small” index using 32-bit numbers in various parts of the index. When the genome is longer, <code>bowtie-build</code> builds a “large” index using 64-bit numbers. Small indexes are stored in files with the <code>.ebwt</code> extension, and large indexes are stored in files with the <code>.ebwtl</code> extension. The user need not worry about whether a particular index is small or large; the wrapper scripts will automatically build and use the appropriate index.</p>
@@ -227,15 +206,15 @@ T2302111203131231130300111123220
 </ol>
 <h2 id="command-line">Command Line</h2>
 <p>Usage:</p>
-<pre><code>bowtie [options]* &lt;ebwt&gt; {-1 &lt;m1&gt; -2 &lt;m2&gt; | --12 &lt;r&gt; | --interleaved &lt;i&gt; | &lt;s&gt;} [&lt;hit&gt;]</code></pre>
+<pre><code>bowtie [options]* -x &lt;ebwt&gt; {-1 &lt;m1&gt; -2 &lt;m2&gt; | --12 &lt;r&gt; | --interleaved &lt;i&gt; | &lt;s&gt;} [&lt;hit&gt;]</code></pre>
 <h3 id="main-arguments">Main arguments</h3>
 <table>
 <tr>
-<td>
-<pre><code>&lt;ebwt&gt;</code></pre>
+<td id="bowtie-options-x">
+<pre><code>-x &lt;ebwt&gt;</code></pre>
 </td>
 <td>
-<p>The basename of the index to be searched. The basename is the name of any of the index files up to but not including the final <code>.1.ebwt</code> / <code>.rev.1.ebwt</code> / etc. <code>bowtie</code> looks for the specified index first in the current directory, then in the <code>indexes</code> subdirectory under the directory where the <code>bowtie</code> executable is located, then looks in the directory specified in the <code>BOWTIE_INDEXES</code> environment variable.</p>
+<p>The basename of the Bowtie, or Bowtie 2, index to be searched. The basename is the name of any of the index files up to but not including the final <code>.1.ebwt</code> / <code>.rev.1.ebwt</code> / <code>1.bt2</code> / etc. <code>bowtie</code> looks for the specified index first in the current directory, then in the <code>indexes</code> subdirectory under the directory where the <code>bowtie</code> executable is located, then looks in the directory specified in the <code>BOWTIE_INDEXES</code> environment variable. If a Bowtie and Bowtie 2 index are located in the same directory and share the same basename, <code>bowtie</code> will use the Bowtie 2 index.</p>
 </td>
 </tr>
 <tr>
@@ -243,7 +222,7 @@ T2302111203131231130300111123220
 <pre><code>&lt;m1&gt;</code></pre>
 </td>
 <td>
-<p>Comma-separated list of files containing the #1 mates (filename usually includes <code>_1</code>), or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, the mate sequences themselves. E.g., this might be <code>flyA_1.fq,flyB_1.fq</code>, or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Sequences specified with this option must correspond file-for-file and read-for-read with those specified in <code>&lt;m2&gt;</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, <code>bowtie</code> will read the #1 mates from the “standard in” filehandle.</p>
+<p>Comma-separated list of files containing the #1 mates (filename usually includes <code>_1</code>), or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, the mate sequences themselves. E.g., this might be <code>flyA_1.fq,flyB_1.fq</code>, or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Sequences specified with this option must correspond file-for-file and read-for-read with those specified in <code>&lt;m2&gt;</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, <code>bowtie</code> will read the #1 mates from the “standard in” filehandle.</p>
 </td>
 </tr>
 <tr>
@@ -251,7 +230,7 @@ T2302111203131231130300111123220
 <pre><code>&lt;m2&gt;</code></pre>
 </td>
 <td>
-<p>Comma-separated list of files containing the #2 mates (filename usually includes <code>_2</code>), or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, the mate sequences themselves. E.g., this might be <code>flyA_2.fq,flyB_2.fq</code>, or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Sequences specified with this option must correspond file-for-file and read-for-read with those specified in <code>&lt;m1&gt;</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, <code>bowtie</code> will read the #2 mates from the “standard in” filehandle.</p>
+<p>Comma-separated list of files containing the #2 mates (filename usually includes <code>_2</code>), or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, the mate sequences themselves. E.g., this might be <code>flyA_2.fq,flyB_2.fq</code>, or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Sequences specified with this option must correspond file-for-file and read-for-read with those specified in <code>&lt;m1&gt;</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, <code>bowtie</code> will read the #2 mates from the “standard in” filehandle.</p>
 </td>
 </tr>
 <tr>
@@ -259,7 +238,7 @@ T2302111203131231130300111123220
 <pre><code>&lt;r&gt;</code></pre>
 </td>
 <td>
-<p>Comma-separated list of files containing a mix of unpaired and paired-end reads in Tab-delimited format. Tab-delimited format is a 1-read-per-line format where unpaired reads consist of a read name, sequence and quality string each separated by tabs. A paired-end read consists of a read name, sequnce of the #1 mate, quality values of the #1 mate, sequence of the #2 mate, and quality values of the #2 mate separated by tabs. Quality values can be expressed using any of the scales supported in FASTQ files. Reads may be a mix of different lengths and paired-end and unpaired reads may be intermingled in the same file. If <code>-</code> is specified, <code>bowtie</code> will read the Tab-delimited reads from the “standard in” filehandle.</p>
+<p>Comma-separated list of files containing a mix of unpaired and paired-end reads in Tab-delimited format. Tab-delimited format is a 1-read-per-line format where unpaired reads consist of a read name, sequence and quality string each separated by tabs. A paired-end read consists of a read name, sequence of the #1 mate, quality values of the #1 mate, sequence of the #2 mate, and quality values of the #2 mate separated by tabs. Quality values can be expressed using any of the scales supported in FASTQ files. Reads may be a mix of different lengths and paired-end and unpaired reads may be intermingled in the same file. If <code>-</code> is specified, <code>bowtie</code> will read the Tab-delimited reads from the “standard in” filehandle.</p>
 </td>
 </tr>
 <tr>
@@ -275,7 +254,7 @@ T2302111203131231130300111123220
 <pre><code>&lt;s&gt;</code></pre>
 </td>
 <td>
-<p>A comma-separated list of files containing unpaired reads to be aligned, or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, the unpaired read sequences themselves. E.g., this might be <code>lane1.fq,lane2.fq,lane3.fq,lane4.fq</code>, or, if <a href="#bowtie-options-C"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, Bowtie gets the reads from the “standard in” filehandle.</p>
+<p>A comma-separated list of files containing unpaired reads to be aligned, or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, the unpaired read sequences themselves. E.g., this might be <code>lane1.fq,lane2.fq,lane3.fq,lane4.fq</code>, or, if <a href="#bowtie-options-c"><code>-c</code></a> is specified, this might be <code>GGTCATCCT,ACGGGTCGT</code>. Reads may be a mix of different lengths. If <code>-</code> is specified, Bowtie gets the reads from the “standard in” filehandle.</p>
 </td>
 </tr>
 <tr>
@@ -328,38 +307,6 @@ T2302111203131231130300111123220
 </td>
 <td>
 <p>The query sequences are given on command line. I.e. <code>&lt;m1&gt;</code>, <code>&lt;m2&gt;</code> and <code>&lt;singles&gt;</code> are comma-separated lists of reads rather than lists of read files.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-C">
-<pre><code>-C/--color</code></pre>
-</td>
-<td>
-<p>Align in colorspace. Read characters are interpreted as colors. The index specified must be a colorspace index (i.e. built with <code>bowtie-build</code> <a href="#bowtie-build-options-C"><code>-C</code></a>, or <code>bowtie</code> will print an error message and quit. See <a href="#colorspace-alignment">Colorspace alignment</a> for more details.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-Q">
-<pre><code>-Q/--quals &lt;files&gt;</code></pre>
-</td>
-<td>
-<p>Comma-separated list of files containing quality values for corresponding unpaired CSFASTA reads. Use in combination with <a href="#bowtie-options-C"><code>-C</code></a> and <a href="#bowtie-options-F"><code>-f</code></a>. <a href="#bowtie-options-integer-quals"><code>--integer-quals</code></a> is set automatically when <code>-Q</code>/<code>--quals</code> is specified.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-Q1">
-<pre><code>--Q1 &lt;files&gt;</code></pre>
-</td>
-<td>
-<p>Comma-separated list of files containing quality values for corresponding CSFASTA #1 mates. Use in combination with <a href="#bowtie-options-C"><code>-C</code></a>, <a href="#bowtie-options-F"><code>-f</code></a>, and <a href="#command-line"><code>-1</code></a>. <a href="#bowtie-options-integer-quals"><code>--integer-quals</code></a> is set automatically when <code>--Q1</code> is specified.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-Q2">
-<pre><code>--Q2 &lt;files&gt;</code></pre>
-</td>
-<td>
-<p>Comma-separated list of files containing quality values for corresponding CSFASTA #2 mates. Use in combination with <a href="#bowtie-options-C"><code>-C</code></a>, <a href="#bowtie-options-F"><code>-f</code></a>, and <a href="#command-line"><code>-2</code></a>. <a href="#bowtie-options-integer-quals"><code>--integer-quals</code></a> is set automatically when <code>--Q2</code> is specified.</p>
 </td>
 </tr>
 <tr>
@@ -506,7 +453,7 @@ T2302111203131231130300111123220
 <pre><code>--fr/--rf/--ff</code></pre>
 </td>
 <td>
-<p>The upstream/downstream mate orientations for a valid paired-end alignment against the forward reference strand. E.g., if <code>--fr</code> is specified and there is a candidate paired-end alignment where mate1 appears upstream of the reverse complement of mate2 and the insert length constraints are met, that alignment is valid. Also, if mate2 appears upstream of the reverse complement of mate1 and all other constraints are met, that too is valid. <code>--rf</code> likewise requires that an upstream mate1 be reverse-complemented and a downstream mate2 be forward-oriented. <code>--ff</code> requires both an upstream mate1 and a downstream mate2 to be forward-oriented. Default: <code>--fr</code> when <a href="#bowtie-options-C"><code>-C</code></a> (colorspace alignment) is not specified, <code>--ff</code> when <a href="#bowtie-options-C"><code>-C</code></a> is specified.</p>
+<p>The upstream/downstream mate orientations for a valid paired-end alignment against the forward reference strand. E.g., if <code>--fr</code> is specified and there is a candidate paired-end alignment where mate1 appears upstream of the reverse complement of mate2 and the insert length constraints are met, that alignment is valid. Also, if mate2 appears upstream of the reverse complement of mate1 and all other constraints are met, that too is valid. <code>--rf</code> likewise requires that an upstream mate1 be reverse-complemented and a downstream mate2 be forward-oriented. <code>--ff</code> requires both an upstream mate1 and a downstream mate2 to be forward-oriented.</p>
 </td>
 </tr>
 <tr>
@@ -688,50 +635,7 @@ T2302111203131231130300111123220
 <pre><code>--fullref</code></pre>
 </td>
 <td>
-<p>Print the full refernce sequence name, including whitespace, in alignment output. By default <code>bowtie</code> prints everything up to but not including the first whitespace.</p>
-</td>
-</tr>
-</table>
-<h4 id="colorspace">Colorspace</h4>
-<table>
-<tr>
-<td id="bowtie-options-snpphred">
-<pre><code>--snpphred &lt;int&gt;</code></pre>
-</td>
-<td>
-<p>When decoding colorspace alignments, use <code>&lt;int&gt;</code> as the SNP penalty. This should be set to the user’s best guess of the true ratio of SNPs per base in the subject genome, converted to the <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations">Phred quality</a> scale. E.g., if the user expects about 1 SNP every 1,000 positions, <code>--snpphred</code> should be set to 30 (which is also the default). To specify the fraction directly, use <a href="#bowtie-options-snpfrac"><code>--snpfrac</code></a>.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-snpfrac">
-<pre><code>--snpfrac &lt;dec&gt;</code></pre>
-</td>
-<td>
-<p>When decoding colorspace alignments, use <code>&lt;dec&gt;</code> as the estimated ratio of SNPs per base. For best decoding results, this should be set to the user’s best guess of the true ratio. <code>bowtie</code> internally converts the ratio to a <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations">Phred quality</a>, and behaves as if that quality had been set via the <a href="#bowtie-options-snpphred"><code>--snpphred</code></a> option. Default: 0.001.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-col-cseq">
-<pre><code>--col-cseq</code></pre>
-</td>
-<td>
-<p>If reads are in colorspace and the <a href="#default-bowtie-output">default output mode</a> is active, <code>--col-cseq</code> causes the reads’ color sequence to appear in the read-sequence column (column 5) instead of the decoded nucleotide sequence. See the <a href="#decoding-colorspace-alignments">Decoding colorspace alignments</a> section for details about decoding. This option is ignored in <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> mode.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-col-cqual">
-<pre><code>--col-cqual</code></pre>
-</td>
-<td>
-<p>If reads are in colorspace and the <a href="#default-bowtie-output">default output mode</a> is active, <code>--col-cqual</code> causes the reads’ original (color) quality sequence to appear in the quality column (column 6) instead of the decoded qualities. See the <a href="#colorspace-alignment">Colorspace alignment</a> section for details about decoding. This option is ignored in <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> mode.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-options-col-keepends">
-<pre><code>--col-keepends</code></pre>
-</td>
-<td>
-<p>When decoding colorpsace alignments, <code>bowtie</code> trims off a nucleotide and quality from the left and right edges of the alignment. This is because those nucleotides are supported by only one color, in contrast to the middle nucleotides which are supported by two. Specify <code>--col-keepends</code> to keep the extreme-end nucleotides and qualities.</p>
+<p>Print the full reference sequence name, including whitespace, in alignment output. By default <code>bowtie</code> prints everything up to but not including the first whitespace.</p>
 </td>
 </tr>
 </table>
@@ -801,7 +705,15 @@ T2302111203131231130300111123220
 <pre><code>-p/--threads &lt;int&gt;</code></pre>
 </td>
 <td>
-<p>Launch <code>&lt;int&gt;</code> parallel search threads (default: 1). Threads will run on separate processors/cores and synchronize when parsing reads and outputting alignments. Searching for alignments is highly parallel, and speedup is fairly close to linear. This option is only available if <code>bowtie</code> is linked with the <code>pthreads</code> library (i.e. if <code>BOWTIE_PTHREADS=0</code> is not specified at build time).</p>
+<p>Launch <code>&lt;int&gt;</code> parallel search threads (default: 1). Threads will run on separate processors/cores and synchronize when parsing reads and outputting alignments. Searching for alignments is highly parallel, and speedup is fairly close to linear.</p>
+</td>
+</tr>
+<tr>
+<td id="bowtie2-options-reorder">
+<pre><code>--reorder</code></pre>
+</td>
+<td>
+<p>Guarantees that output SAM records are printed in an order corresponding to the order of the reads in the original input file, even when <a href="#bowtie-options-p"><code>-p</code></a> is set greater than 1. Specifying <code>--reorder</code> and setting <a href="#bowtie-options-p"><code>-p</code></a> greater than 1 causes Bowtie to run somewhat slower than if <code>--reorder</code> were not specified. Has no effect if <a href="#bowtie-options-p"><code>-p</code></a> is set to 1, since output order will naturally correspond to input order in that case. It is an error to specify <code>--reorder</code> without the <a href="#bowtie-options-S"><code>-S</code></a> parameter. N.B. <code>--reorder</code> does not affect the outputs of <a href="#bowtie-options-al"><code>--al</code></a>/<a href="#bowtie-options-max"><code>--max</code></a>/<a href="#bowtie-options-un"><code>--un</code></a>.</p>
 </td>
 </tr>
 <tr>
@@ -817,7 +729,7 @@ T2302111203131231130300111123220
 <pre><code>--shmem</code></pre>
 </td>
 <td>
-<p>Use shared memory to load the index, rather than normal C file I/O. Using shared memory allows many concurrent bowtie processes on the same computer to share the same memory image of the index (i.e. you pay the memory overhead just once). This facilitates memory-efficient parallelization of <code>bowtie</code> in situations where using <a href="#bowtie-options-p"><code>-p</code></a> is not desirable. Unlike <a href="#bowtie-options-mm"><code>--mm</code></a>, <code>--shmem</code> installs the index into shared memory permanently, or until the user deletes the shared memory chunks manually. See your operating system documentation for details on how to manually list and remove shared memory chunks (on Linux and Mac OS X, these commands are <code>ipcs</code> and <code>ipcrm</code>). You may also need to increase your OS’s maximum shared-memory chunk size to accomodate larger indexes; see your OS documentation.</p>
+<p>Use shared memory to load the index, rather than normal C file I/O. Using shared memory allows many concurrent bowtie processes on the same computer to share the same memory image of the index (i.e. you pay the memory overhead just once). This facilitates memory-efficient parallelization of <code>bowtie</code> in situations where using <a href="#bowtie-options-p"><code>-p</code></a> is not desirable. Unlike <a href="#bowtie-options-mm"><code>--mm</code></a>, <code>--shmem</code> installs the index into shared memory permanently, or until the user deletes the shared memory chunks manually. See your operating system documentation for details on how to manually list and remove shared memory chunks (on Linux and Mac OS X, these commands are <code>ipcs</code> and <code>ipcrm</code>). You may also need to increase your OS’s maximum shared-memory chunk size to accommodate larger indexes; see your OS documentation.</p>
 </td>
 </tr>
 </table>
@@ -864,10 +776,8 @@ T2302111203131231130300111123220
 <li><p>Reference strand aligned to, <code>+</code> for forward strand, <code>-</code> for reverse</p></li>
 <li><p>Name of reference sequence where alignment occurs, or numeric ID if no name was provided</p></li>
 <li><p>0-based offset into the forward reference strand where leftmost character of the alignment occurs</p></li>
-<li><p>Read sequence (reverse-complemented if orientation is <code>-</code>).</p>
-<p>If the read was in colorspace, then the sequence shown in this column is the sequence of <em>decoded nucleotides</em>, not the original colors. See the <a href="#colorspace-alignment">Colorspace alignment</a> section for details about decoding. To display colors instead, use the <a href="#bowtie-options-col-cseq"><code>--col-cseq</code></a> option.</p></li>
-<li><p>ASCII-encoded read qualities (reversed if orientation is <code>-</code>). The encoded quality values are on the Phred scale and the encoding is ASCII-offset by 33 (ASCII char <code>!</code>).</p>
-<p>If the read was in colorspace, then the qualities shown in this column are the <em>decoded qualities</em>, not the original qualities. See the <a href="#colorspace-alignment">Colorspace alignment</a> section for details about decoding. To display colors instead, use the <a href="#bowtie-options-col-cqual"><code>--col-cqual</code></a> option.</p></li>
+<li><p>Read sequence (reverse-complemented if orientation is <code>-</code>).</p></li>
+<li><p>ASCII-encoded read qualities (reversed if orientation is <code>-</code>). The encoded quality values are on the Phred scale and the encoding is ASCII-offset by 33 (ASCII char <code>!</code>).</p></li>
 <li><p>If <a href="#bowtie-options-m"><code>-M</code></a> was specified and the prescribed ceiling was exceeded for this read, this column contains the value of the ceiling, indicating that at least that many valid alignments were found in addition to the one reported.</p>
 <p>Otherwise, this column contains the number of other instances where the same sequence aligned against the same reference characters as were aligned against in the reported alignment. This is <em>not</em> the number of other places the read aligns with the same number of mismatches. The number in this column is generally not a good proxy for that number (e.g., the number in this column may be ‘0’ while the number of other alignments with the same number of mismatches might be large).</p></li>
 <li><p>Comma-separated list of mismatch descriptors. If there are no mismatches in the alignment, this field is empty. A single descriptor has the format offset:reference-base&gt;read-base. The offset is expressed as a 0-based offset from the high-quality (5’) end of the read.</p></li>
@@ -875,7 +785,7 @@ T2302111203131231130300111123220
 <h2 id="sam-bowtie-output">SAM <code>bowtie</code> output</h2>
 <p>Following is a brief description of the <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format as output by <code>bowtie</code> when the <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> option is specified. For more details, see the <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM format specification</a>.</p>
 <p>When <a href="#bowtie-options-S"><code>-S</code>/<code>--sam</code></a> is specified, <code>bowtie</code> prints a SAM header with <code>@HD</code>, <code>@SQ</code> and <code>@PG</code> lines. When one or more <a href="#bowtie-options-sam-RG"><code>--sam-RG</code></a> arguments are specified, <code>bowtie</code> will also print an <code>@RG</code> line that includes all user-specified <a href="#bowtie-options-sam-RG"><code>--sam-RG</code></a> tokens separated by tabs.</p>
-<p>Each subsequnt line corresponds to a read or an alignment. Each line is a collection of at least 12 fields separated by tabs; from left to right, the fields are:</p>
+<p>Each subsequent line corresponds to a read or an alignment. Each line is a collection of at least 12 fields separated by tabs; from left to right, the fields are:</p>
 <ol type="1">
 <li><p>Name of read that aligned</p></li>
 <li><p>Sum of all applicable flags. Flags relevant to Bowtie are:</p>
@@ -960,26 +870,10 @@ T2302111203131231130300111123220
 <table>
 <tr>
 <td>
-<pre><code>    NM:i:&lt;N&gt;</code></pre>
-</td>
-<td>
-<p>Aligned read has an edit distance of <code>&lt;N&gt;</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<pre><code>    CM:i:&lt;N&gt;</code></pre>
-</td>
-<td>
-<p>Aligned read has an edit distance of <code>&lt;N&gt;</code> in colorspace. This field is present in addition to the <code>NM</code> field in <a href="#bowtie-options-C"><code>-C</code>/<code>--color</code></a> mode, but is omitted otherwise.</p>
-</td>
-</tr>
-<tr>
-<td>
 <pre><code>    MD:Z:&lt;S&gt;</code></pre>
 </td>
 <td>
-<p>For aligned reads, <code>&lt;S&gt;</code> is a string representation of the mismatched reference bases in the alignment. See <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format specification for details. For colorspace alignments, <code>&lt;S&gt;</code> describes the decoded <em>nucleotide</em> alignment, not the colorspace alignment.</p>
+<p>For aligned reads, <code>&lt;S&gt;</code> is a string representation of the mismatched reference bases in the alignment. See <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM</a> format specification for details.</p>
 </td>
 </tr>
 <tr>
@@ -995,7 +889,7 @@ T2302111203131231130300111123220
 <pre><code>    XM:i:&lt;N&gt;</code></pre>
 </td>
 <td>
-<p>For a read with no reported alignments, <code>&lt;N&gt;</code> is 0 if the read had no alignments. If <a href="#bowtie-options-m"><code>-m</code></a> was specified and the read’s alignments were supressed because the <a href="#bowtie-options-m"><code>-m</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-m</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (but all were suppressed). In <a href="#bowtie-options-m"><code>-M</code></a> mode, if the alignment was randomly selected because the <a href="#bowtie-options-m"><code>-M</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-M</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (of which one was reported at random).</p>
+<p>For a read with no reported alignments, <code>&lt;N&gt;</code> is 0 if the read had no alignments. If <a href="#bowtie-options-m"><code>-m</code></a> was specified and the read’s alignments were suppressed because the <a href="#bowtie-options-m"><code>-m</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-m</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (but all were suppressed). In <a href="#bowtie-options-m"><code>-M</code></a> mode, if the alignment was randomly selected because the <a href="#bowtie-options-m"><code>-M</code></a> ceiling was exceeded, <code>&lt;N&gt;</code> equals the <a href="#bowtie-options-m"><code>-M</code></a> ceiling + 1, to indicate that there were at least that many valid alignments (of which one was reported at random).</p>
 </td>
 </tr>
 </table>
@@ -1042,14 +936,6 @@ T2302111203131231130300111123220
 </td>
 <td>
 <p>The reference sequences are given on the command line. I.e. <code>&lt;reference_in&gt;</code> is a comma-separated list of sequences rather than a list of FASTA files.</p>
-</td>
-</tr>
-<tr>
-<td id="bowtie-build-options-C">
-<pre><code>-C/--color</code></pre>
-</td>
-<td>
-<p>Build a colorspace index, to be queried using <code>bowtie</code> <a href="#bowtie-options-C"><code>-C</code></a>.</p>
 </td>
 </tr>
 <tr>
@@ -1201,7 +1087,7 @@ T2302111203131231130300111123220
 <pre><code>&lt;ebwt_base&gt;</code></pre>
 </td>
 <td>
-<p>The basename of the index to be inspected. The basename is name of any of the index files but with the <code>.X.ebwt</code> or <code>.rev.X.ebwt</code> suffix omitted. <code>bowtie-inspect</code> first looks in the current directory for the index files, then looks in the <code>indexes</code> subdirectory under the directory where the currently-running <code>bowtie</code> executable is located, then looks in the directory specified in the <code>BOWTIE_INDEXES</code> environment variable.</p>
+<p>The basename of the Bowtie or Bowtie 2 index to be inspected. The basename is name of any of the index files but with the <code>.X.ebwt</code> / <code>.rev.X.ebwt</code> / <code>1.bt2</code>, etc, suffix omitted. <code>bowtie-inspect</code> first looks in the current directory for the index files, then looks in the <code>indexes</code> subdirectory under the directory where the currently-running <code>bowtie</code> executable is located, then looks in the directory specified in the <code>BOWTIE_INDEXES</code> environment variable. If a Bowtie and Bowtie 2 index are located in the same directory and share the same basename, <code>bowtie-inspect</code> will use the Bowtie 2 index.</p>
 </td>
 </tr>
 </table>
@@ -1229,8 +1115,7 @@ T2302111203131231130300111123220
 </td>
 <td>
 <p>Print a summary that includes information about index settings, as well as the names and lengths of the input sequences. The summary has this format:</p>
-<pre><code>Colorspace  &lt;0 or 1&gt;
-SA-Sample   1 in &lt;sample&gt;
+<pre><code>SA-Sample   1 in &lt;sample&gt;
 FTab-Chars  &lt;chars&gt;
 Sequence-1  &lt;name&gt;  &lt;len&gt;
 Sequence-2  &lt;name&gt;  &lt;len&gt;
@@ -1244,7 +1129,7 @@ Sequence-N  &lt;name&gt;  &lt;len&gt;</code></pre>
 <pre><code>-e/--ebwt-ref</code></pre>
 </td>
 <td>
-<p>By default, when <code>bowtie-inspect</code> is run without <a href="#bowtie-options-S"><code>-s</code></a> or <a href="#bowtie-options-n"><code>-n</code></a>, it recreates the reference nucleotide sequences using the bit-encoded reference nucleotides kept in the <code>.3.ebwt</code> and <code>.4.ebwt</code> index files. When <code>-e/--ebwt-ref</code> is specified, <code>bowtie-inspect</code> recreates the reference sequences from the Burrows-Wheeler-transformed reference sequence in the <code>.1.ebwt</code> file instead. The reference recreation process is much slower when <code>-e/--ebwt-ref</code> is specified. Also, when <code>-e/--ebwt-ref</code> is specified and the index is in colorspace, the reference is printed in colors (A=blue, C=green, G=orange, T=red).</p>
+<p>By default, when <code>bowtie-inspect</code> is run without <a href="#bowtie-options-S"><code>-s</code></a> or <a href="#bowtie-options-n"><code>-n</code></a>, it recreates the reference nucleotide sequences using the bit-encoded reference nucleotides kept in the <code>.3.ebwt</code> and <code>.4.ebwt</code> index files. When <code>-e/--ebwt-ref</code> is specified, <code>bowtie-inspect</code> recreates the reference sequences from the Burrows-Wheeler-transformed reference sequence in the <code>.1.ebwt</code> file instead. The reference recreation process is much slower when <code>-e/--ebwt-ref</code> is specified.</p>
 </td>
 </tr>
 <tr>

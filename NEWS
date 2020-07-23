@@ -24,7 +24,8 @@ Keep up with our releases on the GitHub releases page:
 Version Release History
 =======================
 
-Version 1.3.0 - Jul 12, 2020
+Version 1.3.0 - Jul 22, 2020
+
     * Fixed an issue causing `bowtie` to report incorrect results
       when using a Bowtie 2 index.
     * New, more efficient implementation of `--reorder` for keeping
@@ -43,8 +44,11 @@ Version 1.3.0 - Jul 12, 2020
       reads.
     * Removed dependence on some third-party libraries, simplifying
       the code and improving portability.
+    * Fix an issue preventing `bowtie` from running with many threads
+      on big-endian machines.
 
 Version 1.2.3 - Jul 5, 2019
+
     * Added support for reading and inspecting Bowtie 2 indexes.
       Bowtie 2 indexes can now be used with either Bowtie or Bowtie 2.
     * Added support for building an index from a gzipped-compressed

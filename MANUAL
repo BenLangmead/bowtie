@@ -8,8 +8,8 @@ large genomes. It aligns 35-base-pair reads to the human genome at a
 rate of 25 million reads per hour on a typical workstation. Bowtie
 indexes the genome with a [Burrows-Wheeler] index to keep its memory
 footprint small: for the human genome, the index is typically about
-2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end or colorspace
-alignment).  Multiple processors can be used simultaneously to achieve
+2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end alignment).
+Multiple processors can be used simultaneously to achieve
 greater alignment speed.  Bowtie can also output alignments in the
 standard [SAM] format, allowing Bowtie to interoperate with other tools
 supporting SAM, including the [SAMtools] consensus, SNP, and indel
@@ -76,22 +76,9 @@ directory, and run GNU `make` (usually with the command `make`, but
 sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
-To build Bowtie including support for the `bowtie` `-p`  and
-`bowtie-build` `--threads`
-multithreading options, we recommend that you first install the
-[Thread Building Blocks library], also known as TBB, the default
-threading library.  TBB is installed by default on many operating
-systems.
-
-If TBB is not available, then use the `NO_TBB=1` option.  On Linux or
-Mac OS X, this requires the pthreads library, which is installed by
-default.  On Windows, native Windows threads will be used, which require
-no special libraries.
-
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
-[Thread Building Blocks library]: https://www.threadingbuildingblocks.org
 [Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
 The `bowtie` aligner
@@ -414,127 +401,11 @@ in repetitive regions, but the user may use the `--pairtries` or
 Paired-end alignments where one mate's alignment is entirely contained
 within the other's are considered invalid.
 
-When colospace alignment is enabled via `-C`, the default setting for
-paired-end orientation is `--ff`.  This is because most SOLiD datasets
-have that orientation.  When colorspace alignment is not enabled
-(default), the default setting for orientation is `--fr`, since most
-Illumina datasets have this orientation.  The default can be overriden
-in either case.
-
 Because Bowtie uses an in-memory representation of the original
 reference string when finding paired-end alignments, its memory
 footprint is larger when aligning paired-end reads.  For example, the
 human index has a memory footprint of about 2.2 GB in single-end mode
-and 2.9 GB in paired-end mode.  Note that paired-end and unpaired
-alignment incur the same memory footprint in colorspace (e.g. human
-incurs about 2.9 GB)
-
-Colorspace Alignment
---------------------
-
-As of version 0.12.0, `bowtie` can align colorspace reads against a
-colorspace index when `-C` is specified.  Colorspace is the
-characteristic output format of Applied Biosystems' SOLiD system.  In a
-colorspace read, each character is a color rather than a nucleotide,
-where a color encodes a class of dinucleotides.  E.g. the color blue
-encodes any of the dinucleotides: AA, CC, GG, TT.  Colorspace has the
-advantage of (often) being able to distinguish sequencing errors from
-SNPs once the read has been aligned.  See ABI's [Principles of Di-Base
-Sequencing] document for details.
-
-  Colorspace reads
-
-All input formats (FASTA `-f`, FASTQ `-q`, raw `-r`, tab-delimited
-`--12`, command-line `-c`) are compatible with colorspace (`-C`).
-When `-C` is specified, read sequences are treated as colors.  Colors
-may be encoded either as numbers (`0`=blue, `1`=green, `2`=orange,
-`3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green, `G`=orange,
-`T`=red).
-
-Some reads include a primer base as the first character; e.g.:
-
-    >1_53_33_F3
-    T2213120002010301233221223311331
-    >1_53_70_F3
-    T2302111203131231130300111123220
-    ...
-
-Here, `T` is the primer base.  `bowtie` detects and handles primer
-bases properly (i.e., the primer base and the adjacent color are both
-trimmed away prior to alignment) as long as the rest of the read is
-encoded as numbers.
-
-`bowtie` also handles input in the form of parallel `.csfasta` and
-`_QV.qual` files.  Use `-f` to specify the `.csfasta` files and `-Q`
-(for unpaired reads) or `--Q1`/`--Q2` (for paired-end reads) to
-specify the corresponding `_QV.qual` files.  It is not necessary to
-first convert to FASTQ, though `bowtie` also handles FASTQ-formatted
-colorspace reads (with `-q`, the default).
-
-  Building a colorspace index
-
-A colorspace index is built in the same way as a normal index except
-that `-C` must be specified when running `bowtie-build`.  If the user
-attempts to use `bowtie` without `-C` to align against an index that
-was built with `-C` (or vice versa), `bowtie` prints an error message
-and quits.
-
-  Decoding colorspace alignments
-
-Once a colorspace read is aligned, Bowtie decodes the alignment into
-nucleotides and reports the decoded nucleotide sequence.  A principled
-decoding scheme is necessary because many different possible decodings
-are usually possible.  Finding the true decoding with 100% certainty
-requires knowing all variants (e.g. SNPs) in the subject's genome
-beforehand, which is usually not possible.  Instead, `bowtie` employs
-the approximate decoding scheme described in the [BWA paper].  This
-scheme attempts to distinguish variants from sequencing errors
-according to their relative likelihood under a model that considers the
-quality values of the colors and the (configurable) global likelihood
-of a SNP.
-
-Quality values are also "decoded" so that each reported quality value
-is a function of the two color qualities overlapping it.  Bowtie again
-adopts the scheme described in the [BWA paper], i.e., the decoded
-nucleotide quality is either the sum of the overlapping color qualities
-(when both overlapping colors correspond to bases that match in the
-alignment), the quality of the matching color minus the quality of the
-mismatching color, or 0 (when both overlapping colors correspond to
-mismatches).
-
-For accurate decoding, `--snpphred`/`--snpfrac` should be set according
-to the user's best guess of the SNP frequency in the subject.  The
-`--snpphred` parameter sets the SNP penalty directly (on the [Phred
-quality] scale), whereas `--snpfrac` allows the user to specify the
-fraction of sites expected to be SNPs; the fraction is then converted
-to a [Phred quality] internally.  For the purpose of decoding, the SNP
-fraction is defined in terms of SNPs per *haplotype* base.  Thus, if
-the genome is diploid, heterozygous SNPs have half the weight of
-homozygous SNPs
-
-Note that in `-S`/`--sam` mode, the decoded nucleotide sequence is
-printed for alignments, but the original color sequence (with `A`=blue,
-`C`=green, `G`=orange, `T`=red) is printed for unaligned reads without
-any reported alignments.  As always, the `--un`, `--max` and `--al`
-parameters print reads exactly as they appeared in the input file.
-
-  Paired-end colorspace alignment
-
-Like other platforms, SOLiD supports generation of paired-end reads.
-When colorspace alignment is enabled, the default paired-end
-orientation setting is `--ff`.  This is because most SOLiD datasets
-have that orientation.
-
-Note that SOLiD-generated read files can have "orphaned" mates; i.e.
-mates without a correpsondingly-named mate in the other file.  To avoid
-problems due to orphaned mates, SOLiD paired-end output should first be
-converted to `.csfastq` files with unpaired mates omitted.  This can be
-accomplished using, for example, [Galaxy]'s conversion tool (click
-"NGS: QC and manipulation", then "SOLiD-to-FASTQ" in the left-hand
-sidebar).
-
-[Principles of Di-Base Sequencing]: http://tinyurl.com/ygnb2gn
-[BWA paper]: http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754
+and 2.9 GB in paired-end mode.
 
 Wrapper scripts
 ---------------
@@ -543,7 +414,7 @@ The `bowtie`, `bowtie-build` and `bowtie-inspect` executables are
 actually wrapper scripts that call binary programs as appropriate. The
 wrappers shield users from having to distinguish between "small" and
 "large" index formats, discussed briefly in the following section. The
-appropiate index type is selected based on the input size.
+appropriate index type is selected based on the input size.
 
 It is recommended that you always run the bowtie wrappers and not run
 the binaries directly.
@@ -616,18 +487,21 @@ Command Line
 
 Usage:
 
-    bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]
+    bowtie [options]* -x <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]
 
   Main arguments
 
-    <ebwt>
+    -x <ebwt>
 
-The basename of the index to be searched.  The basename is the name of
-any of the index files up to but not including the final `.1.ebwt` /
-`.rev.1.ebwt` / etc.  `bowtie` looks for the specified index first in
-the current directory, then in the `indexes` subdirectory under the
-directory where the `bowtie` executable is located, then looks in the
-directory specified in the `BOWTIE_INDEXES` environment variable.
+The basename of the Bowtie, or Bowtie 2, index to be searched. The
+basename is the name of any of the index files up to but not including
+the final `.1.ebwt` / `.rev.1.ebwt` / `1.bt2` / etc.  `bowtie` looks
+for the specified index first in the current directory, then in the
+`indexes` subdirectory under the directory where the `bowtie`
+executable is located, then looks in the directory specified in the
+`BOWTIE_INDEXES` environment variable. If a Bowtie and Bowtie 2
+index are located in the same directory and share the same basename,
+`bowtie` will use the Bowtie 2 index.
 
     <m1>
 
@@ -657,7 +531,7 @@ Comma-separated list of files containing a mix of unpaired and
 paired-end reads in Tab-delimited format.  Tab-delimited format is a
 1-read-per-line format where unpaired reads consist of a read name,
 sequence and quality string each separated by tabs.  A paired-end read
-consists of a read name, sequnce of the #1 mate, quality values of the
+consists of a read name, sequence of the #1 mate, quality values of the
 #1 mate, sequence of the #2 mate, and quality values of the #2 mate
 separated by tabs.  Quality values can be expressed using any of the
 scales supported in FASTQ files.  Reads may be a mix of different
@@ -729,34 +603,6 @@ scale.
 The query sequences are given on command line.  I.e. `<m1>`, `<m2>` and
 `<singles>` are comma-separated lists of reads rather than lists of
 read files.
-
-    -C/--color
-
-Align in colorspace.  Read characters are interpreted as colors.  The
-index specified must be a colorspace index (i.e. built with
-`bowtie-build` `-C`, or `bowtie` will print an error message and quit.
-See [Colorspace alignment] for more details.
-
-    -Q/--quals <files>
-
-Comma-separated list of files containing quality values for
-corresponding unpaired CSFASTA reads.  Use in combination with `-C`
-and `-f`.  `--integer-quals` is set automatically when `-Q`/`--quals`
-is specified.
-
-    --Q1 <files>
-
-Comma-separated list of files containing quality values for
-corresponding CSFASTA #1 mates.  Use in combination with `-C`, `-f`,
-and `-1`.  `--integer-quals` is set automatically when `--Q1`
-is specified.
-
-    --Q2 <files>
-
-Comma-separated list of files containing quality values for
-corresponding CSFASTA #2 mates.  Use in combination with `-C`, `-f`,
-and `-2`.  `--integer-quals` is set automatically when `--Q2`
-is specified.
 
     -s/--skip <int>
 
@@ -883,8 +729,7 @@ appears upstream of the reverse complement of mate1 and all other
 constraints are met, that too is valid.  `--rf` likewise requires that
 an upstream mate1 be reverse-complemented and a downstream mate2 be
 forward-oriented. ` --ff` requires both an upstream mate1 and a
-downstream mate2 to be forward-oriented.  Default: `--fr` when `-C`
-(colorspace alignment) is not specified, `--ff` when `-C` is specified.
+downstream mate2 to be forward-oriented.
 
     --allow-contain
 
@@ -1107,52 +952,9 @@ descriptions.  This option is ignored if the output mode is
 
     --fullref
 
-Print the full refernce sequence name, including whitespace, in
+Print the full reference sequence name, including whitespace, in
 alignment output.  By default `bowtie` prints everything up to but not
 including the first whitespace.
-
-    Colorspace
-
-    --snpphred <int>
-
-When decoding colorspace alignments, use `<int>` as the SNP penalty.
-This should be set to the user's best guess of the true ratio of SNPs
-per base in the subject genome, converted to the [Phred quality] scale.
-E.g., if the user expects about 1 SNP every 1,000 positions,
-`--snpphred` should be set to 30 (which is also the default).  To
-specify the fraction directly, use `--snpfrac`.
-
-    --snpfrac <dec>
-
-When decoding colorspace alignments, use `<dec>` as the estimated ratio
-of SNPs per base.  For best decoding results, this should be set to the
-user's best guess of the true ratio.  `bowtie` internally converts the
-ratio to a [Phred quality], and behaves as if that quality had been set
-via the `--snpphred` option.  Default: 0.001.
-
-    --col-cseq
-
-If reads are in colorspace and the [default output mode] is active,
-`--col-cseq` causes the reads' color sequence to appear in the
-read-sequence column (column 5) instead of the decoded nucleotide
-sequence.  See the [Decoding colorspace alignments] section for details
-about decoding.  This option is ignored in `-S`/`--sam` mode.
-
-    --col-cqual
-
-If reads are in colorspace and the [default output mode] is active,
-`--col-cqual` causes the reads' original (color) quality sequence to
-appear in the quality column (column 6) instead of the decoded
-qualities.  See the [Colorspace alignment] section for details about
-decoding.  This option is ignored in `-S`/`--sam` mode.
-
-    --col-keepends
-
-When decoding colorpsace alignments, `bowtie` trims off a nucleotide
-and quality from the left and right edges of the alignment.  This is
-because those nucleotides are supported by only one color, in contrast
-to the middle nucleotides which are supported by two.  Specify
-`--col-keepends` to keep the extreme-end nucleotides and qualities.
 
     SAM
 
@@ -1214,9 +1016,17 @@ index.
 Launch `<int>` parallel search threads (default: 1).  Threads will run
 on separate processors/cores and synchronize when parsing reads and
 outputting alignments.  Searching for alignments is highly parallel,
-and speedup is fairly close to linear.  This option is only available
-if `bowtie` is linked with the `pthreads` library (i.e. if
-`BOWTIE_PTHREADS=0` is not specified at build time).
+and speedup is fairly close to linear.
+
+    --reorder
+
+Guarantees that output SAM records are printed in an order corresponding to the
+order of the reads in the original input file, even when `-p` is set greater
+than 1.  Specifying `--reorder` and setting `-p` greater than 1 causes Bowtie
+to run somewhat slower than if `--reorder` were not specified.  Has no effect if
+`-p` is set to 1, since output order will naturally correspond to input order
+in that case. It is an error to specify `--reorder` without the `-S` parameter.
+N.B. `--reorder` does not affect the outputs of `--al`/`--max`/`--un`.
 
     --mm
 
@@ -1239,7 +1049,7 @@ memory permanently, or until the user deletes the shared memory chunks
 manually.  See your operating system documentation for details on how
 to manually list and remove shared memory chunks (on Linux and Mac OS
 X, these commands are `ipcs` and `ipcrm`).  You may also need to
-increase your OS's maximum shared-memory chunk size to accomodate
+increase your OS's maximum shared-memory chunk size to accommodate
 larger indexes; see your OS documentation.
 
     Other
@@ -1284,19 +1094,9 @@ Default `bowtie` output
 
 5.  Read sequence (reverse-complemented if orientation is `-`).
 
-    If the read was in colorspace, then the sequence shown in this
-    column is the sequence of *decoded nucleotides*, not the original
-    colors.  See the [Colorspace alignment] section for details about
-    decoding.  To display colors instead, use the `--col-cseq` option.
-
 6.  ASCII-encoded read qualities (reversed if orientation is `-`).  The
     encoded quality values are on the Phred scale and the encoding is
     ASCII-offset by 33 (ASCII char `!`).
-
-    If the read was in colorspace, then the qualities shown in this
-    column are the *decoded qualities*, not the original qualities.
-    See the [Colorspace alignment] section for details about decoding.
-    To display colors instead, use the `--col-cqual` option.
 
 7.  If `-M` was specified and the prescribed ceiling was exceeded for
     this read, this column contains the value of the ceiling,
@@ -1330,7 +1130,7 @@ When `-S`/`--sam` is specified, `bowtie` prints a SAM header with
 are specified, `bowtie` will also print an `@RG` line that includes all
 user-specified `--sam-RG` tokens separated by tabs.
 
-Each subsequnt line corresponds to a read or an alignment.  Each line
+Each subsequent line corresponds to a read or an alignment.  Each line
 is a collection of at least 12 fields separated by tabs; from left to
 right, the fields are:
 
@@ -1409,23 +1209,11 @@ right, the fields are:
     `bowtie` outputs some of these optional fields for each alignment,
     depending on the type of the alignment:
 
-        NM:i:<N>
-
-Aligned read has an edit distance of `<N>`.
-
-        CM:i:<N>
-
-Aligned read has an edit distance of `<N>` in colorspace.  This
-field is present in addition to the `NM` field in `-C`/`--color`
-mode, but is omitted otherwise.
-
         MD:Z:<S>
 
 For aligned reads, `<S>` is a string representation of the
 mismatched reference bases in the alignment.  See [SAM] format
-specification for details.  For colorspace alignments, `<S>`
-describes the decoded *nucleotide* alignment, not the colorspace
-alignment.
+specification for details.
 
         XA:i:<N>
 
@@ -1435,7 +1223,7 @@ Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
 For a read with no reported alignments, `<N>` is 0 if the read had
 no alignments.  If `-m` was specified and the read's alignments
-were supressed because the `-m` ceiling was exceeded, `<N>` equals
+were suppressed because the `-m` ceiling was exceeded, `<N>` equals
 the `-m` ceiling + 1, to indicate that there were at least that
 many valid alignments (but all were suppressed).  In `-M` mode, if
 the alignment was randomly selected because the `-M` ceiling was
@@ -1519,10 +1307,6 @@ files (usually having extension `.fa`, `.mfa`, `.fna` or similar).
 The reference sequences are given on the command line.  I.e.
 `<reference_in>` is a comma-separated list of sequences rather than a
 list of FASTA files.
-
-    -C/--color
-
-Build a colorspace index, to be queried using `bowtie` `-C`.
 
     -a/--noauto
 
@@ -1660,13 +1444,16 @@ Usage:
 
     <ebwt_base>
 
-The basename of the index to be inspected.  The basename is name of any
-of the index files but with the `.X.ebwt` or `.rev.X.ebwt` suffix
-omitted.  `bowtie-inspect` first looks in the current directory for the
-index files, then looks in the `indexes` subdirectory under the
-directory where the currently-running `bowtie` executable is located,
-then looks in the directory specified in the `BOWTIE_INDEXES`
-environment variable.
+The basename of the Bowtie or Bowtie 2 index to be inspected.  The
+basename is name of any of the index files but with the `.X.ebwt`
+/ `.rev.X.ebwt` / `1.bt2`, etc,  suffix omitted.  `bowtie-inspect`
+first looks in the current directory for the index files, then looks
+in the `indexes` subdirectory under the directory where the
+currently-running `bowtie` executable is located, then looks in the
+directory specified in the `BOWTIE_INDEXES` environment variable.
+If a Bowtie and Bowtie 2 index are located in the same directory
+and share the same basename, `bowtie-inspect` will use the Bowtie
+2 index.
 
   Options
 
@@ -1685,7 +1472,6 @@ Print a summary that includes information about index settings, as well
 as the names and lengths of the input sequences.  The summary has this
 format:
 
-    Colorspace	<0 or 1>
     SA-Sample	1 in <sample>
     FTab-Chars	<chars>
     Sequence-1	<name>	<len>
@@ -1703,9 +1489,7 @@ reference nucleotides kept in the `.3.ebwt` and `.4.ebwt` index files.
 When `-e/--ebwt-ref` is specified, `bowtie-inspect` recreates the
 reference sequences from the Burrows-Wheeler-transformed reference
 sequence in the `.1.ebwt` file instead.  The reference recreation
-process is much slower when `-e/--ebwt-ref` is specified.  Also, when
-`-e/--ebwt-ref` is specified and the index is in colorspace, the
-reference is printed in colors (A=blue, C=green, G=orange, T=red).
+process is much slower when `-e/--ebwt-ref` is specified.
 
     -v/--verbose
 
