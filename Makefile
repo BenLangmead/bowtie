@@ -410,6 +410,7 @@ doc: doc/manual.html MANUAL
 doc/manual.html: MANUAL.markdown
 	echo "<h1>Table of Contents</h1>" > .tmp.head
 	pandoc -B .tmp.head \
+	       --ascii \
 	       --css style.css -o $@ \
 	       --from markdown --to HTML \
 	       --metadata title:"Bowtie Manual" \

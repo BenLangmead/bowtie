@@ -1427,7 +1427,7 @@ on separate processors/cores and synchronize when parsing reads and
 outputting alignments.  Searching for alignments is highly parallel,
 and speedup is fairly close to linear.
 
-</td></tr><tr><td id="bowtie2-options-reorder">
+</td></tr><tr><td id="bowtie-options-reorder">
 
 [`--reorder`]: #bowtie-options-reorder
 
