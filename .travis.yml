@@ -11,6 +11,7 @@ matrix:
     - os: linux
       language: python
       python: "3.4"
+      dist: xenial
       addons:
         apt:
           sources:
