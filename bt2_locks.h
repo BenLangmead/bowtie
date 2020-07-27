@@ -12,13 +12,17 @@
 class cpu_backoff {
 public:
 	cpu_backoff(): count(1) {}
-	void pause() {
+	inline void pause() {
 		if (count <= LOOPS_BEFORE_YIELD) {
 			for (int32_t i = 0; i < count; i++) {
 #ifdef __aarch64__
 				__asm__ __volatile__("yield" ::: "memory");
-#else
+#elif __ppc__
+				__asm__ __volatile__("or 27,27,27" ::: "memory");
+#elif __x86_64__
 				__asm__ __volatile__("pause;");
+#else
+				// do nothing
 #endif
 			}
 			count *= 2;
