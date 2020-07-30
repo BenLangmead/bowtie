@@ -21,7 +21,6 @@
 
 
 import os
-import imp
 import inspect
 from importlib.machinery import SourceFileLoader
 import logging
