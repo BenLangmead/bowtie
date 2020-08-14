@@ -325,7 +325,6 @@
       <li style="font-size: x-small; line-height: 130%">Langmead B. <a href="https://doi.org/10.1002/0471250953.bi1107s32"><b>Aligning Short Sequencing Reads with Bowtie</b></a>. <i><a href="https://currentprotocols.onlinelibrary.wiley.com/journal/1934340x">Current Protocols in Bioinformatics</a></i> Vol 32, Iss 1, 2010, pp 11.7.1-11.7.14.
       <br/><br/>
       <li style="font-size: x-small; line-height: 130%">Langmead B, Wilks C, Antonescu V, Charles R. <a href="https://doi.org/10.1093/bioinformatics/bty648"><b>Scaling read aligners to hundreds of threads on general-purpose processors</b></a>. <i><a href="https://academic.oup.com/bioinformatics">Bioinformatics</a></i> Vol 35, Iss 3, 2019, pp 421–432.
-      <br/><br/>
     </ul>
   </div>
   <h2>Contributors</h2>
