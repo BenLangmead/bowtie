@@ -37,6 +37,8 @@
     <ul>
       <li><a href="https://github.com/BenLangmead/bowtie">Bowtie GitHub repository</a></li>
       <li><a href="https://github.com/BenLangmead/bowtie/issues">Report an issue</a></li>
+      <li><a href="http://bowtie-bio.sourceforge.net/bowtie2">Bowtie 2</a></li>
+      <li><a href="http://scholar.google.com/scholar?cites=9743535340779752835&as_sdt=20000005&sciodt=0,21&hl=en">Papers citing Bowtie</a></li>
     </ul>
   </div>
   <h2><u>Pre-built indexes</u></h2>
@@ -65,7 +67,11 @@
             <a href="https://genome-idx.s3.amazonaws.com/bt/grch38_1kgmaj.zip"><i>H. sapiens</i>, GRCh38 + major SNVs</a>
         </td>
         <td align="right">
-            NCBI+1KG<sup>1</sup>
+            NCBI+1KG
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="font-size: x-small">&nbsp;&nbsp;<a href="https://github.com/BenLangmead/bowtie-majref">How we built this</a>, <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/grch38_1kgmaj.fa.gz">FASTA</a>
         </td>
       </tr>
 
@@ -83,7 +89,7 @@
             <a href="https://genome-idx.s3.amazonaws.com/bt/Ash1v1.7.zip"><i>H. sapiens</i>, Ash1.7</a>
         </td>
         <td align="right">
-            JHU <sup>2</sup>
+            JHU
         </td>
       </tr>
 
@@ -311,12 +317,12 @@
     <p style="font-size: x-small; line-height: 130%">
     We no longer link to the colorspace indexes, but they are still available at the <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/">old FTP site</a>.</p>
   </div>
-  <h2>Publication</h2>
+  <h2>Publications</h2>
   <div class="box">
     <ul>
       <li style="font-size: x-small; line-height: 130%">Langmead B, Trapnell C, Pop M, Salzberg SL. <a href="https://doi.org/10.1186/gb-2009-10-3-r25"><b>Ultrafast and memory-efficient alignment of short DNA sequences to the human genome</b></a>. <i><a href="http://genomebiology.com">Genome Biology</a></i> <b>10</b>:R25.
       <br/><br/>
-      <li style="font-size: x-small; line-height: 130%">Langmead B<a href="https://doi.org/10.1002/0471250953.bi1107s32"><b>Aligning Short Sequencing Reads with Bowtie</b></a>. <i><a href="https://currentprotocols.onlinelibrary.wiley.com/journal/1934340x">Current Protocols in Bioinformatics</a></i> Vol 32, Iss 1, 2010, pp 11.7.1-11.7.14.
+      <li style="font-size: x-small; line-height: 130%">Langmead B. <a href="https://doi.org/10.1002/0471250953.bi1107s32"><b>Aligning Short Sequencing Reads with Bowtie</b></a>. <i><a href="https://currentprotocols.onlinelibrary.wiley.com/journal/1934340x">Current Protocols in Bioinformatics</a></i> Vol 32, Iss 1, 2010, pp 11.7.1-11.7.14.
       <br/><br/>
       <li style="font-size: x-small; line-height: 130%">Langmead B, Wilks C, Antonescu V, Charles R. <a href="https://doi.org/10.1093/bioinformatics/bty648"><b>Scaling read aligners to hundreds of threads on general-purpose processors</b></a>. <i><a href="https://academic.oup.com/bioinformatics">Bioinformatics</a></i> Vol 35, Iss 3, 2019, pp 421–432.
       <br/><br/>
@@ -332,15 +338,6 @@
       <li>Chris Wilks</li>
       <li>Nae-Chyun Chen</li>
       <li>Valentin Antonescu</li>
-    </ul>
-  </div>
-  <h2>Related links</h2>
-  <div class="box">
-    <ul>
-      <li><a href="http://bowtie-bio.sourceforge.net/bowtie2">Bowtie 2</a></li>
-      <li><a href="http://scholar.google.com/scholar?cites=9743535340779752835&as_sdt=20000005&sciodt=0,21&hl=en">Papers citing Bowtie</a></li>
-      <li><a href="http://www.jhu.edu/">Johns Hopkins University</a></li>
-      <li><a href="http://www.cs.jhu.edu/">JHU Computer Science</a></li>
     </ul>
   </div>
 </div> <!-- End of "rightside" -->
