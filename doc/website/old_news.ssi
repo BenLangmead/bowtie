@@ -1,3 +1,15 @@
+<h2>1.1.2 - 6/23/2015</h2>
+<ul>
+   <li>  Fixed the building process for Mac OS X Yosemite.</li>
+   <li>  Added <tt>install</tt> target (<tt>make install</tt>) for Linux to better aid package building process and the overall installation process.</li>
+   <li>  Added support for Intel TBB threading, providing better thread scaling in most situations. The default build still uses <a href="http://tinythreadpp.bitsnbites.eu">TinyThread</a> but TBB is used with <tt>make WITH_TBB=1</tt>.</li>
+   <li>  Fixed minor issue related with managing the number of threads spawned.</li>
+   <li>  Fixed minor issue which may have caused a memory leak after an exception was thrown.</li>
+   <li>  Fixed bug that caused bowtie to crash if a read was trimmed more than the read's length on 5' end.</li>
+   <li>  Added minor corrections/addition to the manual.</li>
+   <li>  Fixed bug that caused the wrapper to incorrectly identify the bowtie binary.</li>
+</ul>
+
 <h2>Lighter released</h2>
 <ul>
    <li>Lighter is an extremely fast and memory-efficient program for correcting sequencing errors in DNA sequencing data.  For details on how error correction can help improve the speed and accuracy of downstream analysis tools, see the <a href="http://genomebiology.com/2014/15/11/509">paper in Genome Biology</a>.  Source and software <a href="https://github.com/mourisl/Lighter">available at GitHub</a>.
