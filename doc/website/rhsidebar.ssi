@@ -122,6 +122,15 @@
 
       <tr>
         <td>
+            <a href="https://genome-idx.s3.amazonaws.com/bt/GRCm39.zip"><i>M. Musculus</i>, GRCm39</a>
+        </td>
+        <td align="right">
+            NCBI
+        </td>
+      </tr>
+
+      <tr>
+        <td>
             <a href="https://genome-idx.s3.amazonaws.com/bt/mm10.zip"><i>M. Musculus</i>, mm10</a>
         </td>
         <td align="right">
@@ -194,6 +203,15 @@
 
       <tr>
         <td>
+            <a href="https://genome-idx.s3.amazonaws.com/bt/canfam4.zip"><i>C. familiaris</i>, CanFam4</a>
+        </td>
+        <td align="right">
+            Ensembl
+        </td>
+      </tr>
+
+      <tr>
+        <td>
             <a href="https://genome-idx.s3.amazonaws.com/bt/rn4.zip"><i>R. norvegicus</i>, rn4</a>
         </td>
         <td align="right">
@@ -252,6 +270,15 @@
         </td>
         <td align="right">
             Ensembl
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+            <a href="https://genome-idx.s3.amazonaws.com/bt/Zm-B73-REFERENCE-NAM-5.0.zip"><i>Z. mays</i>, B73 RefGenV5</a>
+        </td>
+        <td align="right">
+            NCBI
         </td>
       </tr>
 
