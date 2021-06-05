@@ -1,3 +1,12 @@
+<h2>LevioSAM paper and indel-aware major allele references - June 4, 2021</h2>
+<ul>
+    <li>The <a href="https://doi.org/10.1093/bioinformatics/btab396">levioSAM paper</a> is out in the journal <em>Bioinformatics</em>
+    <li>LevioSAM is a tool that rapidly "lifts" alignments between reference genomes related through a VCF file.
+    <li>LevioSAM makes it easy to align to one reference with Bowtie (or other aligner), then immediately translate the alignments to a different coordinate system
+    <li>As a demonstration, we are adding new major-allele versions of human references (GRCh38 and h19) that contain both major-allele SNVs and major-allele (small) indels.  Because they include indels, these are more comprehensive than the SNV-only major-allele reference we released previously.  LevioSAM provides the ability to translate the alignments back to the original (indel-less) references immediately after.  These are in the "Indexes" sidebar on the right.
+    <li>Detailed instructions on using levioSAM+Bowtie in this context are available in the <a href="https://github.com/alshai/levioSAM">levioSAM repo</a> <a href="https://github.com/alshai/levioSAM/blob/master/README.md">README.md</a>
+</ul>
+
 <h2>1.3.0 - 07/22/2020</h2>
 <ul>
     <li>Fixed an issue causing <code>bowtie</code> to report incorrect results when using a Bowtie 2 index.</li>
@@ -81,16 +90,4 @@ these libraries be pre-installed.</p>
     <li>Unnecessary thread synchronization removed</li>
     <li>Fixed colorspace parsing when primer base is present</li>
     <li>Fixed bugs related to <tt><a href="manual.shtml#bowtie-options-s">--skip</a></tt> command line option</li>
-</ul>
-
-<h2>1.1.2 - 6/23/2015</h2>
-<ul>
-   <li>  Fixed the building process for Mac OS X Yosemite.</li>
-   <li>  Added <tt>install</tt> target (<tt>make install</tt>) for Linux to better aid package building process and the overall installation process.</li>
-   <li>  Added support for Intel TBB threading, providing better thread scaling in most situations. The default build still uses <a href="http://tinythreadpp.bitsnbites.eu">TinyThread</a> but TBB is used with <tt>make WITH_TBB=1</tt>.</li>
-   <li>  Fixed minor issue related with managing the number of threads spawned.</li>
-   <li>  Fixed minor issue which may have caused a memory leak after an exception was thrown.</li>
-   <li>  Fixed bug that caused bowtie to crash if a read was trimmed more than the read's length on 5' end.</li>
-   <li>  Added minor corrections/addition to the manual.</li>
-   <li>  Fixed bug that caused the wrapper to incorrectly identify the bowtie binary.</li>
 </ul>
