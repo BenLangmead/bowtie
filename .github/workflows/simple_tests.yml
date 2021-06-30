@@ -1,0 +1,54 @@
+name: Run bowtie simple tests on Ubuntu and MacOS
+on:
+  push:
+    branches:
+      - 'bug_fixes'
+      - 'master'
+    paths:
+      - '**.c'
+      - '**.h'
+      - '**.cpp'
+      - 'bowtie'
+      - 'bowtie-build'
+      - 'bowtie-inspect'
+      - 'Makefile'
+      - 'scripts/test/**'
+  pull_request:
+    branches:
+      - 'master'
+    paths:
+      - '**.c'
+      - '**.h'
+      - '**.cpp'
+      - 'bowtie'
+      - 'bowtie-build'
+      - 'bowtie-inspect'
+      - 'Makefile'
+      - 'scripts/test/**'
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+      - name: Install zlib development files
+        run: |
+          sudo apt-get update
+          sudo apt-get install zlib1g-dev
+  linux:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run simple tests
+        run: |
+          make allall
+          make simple-test
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run simple tests
+        run: |
+          make allall
+          make simple-test
