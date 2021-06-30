@@ -7,7 +7,7 @@ bindir = $(prefix)/bin
 
 ARCH = $(shell uname -m)
 INC = $(if $(RELEASE_BUILD),-I$(CURDIR)/.include) -I third_party
-LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz
+LIBS = $(LDFLAGS) $(if $(RELEASE_BUILD),-L$(CURDIR)/.lib) -lz -lpthread
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -65,25 +65,9 @@ SHMEM_DEF =
 ifeq (1,$(BOWTIE_SHARED_MEM))
     SHMEM_DEF = -DBOWTIE_SHARED_MEM
 endif
-PTHREAD_PKG =
-PTHREAD_LIB =
-PTHREAD_DEF =
 
 ifeq (1,$(MINGW))
-	PTHREAD_LIB = 
 	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
-else
-    PTHREAD_LIB = -lpthread
-endif
-
-ifeq (1,$(NO_SPINLOCK))
-	override EXTRA_FLAGS += -DNO_SPINLOCK
-endif
-
-
-LIBS += $(PTHREAD_LIB)
-ifeq (1, $(WITH_TBBMALLOC))
-	LIBS += -ltbbmalloc
 endif
 
 POPCNT_CAPABILITY ?= 1
@@ -113,15 +97,14 @@ ifeq (1,$(WITH_THREAD_PROFILING))
 endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
-             edit.cpp ebwt.cpp
-
-ifneq (1, $(NO_SPINLOCK))
-	OTHER_CPPS += bt2_locks.cpp
-endif
+             edit.cpp ebwt.cpp bt2_locks.cpp
 
 ifeq (1,$(WITH_QUEUELOCK))
-	OTHER_CPPS += bt2_locks.cpp
-	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
+	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1 -DNO_SPINLOCK
+endif
+
+ifeq (1, $(NO_SPINLOCK))
+	EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
 ifeq (1,$(WITH_FINE_TIMER))
@@ -232,9 +215,9 @@ DEFS=-fno-strict-aliasing \
      $(MM_DEF) \
      $(SHMEM_DEF)
 
-ALL_FLAGS = $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
-DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(ALL_FLAGS)\""
-RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
+# ALL_FLAGS = "$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)"
+DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)\""
+RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)\""
 
 #
 # bowtie-build targets
