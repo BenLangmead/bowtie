@@ -47,7 +47,7 @@ char* itoa10(const T& value, char* result) {
 	// Only apply negative sign for base 10
 	if(std::numeric_limits<T>::is_signed) {
 		// Avoid compiler warning in cases where T is unsigned
-		if (value <= 0 && value != 0) *out++ = '-';
+		if (value < 0) *out++ = '-';
 	}
 	std::reverse( result, out );
 	*out = 0; // terminator
