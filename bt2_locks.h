@@ -12,13 +12,17 @@
 class cpu_backoff {
 public:
 	cpu_backoff(): count(1) {}
-	void pause() {
+	inline void pause() {
 		if (count <= LOOPS_BEFORE_YIELD) {
 			for (int32_t i = 0; i < count; i++) {
 #ifdef __aarch64__
 				__asm__ __volatile__("yield" ::: "memory");
-#else
+#elif __ppc__
+				__asm__ __volatile__("or 27,27,27" ::: "memory");
+#elif __x86_64__
 				__asm__ __volatile__("pause;");
+#else
+				// do nothing
 #endif
 			}
 			count *= 2;
@@ -44,27 +48,27 @@ class mcs_lock {
 public:
 	mcs_lock(): q(nullptr) {}
         struct mcs_node {
-		mcs_node *next;
+		std::atomic<mcs_node *> next;
 		std::atomic_bool unlocked;
         };
 
-	void lock();
-	void unlock();
-	typedef mcs_node* mcs_node_ptr;
+	void lock(mcs_node &node);
+	void unlock(mcs_node &node);
+	typedef std::atomic<mcs_node *> mcs_node_ptr;
 private:
-	void spin_while_eq(const volatile mcs_node_ptr& value, mcs_node *expected) {
+	void spin_while_eq(const volatile mcs_node_ptr& value, const volatile mcs_node *expected) {
 		cpu_backoff backoff;
-		while (value == expected)
+		while (value.load(std::memory_order_acquire) == expected)
 			backoff.pause();
 	}
 
-	void spin_while_eq(const volatile std::atomic_bool& value, bool expected) {
+	void spin_while_eq(const volatile std::atomic_bool& value, const volatile bool expected) {
 	 	cpu_backoff backoff;
 	 	while (value.load(std::memory_order_acquire) == expected)
 	 		backoff.pause();
 	}
         std::atomic<mcs_node *> q;
-        static thread_local mcs_node node;
 };
-#endif
+
+#endif // if (__cplusplus >= 201103L)
 #endif // __MCS_LOCK_H__
