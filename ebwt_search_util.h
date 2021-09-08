@@ -34,7 +34,7 @@ struct QueryMutation {
  * into the spillover list, a non-tail entry in the spillover list, or
  * a tail entry in the spillover list.
  */
-typedef union {
+typedef union PartialAlignment {
 	struct {
 		uint64_t pos0  : 16;   // mismatched pos 1
 		uint64_t pos1  : 16;   // mismatched pos 2
