@@ -100,11 +100,13 @@ OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp bt2_locks.cpp
 
 ifeq (1,$(WITH_QUEUELOCK))
-	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1 -DNO_SPINLOCK
+	NO_SPINLOCK = 1
+	override EXTRA_FLAGS += -DWITH_QUEUELOCK
 endif
 
-ifeq (1, $(NO_SPINLOCK))
-	EXTRA_FLAGS += -DNO_SPINLOCK
+ifeq (1,$(NO_SPINLOCK))
+$(info $(NO_SPINLOCK))
+	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
 ifeq (1,$(WITH_FINE_TIMER))
@@ -215,7 +217,7 @@ DEFS=-fno-strict-aliasing \
      $(MM_DEF) \
      $(SHMEM_DEF)
 
-# ALL_FLAGS = "$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)"
+ALL_FLAGS = $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)\""
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)\""
 

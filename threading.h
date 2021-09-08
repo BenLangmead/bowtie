@@ -82,11 +82,11 @@ class ThreadSafe {
 public:
 
 	ThreadSafe(MUTEX_T *mutex) :
-#if __cplusplus >= 201103L && NO_SPINLOCK && WITH_QUEUELOCK
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
 		node_{},
 #endif
 		mutex_(mutex) {
-#if __cplusplus >= 201103L && NO_SPINLOCK && WITH_QUEUELOCK
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
 		mutex_->lock(node_);
 #else
 		mutex_->lock();
@@ -95,7 +95,7 @@ public:
 	}
 
 	~ThreadSafe() {
-#if __cplusplus >= 201103L && NO_SPINLOCK && WITH_QUEUELOCK
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
 		mutex_->unlock(node_);
 #else
 		mutex_->unlock();
@@ -104,7 +104,7 @@ public:
 
 private:
 
-#if __cplusplus >= 201103L && NO_SPINLOCK && WITH_QUEUELOCK
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
 	MUTEX_T::mcs_node node_;
 #endif
 	MUTEX_T *mutex_;
