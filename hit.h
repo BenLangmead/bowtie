@@ -775,7 +775,6 @@ public:
 			if(paired) {
 				xms /= 2;
 			}
-			xms++;
 			_sink.reportHits(NULL, &_bufferedHits, 0, _bufferedHits.size(),
 			                 threadId_, mapq, xms, true, p);
 			_sink.dumpAlign(p);
