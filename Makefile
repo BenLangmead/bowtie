@@ -76,7 +76,6 @@ ifeq (aarch64,$(shell uname -m))
 endif
 ifeq (1, $(POPCNT_CAPABILITY))
     override EXTRA_FLAGS += -DPOPCNT_CAPABILITY
-    INC += -I third_party
 endif
 
 PREFETCH_LOCALITY = 2
