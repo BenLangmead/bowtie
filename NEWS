@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `LICENSE') and freely
-available to the public for download.  The current version is 1.3.0.
+available to the public for download.  The current version is 1.3.1.
 
 Reporting Issues
 ================
@@ -23,6 +23,18 @@ Keep up with our releases on the GitHub releases page:
 
 Version Release History
 =======================
+Version 1.3.1 - Sep 13, 2021
+
+    * Fixed an overflow issue in `bowtie-build` that would sometimes
+      yield corrupt "large" (64-bit) indexes; the resulting index
+      would sometimes cause `bowtie` to hang. Note: `bowtie2-build`
+      does not have this issue.
+    * Fixed an issue in `bowtie` causing XM:i SAM optional field to
+      sometimes be off by 1 when using the `-m/-M` flags.
+    * Fixed an issue that would sometimes cause deadlocks in `bowtie`
+      when running multithreaded.
+    * Fixed an issue causing build errors when compiling against
+      a pre-C++11 standard.
 
 Version 1.3.0 - Jul 22, 2020
 
