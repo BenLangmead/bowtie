@@ -288,16 +288,21 @@ public:
 				numMaxed += ptNumMaxed_[i];
 			}
 
-			uint64_t tot = numAligned + numUnaligned + numMaxed;
+			uint64_t tot = numAligned + numUnaligned;
+			if (!sampleMax_)
+				tot += numMaxed;
 			double alPct = 0.0, unalPct = 0.0, maxPct = 0.0;
 			if(tot > 0) {
-				alPct   = 100.0 * (double)(numAligned + numMaxed) / (double)tot;
+				if (sampleMax_)
+					alPct   = 100.0 * (double)(numAligned) / (double)tot;
+				else
+					alPct   = 100.0 * (double)(numAligned + numMaxed) / (double)tot;
 				unalPct = 100.0 * (double)numUnaligned / (double)tot;
 				maxPct  = 100.0 * (double)numMaxed / (double)tot;
 			}
 			cerr << "# reads processed: " << tot << endl;
 			cerr << "# reads with at least one alignment: "
-			     << numAligned + numMaxed << " (" << fixed << setprecision(2)
+			     << numAligned + (sampleMax_ ? 0 : numMaxed) << " (" << fixed << setprecision(2)
 			     << alPct << "%)" << endl;
 			cerr << "# reads that failed to align: "
 			     << numUnaligned << " (" << fixed << setprecision(2)
@@ -770,7 +775,6 @@ public:
 			if(paired) {
 				xms /= 2;
 			}
-			xms++;
 			_sink.reportHits(NULL, &_bufferedHits, 0, _bufferedHits.size(),
 			                 threadId_, mapq, xms, true, p);
 			_sink.dumpAlign(p);

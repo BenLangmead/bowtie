@@ -19,13 +19,17 @@
 #ifdef NO_SPINLOCK
 # if (__cplusplus >= 201103L)
 #   ifdef WITH_QUEUELOCK
-        #include "bt2_locks.h"
-#  	define MUTEX_T mcs_lock
+#     include "bt2_locks.h"
+#     define MUTEX_T mcs_lock
 #   else
-#       define MUTEX_T std::mutex
+#     define MUTEX_T std::mutex
 #   endif
 # else
-#   define MUTEX_T tthread::mutex
+#   ifdef WITH_QUEUELOCK
+#     error "QUEUELOCK requires C++11 or newer."
+#   else
+#     define MUTEX_T tthread::mutex
+#   endif
 # endif
 #else
 # if (__cplusplus >= 201103L)
@@ -57,23 +61,55 @@ struct thread_tracking_pair {
 /**
  * Wrap a lock; obtain lock upon construction, release upon destruction.
  */
+// class ThreadSafe {
+// public:
+
+// 	ThreadSafe(MUTEX_T* ptr_mutex) :
+// 		ptr_mutex_(ptr_mutex)
+// 		{
+// 			assert(ptr_mutex_ != NULL);
+// 			ptr_mutex_->lock();
+// 		}
+
+// 	~ThreadSafe() {
+// 		ptr_mutex_->unlock();
+// 	}
+
+// private:
+// 	MUTEX_T *ptr_mutex_;
+// };
 class ThreadSafe {
 public:
 
-	ThreadSafe(MUTEX_T* ptr_mutex) :
-		ptr_mutex_(ptr_mutex)
-		{
-			assert(ptr_mutex_ != NULL);
-			ptr_mutex_->lock();
-		}
+	ThreadSafe(MUTEX_T *mutex) :
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
+		node_{},
+#endif
+		mutex_(mutex) {
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
+		mutex_->lock(node_);
+#else
+		mutex_->lock();
+#endif
+
+	}
 
 	~ThreadSafe() {
-		ptr_mutex_->unlock();
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
+		mutex_->unlock(node_);
+#else
+		mutex_->unlock();
+#endif
 	}
 
 private:
-	MUTEX_T *ptr_mutex_;
+
+#if (__cplusplus >= 201103L && defined(NO_SPINLOCK) && defined(WITH_QUEUELOCK))
+	MUTEX_T::mcs_node node_;
+#endif
+	MUTEX_T *mutex_;
 };
+
 
 #if defined(_TTHREAD_WIN32_)
 #define SLEEP(x) Sleep(x)

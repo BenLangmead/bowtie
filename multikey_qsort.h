@@ -1,6 +1,7 @@
  #ifndef MULTIKEY_QSORT_H_
 #define MULTIKEY_QSORT_H_
 
+#include <algorithm>
 #include <iostream>
 
 #include "alphabet.h"
@@ -292,26 +293,38 @@ bool assertPartitionedSuf2(
 #endif
 
 /**
- * Assert that the seqan::String s of suffix offsets into seqan::String
- * 'host' is a seemingly legitimate suffix-offset list (at this time,
- * we just check that it doesn't list any suffix twice).
+ * Assert that string s of suffix offsets into string 'host' is a seemingly
+ * legitimate suffix-offset list (at this time, we just check that it doesn't
+ * list any suffix twice).
  */
+
 static inline void sanityCheckInputSufs(TIndexOffU *s, size_t slen) {
 	assert_gt(slen, 0);
-	for(size_t i = 0; i < slen; i++) {
-		// Actually, it's convenient to allow the caller to provide
-		// suffix offsets thare are off the end of the host string.
-		// See, e.g., build() in diff_sample.cpp.
-		//assert_lt(s[i], length(host));
-		for(size_t j = i+1; j < slen; j++) {
-			assert_neq(s[i], s[j]);
+	// Try keeping the running time <1min
+        if (slen > 4096) {
+		TIndexOffU *s_copy = new TIndexOffU[slen];
+		assert(s_copy != NULL);
+		std::copy(s, s + slen, s_copy);
+		std::sort(s_copy, s_copy + slen);
+		for (size_t i = 0; i < slen - 1; i++)
+			assert_neq(s_copy[i], s_copy[i + 1]);
+		delete[] s_copy;
+        } else {
+		for(size_t i = 0; i < slen; i++) {
+			// Actually, it's convenient to allow the caller to provide
+			// suffix offsets thare are off the end of the host string.
+			// See, e.g., build() in diff_sample.cpp.
+			//assert_lt(s[i], length(host));
+			for(size_t j = i+1; j < slen; j++) {
+				assert_neq(s[i], s[j]);
+			}
 		}
 	}
 }
 
 /**
- * Assert that the seqan::String s of suffix offsets into seqan::String
- * 'host' really are in lexicographical order up to depth 'upto'.
+ * Assert that the string s of suffix offsets into  'host' really are in
+ * lexicographical order up to depth 'upto'.
  */
 template <typename T>
 void sanityCheckOrderedSufs(const T& host,

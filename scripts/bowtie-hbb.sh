@@ -44,7 +44,17 @@ fi
 # this variant creates static binaries with PIC
 source /hbb_exe_gc_hardened/activate
 
-make bowtie-bin.zip
+mkdir /mybin
+echo  'res=`echo $@ | sed "s/-L.*$//"`; /opt/rh/devtoolset-8/root/usr/bin/ar $res;' > /mybin/ar
+chmod +x /mybin/ar && export PATH=/mybin:$PATH
+
+# make static-libs
+# if [ $? -ne 0 ] ; then
+#     echo "Unable to build tbb and/or zlib static dependencies"
+#     exit 1
+# fi
+
+make bowtie-bin.zip RELEASE_BUILD=1
 if [ $? -ne 0 ] ; then
     echo "Unable to create bowtie package"
     exit 1

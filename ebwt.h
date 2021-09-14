@@ -36,6 +36,7 @@
 #include "threading.h"
 #include "timer.h"
 #include "word_io.h"
+#include "mem_ids.h"
 
 #ifdef POPCNT_CAPABILITY
     #include "processor_support.h"
@@ -206,7 +207,7 @@ public:
 	uint32_t sideSz() const        { return _sideSz; }
 	uint32_t sideBwtSz() const     { return _sideBwtSz; }
 	uint32_t sideBwtLen() const    { return _sideBwtLen; }
-	uint32_t numSidePairs() const  { return _numSidePairs; } /* check */
+	TIndexOffU numSidePairs() const  { return _numSidePairs; } /* check */
 	TIndexOffU numSides() const      { return _numSides; }
 	TIndexOffU numLines() const      { return _numLines; }
 	TIndexOffU ebwtTotLen() const    { return _ebwtTotLen; }
@@ -310,7 +311,7 @@ public:
 	uint32_t _sideSz;
 	uint32_t _sideBwtSz;
 	uint32_t _sideBwtLen;
-	uint32_t _numSidePairs;
+	TIndexOffU _numSidePairs;
 	TIndexOffU _numSides;
 	TIndexOffU _numLines;
 	TIndexOffU _ebwtTotLen;
@@ -754,17 +755,17 @@ public:
 					dcv <<= 1;
 					TIndexOffU sz = (TIndexOffU)DifferenceCoverSample<TStr>::simulateAllocs(s, dcv >> 1);
 					if(nthreads > 1) sz *= (nthreads + 1);
-					AutoArray<uint8_t> tmp(sz);
+					AutoArray<uint8_t> tmp(sz, EBWT_CAT);
 					dcv >>= 1;
 					// Likewise with the KarkkainenBlockwiseSA
 					sz = (TIndexOffU)KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
-					AutoArray<uint8_t> tmp2(sz);
+					AutoArray<uint8_t> tmp2(sz, EBWT_CAT);
 					// Now throw in the 'ftab' and 'isaSample' structures
 					// that we'll eventually allocate in buildToDisk
-					AutoArray<TIndexOffU> ftab(_eh._ftabLen * 2);
+					AutoArray<TIndexOffU> ftab(_eh._ftabLen * 2, EBWT_CAT);
 					AutoArray<uint8_t> side(_eh._sideSz);
 					// Grab another 20 MB out of caution
-					AutoArray<uint32_t> extra(20*1024*1024);
+					AutoArray<uint32_t> extra(20*1024*1024, EBWT_CAT);
 					// If we made it here without throwing bad_alloc, then we
 					// passed the memory-usage stress test
 					VMSG("  Passed!  Constructing with these parameters: --bmax " << bmax << " --dcv " << dcv);
@@ -3996,13 +3997,14 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	assert(sa.suffixItrIsReset());
 	// assert_leq((int)ValueSize<Dna>::VALUE, 4);
 
-	TIndexOffU  len = eh._len;
-	TIndexOffU  ftabLen = eh._ftabLen;
-	TIndexOffU  sideSz = eh._sideSz;
-	TIndexOffU  ebwtTotSz = eh._ebwtTotSz;
-	TIndexOffU  fchr[] = {0, 0, 0, 0, 0};
-	TIndexOffU* ftab = NULL;
-	TIndexOffU  zOff = OFF_MASK;
+	TIndexOffU len = eh._len;
+	TIndexOffU ftabLen = eh._ftabLen;
+	TIndexOffU sideSz = eh._sideSz;
+	TIndexOffU ebwtTotSz = eh._ebwtTotSz;
+	TIndexOffU fchr[] = {0, 0, 0, 0, 0};
+	EList<TIndexOffU> ftab(EBWT_CAT);
+	TIndexOffU zOff = OFF_MASK;
+
 
 	// Save # of occurrences of each character as we walk along the bwt
 	TIndexOffU occ[4] = {0, 0, 0, 0};
@@ -4013,42 +4015,42 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// The absorbed rows represent suffixes shorter than the ftabChars
 	// cutoff.
 	uint8_t absorbCnt = 0;
-	uint8_t *absorbFtab;
+	EList<uint8_t> absorbFtab(EBWT_CAT);
+
 	try {
 		VMSG_NL("Allocating ftab, absorbFtab");
-		ftab = new TIndexOffU[ftabLen];
-		memset(ftab, 0, OFF_SIZE * ftabLen);
-		absorbFtab = new uint8_t[ftabLen];
-		memset(absorbFtab, 0, ftabLen);
+		ftab.resize(ftabLen);
+		ftab.fillZero();
+		absorbFtab.resize(ftabLen);
+		absorbFtab.fillZero();
+
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating ftab[] or absorbFtab[] "
 		     << "in Ebwt::buildToDisk() at " << __FILE__ << ":"
 		     << __LINE__ << endl;
 		throw e;
 	}
-	assert(ftab != NULL);
-	assert(absorbFtab != NULL);
 
 	// Allocate the side buffer; holds a single side as its being
 	// constructed and then written to disk.  Reused across all sides.
 #ifdef SIXTY4_FORMAT
-	uint64_t *ebwtSide = NULL;
+	EList<uint64_t> ebwtSide(EBWT_CAT);
 #else
-	uint8_t *ebwtSide = NULL;
+	EList<uint8_t> ebwtSide(EBWT_CAT);
 #endif
 	try {
 #ifdef SIXTY4_FORMAT
-		ebwtSide = new uint64_t[sideSz >> 3];
+		ebwtSide.resize(sideSz >> 3);
 #else
-		ebwtSide = new uint8_t[sideSz];
+		ebwtSide.resize(sideSz);
 #endif
+
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating ebwtSide[] in "
 		     << "Ebwt::buildToDisk() at " << __FILE__ << ":"
 		     << __LINE__ << endl;
 		throw e;
 	}
-	assert(ebwtSide != NULL);
 
 	// Allocate a buffer to hold the ISA sample, which we accumulate in
 	// the loop and then output at the end.  We can't write output the
@@ -4244,7 +4246,7 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			// Write 'G' and 'T'
 			assert_leq(occSave[0], occ[2]);
 			assert_leq(occSave[1], occ[3]);
-			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide);
+			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide.ptr());
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
 #ifdef BOWTIE_64BIT_INDEX
@@ -4255,14 +4257,14 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occSave[1], this->toBe());
 #endif
 			// Write forward side to primary file
-			out1.write((const char *)ebwtSide, sideSz);
+			out1.write((const char *)ebwtSide.ptr(), sideSz);
 		} else if (sideCur == -1) {
 			// Backward side boundary
 			assert_eq(0, si % eh._sideBwtLen);
 			sideCur = 0;
 			assert(!fw); fw = true;
 			// Write 'A' and 'C'
-			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide);
+			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide.ptr());
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
 #ifdef BOWTIE_64BIT_INDEX
@@ -4275,11 +4277,10 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			occSave[0] = occ[2]; // save 'G' count
 			occSave[1] = occ[3]; // save 'T' count
 			// Write backward side to primary file
-			out1.write((const char *)ebwtSide, sideSz);
+			out1.write((const char *)ebwtSide.ptr(), sideSz);
 		}
 	}
 	VMSG_NL("Exited Ebwt loop");
-	assert(ftab != NULL);
 	assert_neq(zOff, OFF_MASK);
 	if(absorbCnt > 0) {
 		// Absorb any trailing, as-yet-unabsorbed short suffixes into
@@ -4331,20 +4332,20 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	}
 	assert_leq(eftabLen, (TIndexOffU)eh._ftabChars*2);
 	eftabLen = eh._ftabChars*2;
-	TIndexOffU *eftab = NULL;
+	EList<TIndexOffU> eftab(EBWT_CAT);
 	try {
-		eftab = new TIndexOffU[eftabLen];
-		memset(eftab, 0, OFF_SIZE * eftabLen);
+		eftab.resize(eftabLen);
+		eftab.fillZero();
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating eftab[] "
 		     << "in Ebwt::buildToDisk() at " << __FILE__ << ":"
 		     << __LINE__ << endl;
 		throw e;
 	}
-	assert(eftab != NULL);
+
 	TIndexOffU eftabCur = 0;
 	for(TIndexOffU i = 1; i < ftabLen; i++) {
-		TIndexOffU lo = ftab[i] + Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, i-1);
+		TIndexOffU lo = ftab[i] + Ebwt::ftabHi(ftab.ptr(), eftab.ptr(), len, ftabLen, eftabLen, i-1);
 		if(absorbFtab[i] > 0) {
 			// Skip a number of short pattern indicated by absorbFtab[i]
 			TIndexOffU hi = lo + absorbFtab[i];
@@ -4352,13 +4353,13 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			eftab[eftabCur*2] = lo;
 			eftab[eftabCur*2+1] = hi;
 			ftab[i] = (eftabCur++) ^ OFF_MASK; // insert pointer into eftab
-			assert_eq(lo, Ebwt::ftabLo(ftab, eftab, len, ftabLen, eftabLen, i));
-			assert_eq(hi, Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, i));
+			assert_eq(lo, Ebwt::ftabLo(ftab.ptr(), eftab.ptr(), len, ftabLen, eftabLen, i));
+			assert_eq(hi, Ebwt::ftabHi(ftab.ptr(), eftab.ptr(), len, ftabLen, eftabLen, i));
 		} else {
 			ftab[i] = lo;
 		}
 	}
-	assert_eq(Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, ftabLen-1), len+1);
+	assert_eq(Ebwt::ftabHi(ftab.ptr(), eftab.ptr(), len, ftabLen, eftabLen, ftabLen-1), len+1);
 	// Write ftab to primary file
 	for(TIndexOffU i = 0; i < ftabLen; i++) {
 		writeU<TIndexOffU>(out1, ftab[i], this->toBe());
@@ -4379,9 +4380,6 @@ void Ebwt::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		}
 		delete[] isaSample;
 	}
-	delete[] ftab;
-	delete[] eftab;
-	delete[] absorbFtab;
 
 	// Note: if you'd like to sanity-check the Ebwt, you'll have to
 	// read it back into memory first!
