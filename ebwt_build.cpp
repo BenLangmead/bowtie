@@ -475,7 +475,7 @@ static void driver(const string& infile,
 		}
 		if(verbose) {
 			if(s2.length() < 1000) {
-				cout << "Passed restore check: " << s2.toZBuf() << endl;
+				cout << "Passed restore check: " << s2.toZBufXForm("ACGTN") << endl;
 			} else {
 				cout << "Passed restore check: (" << s2.length() << " chars)" << endl;
 			}

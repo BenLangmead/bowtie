@@ -842,7 +842,7 @@ public:
 		assert(printcs != NULL);
 		for(size_t i = 0; i < len_; i++) {
 			assert_lt(cs_[i], (int)xformElts);
-			printcs[i] = xform[cs_[i]];
+			printcs[i] = xform[(int)cs_[i]];
 		}
 		printcs[len_] = 0;
 		return printcs_;
