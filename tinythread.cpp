@@ -21,6 +21,8 @@ freely, subject to the following restrictions:
     distribution.
 */
 
+#if (__cplusplus < 201103L)
+
 #include <exception>
 #include "tinythread.h"
 
@@ -301,3 +303,5 @@ thread::id this_thread::get_id()
 }
 
 }
+
+#endif
