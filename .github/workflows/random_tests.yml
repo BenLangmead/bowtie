@@ -42,7 +42,7 @@ jobs:
       - name: Run random tests
         run: |
           make allall
-          make random-test
+          make random-test 2500
   macos:
     runs-on: macos-latest
     steps:
@@ -50,4 +50,4 @@ jobs:
       - name: Run random tests
         run: |
           make allall
-          make random-test
+          make random-test 2500
