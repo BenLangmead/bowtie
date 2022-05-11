@@ -74,6 +74,9 @@ POPCNT_CAPABILITY ?= 1
 ifeq (aarch64,$(shell uname -m))
 	POPCNT_CAPABILITY=0
 endif
+ifeq (arm64,$(shell uname -m))
+	POPCNT_CAPABILITY=0
+endif
 ifeq (1, $(POPCNT_CAPABILITY))
     override EXTRA_FLAGS += -DPOPCNT_CAPABILITY
 endif
