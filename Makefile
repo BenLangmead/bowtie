@@ -328,7 +328,7 @@ bowtie-inspect-s: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(ALL_FLAGS) \
 		$(DEFS) $(WARNING_FLAGS) \
-		$(INC) -I . \
+		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) \
 		$(LIBS)
@@ -337,7 +337,7 @@ bowtie-inspect-l: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -DBOWTIE_64BIT_INDEX $(WARNING_FLAGS) \
-		$(INC) -I . \
+		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) \
 		$(LIBS)
@@ -346,7 +346,7 @@ bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) $(WARNING_FLAGS) \
-		$(INC) -I . \
+		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) \
 		$(LIBS)
@@ -355,7 +355,7 @@ bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -DBOWTIE_64BIT_INDEX $(WARNING_FLAGS) \
-		$(INC) -I . \
+		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) \
 		$(LIBS)
